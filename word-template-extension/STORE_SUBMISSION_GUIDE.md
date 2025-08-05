@@ -82,10 +82,10 @@ word template, data extraction, document automation, productivity, office automa
 https://github.com/your-repo/word-template-extension/privacy
 
 ### Support Email
-support@yourcompany.com
+abeperl@gmail.com
 
 ### Website URL  
-https://github.com/your-repo/word-template-extension
+https://github.com/abeperl/BrowserExtensions
 
 ### Screenshots Required
 1. Extension popup showing data extraction interface (1280x800)
