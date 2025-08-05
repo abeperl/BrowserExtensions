@@ -1,0 +1,9 @@
+﻿{
+    "name":  "com.wordtemplateextension.nativehost",
+    "description":  "Word Template Extension Native Messaging Host",
+    "path":  "C:\\\\Users\\\\User\\\\source\\\\repos\\\\BrowserExtensions\\\\word-template-extension\\\\native-host\\\\word_updater_launcher.bat",
+    "type":  "stdio",
+    "allowed_origins":  [
+                            "chrome-extension://kppgbdkcdnlijlaijpmdmphlohlpejca/"
+                        ]
+}

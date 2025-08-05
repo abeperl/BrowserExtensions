@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Scan Overlay Extension - Settings</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="settings-page">
+  <div class="settings-container">
+    <header class="settings-header">
+      <h1>Scan Overlay Extension Settings</h1>
+    </header>
+
+    <div class="settings-content">
+      <!-- XPath Configuration -->
+      <section class="settings-section">
+        <h2>Field Selectors</h2>
+        <p class="section-description">Configure CSS selectors for scan input fields</p>
+        
+        <div class="input-group">
+          <label for="itemIdSelector">Item ID Selector:</label>
+          <input type="text" id="itemIdSelector" placeholder="#product-scan" class="selector-input">
+          <span class="input-help">CSS selector for the item ID input field</span>
+        </div>
+        
+        <div class="input-group">
+          <label for="statusIdSelector">Status ID Selector:</label>
+          <input type="text" id="statusIdSelector" placeholder="#status-scan" class="selector-input">
+          <span class="input-help">CSS selector for the status ID input field</span>
+        </div>
+
+        <div class="input-group">
+          <label for="apiUrlPattern">API URL Pattern:</label>
+          <input type="text" id="apiUrlPattern" placeholder="/api/scan" class="selector-input">
+          <span class="input-help">URL pattern to intercept for API calls</span>
+        </div>
+
+        <button type="button" id="testSelectors" class="btn btn-secondary">Test Selectors</button>
+        <div id="selectorTestResult" class="test-result"></div>
+      </section>
+
+      <!-- Overlay Settings -->
+      <section class="settings-section">
+        <h2>Overlay Display</h2>
+        <p class="section-description">Customize overlay appearance and behavior</p>
+        
+        <div class="input-group">
+          <label for="overlayDuration">Overlay Duration (ms):</label>
+          <input type="number" id="overlayDuration" min="500" max="10000" step="100" value="2000">
+          <span class="input-help">How long overlays stay visible (except errors)</span>
+        </div>
+        
+        <div class="input-group">
+          <label for="colorScheme">Color Scheme:</label>
+          <select id="colorScheme">
+            <option value="default">Default</option>
+            <option value="high-contrast">High Contrast</option>
+            <option value="dark">Dark Mode</option>
+          </select>
+        </div>
+
+        <div class="input-group">
+          <label for="overlayPosition">Overlay Position:</label>
+          <select id="overlayPosition">
+            <option value="center">Center</option>
+            <option value="top">Top</option>
+            <option value="bottom">Bottom</option>
+          </select>
+        </div>
+      </section>
+
+      <!-- Audio Settings -->
+      <section class="settings-section">
+        <h2>Audio Feedback</h2>
+        <p class="section-description">Configure sound notifications</p>
+        
+        <div class="checkbox-group">
+          <label class="checkbox-label">
+            <input type="checkbox" id="audioEnabled" checked>
+            <span class="checkmark"></span>
+            Enable Audio Feedback
+          </label>
+        </div>
+
+        <div class="input-group">
+          <label for="audioVolume">Volume:</label>
+          <input type="range" id="audioVolume" min="0" max="100" value="50" class="volume-slider">
+          <span class="volume-display">50%</span>
+        </div>
+
+        <div class="audio-test-buttons">
+          <button type="button" class="btn btn-small" data-audio="scan">Test Scan</button>
+          <button type="button" class="btn btn-small" data-audio="success">Test Success</button>
+          <button type="button" class="btn btn-small" data-audio="error">Test Error</button>
+          <button type="button" class="btn btn-small" data-audio="warning">Test Warning</button>
+        </div>
+      </section>
+
+      <!-- Keyboard Shortcuts -->
+      <section class="settings-section">
+        <h2>Keyboard Shortcuts</h2>
+        <p class="section-description">Customize keyboard controls</p>
+        
+        <div class="input-group">
+          <label for="dismissKey">Dismiss Overlay Key:</label>
+          <select id="dismissKey">
+            <option value="Escape">Escape</option>
+            <option value="Enter">Enter</option>
+            <option value="Space">Space</option>
+            <option value="Tab">Tab</option>
+          </select>
+        </div>
+
+        <div class="checkbox-group">
+          <label class="checkbox-label">
+            <input type="checkbox" id="autoFocusAfterScan">
+            <span class="checkmark"></span>
+            Auto-focus first field after scan
+          </label>
+        </div>
+      </section>
+
+      <!-- Advanced Settings -->
+      <section class="settings-section">
+        <h2>Advanced Settings</h2>
+        <p class="section-description">Advanced configuration options</p>
+        
+        <div class="checkbox-group">
+          <label class="checkbox-label">
+            <input type="checkbox" id="debugMode">
+            <span class="checkmark"></span>
+            Enable Debug Mode (console logging)
+          </label>
+        </div>
+
+        <div class="input-group">
+          <label for="maxHistoryEntries">Max History Entries:</label>
+          <input type="number" id="maxHistoryEntries" min="10" max="1000" value="100">
+          <span class="input-help">Maximum number of scan history entries to keep</span>
+        </div>
+
+        <div class="checkbox-group">
+          <label class="checkbox-label">
+            <input type="checkbox" id="interceptFormSubmit">
+            <span class="checkmark"></span>
+            Intercept form submissions
+          </label>
+        </div>
+      </section>
+    </div>
+
+    <footer class="settings-footer">
+      <div class="button-group">
+        <button type="button" id="resetSettings" class="btn btn-danger">Reset to Defaults</button>
+        <button type="button" id="exportSettings" class="btn btn-secondary">Export Settings</button>
+        <button type="button" id="importSettings" class="btn btn-secondary">Import Settings</button>
+        <button type="button" id="saveSettings" class="btn btn-primary">Save Settings</button>
+      </div>
+      <div id="saveStatus" class="save-status"></div>
+    </footer>
+  </div>
+
+  <input type="file" id="importFile" accept=".json" style="display: none;">
+  <script src="settings.js"></script>
+</body>
+</html>

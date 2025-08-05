@@ -1,0 +1,9 @@
+Test Template
+
+Order ID: {{ORDERID}}
+Product Name: {{PNAME}}
+Product ID: {{PRODUCTID}}
+Selected Text: {{SELECTEDTEXT}}
+Date: {{EXTRACTIONDATE}}
+
+This is a test template for the Word Template Extension.

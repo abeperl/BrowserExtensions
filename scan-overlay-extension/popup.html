@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Scan Overlay Extension</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="popup-container">
+    <!-- Header -->
+    <header class="popup-header">
+      <div class="header-content">
+        <img src="icons/icon32.png" alt="Scan Overlay" class="header-icon">
+        <h1>Scan Overlay</h1>
+      </div>
+      <div class="header-actions">
+        <button id="settingsBtn" class="icon-btn" title="Settings">
+          <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+            <path d="M8 4.754a3.246 3.246 0 1 0 0 6.492 3.246 3.246 0 0 0 0-6.492zM5.754 8a2.246 2.246 0 1 1 4.492 0 2.246 2.246 0 0 1-4.492 0z"/>
+            <path d="M9.796 1.343c-.527-1.79-3.065-1.79-3.592 0l-.094.319a.873.873 0 0 1-1.255.52l-.292-.16c-1.64-.892-3.433.902-2.54 2.541l.159.292a.873.873 0 0 1-.52 1.255l-.319.094c-1.79.527-1.79 3.065 0 3.592l.319.094a.873.873 0 0 1 .52 1.255l-.16.292c-.892 1.64.901 3.434 2.541 2.54l.292-.159a.873.873 0 0 1 1.255.52l.094.319c.527 1.79 3.065 1.79 3.592 0l.094-.319a.873.873 0 0 1 1.255-.52l.292.16c1.64.893 3.434-.902 2.54-2.541l-.159-.292a.873.873 0 0 1 .52-1.255l.319-.094c1.79-.527 1.79-3.065 0-3.592l-.319-.094a.873.873 0 0 1-.52-1.255l.16-.292c.893-1.64-.902-3.433-2.541-2.54l-.292.159a.873.873 0 0 1-1.255-.52l-.094-.319zm-2.633.283c.246-.835 1.428-.835 1.674 0l.094.319a1.873 1.873 0 0 0 2.693 1.115l.291-.16c.764-.415 1.6.42 1.184 1.185l-.159.292a1.873 1.873 0 0 0 1.116 2.692l.318.094c.835.246.835 1.428 0 1.674l-.319.094a1.873 1.873 0 0 0-1.115 2.693l.16.291c.415.764-.42 1.6-1.185 1.184l-.291-.159a1.873 1.873 0 0 0-2.693 1.116l-.094.318c-.246.835-1.428.835-1.674 0l-.094-.319a1.873 1.873 0 0 0-2.692-1.115l-.292.16c-.764.415-1.6-.42-1.184-1.185l.159-.291A1.873 1.873 0 0 0 1.945 8.93l-.319-.094c-.835-.246-.835-1.428 0-1.674l.319-.094A1.873 1.873 0 0 0 3.06 4.377l-.16-.292c-.415-.764.42-1.6 1.185-1.184l.292.159a1.873 1.873 0 0 0 2.692-1.115l.094-.319z"/>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Status Section -->
+    <section class="status-section">
+      <div class="status-indicator">
+        <div id="connectionStatus" class="status-dot"></div>
+        <span id="statusText">Ready</span>
+      </div>
+      <div class="scan-counter">
+        <span>Session Scans: </span>
+        <strong id="scanCount">0</strong>
+      </div>
+    </section>
+
+    <!-- Quick Settings -->
+    <section class="quick-settings">
+      <div class="setting-row">
+        <label class="toggle-switch">
+          <input type="checkbox" id="quickAudioToggle" checked>
+          <span class="slider"></span>
+        </label>
+        <span class="setting-label">Audio Feedback</span>
+      </div>
+      
+      <div class="setting-row">
+        <label class="toggle-switch">
+          <input type="checkbox" id="quickOverlayToggle" checked>
+          <span class="slider"></span>
+        </label>
+        <span class="setting-label">Overlay Display</span>
+      </div>
+    </section>
+
+    <!-- Current Field Status -->
+    <section class="field-status">
+      <h3>Field Detection</h3>
+      <div class="field-info">
+        <div class="field-item">
+          <span class="field-label">Item ID Field:</span>
+          <span id="itemFieldStatus" class="field-status-indicator">Not detected</span>
+        </div>
+        <div class="field-item">
+          <span class="field-label">Status ID Field:</span>
+          <span id="statusFieldStatus" class="field-status-indicator">Not detected</span>
+        </div>
+      </div>
+      <button id="detectFieldsBtn" class="btn btn-secondary btn-small">Detect Fields</button>
+    </section>
+
+    <!-- Scan History -->
+    <section class="history-section">
+      <div class="section-header">
+        <h3>Recent Scans</h3>
+        <button id="clearHistoryBtn" class="btn btn-link btn-small">Clear</button>
+      </div>
+      <div id="history-list" class="history-list">
+        <div class="no-history">No scans in this session</div>
+      </div>
+    </section>
+
+    <!-- Actions -->
+    <section class="actions-section">
+      <div class="action-buttons">
+        <button id="testOverlayBtn" class="btn btn-secondary">Test Overlay</button>
+        <button id="fullSettingsBtn" class="btn btn-primary">Settings</button>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="popup-footer">
+      <div class="version-info">v1.0.0</div>
+    </footer>
+  </div>
+
+  <script src="popup.js"></script>
+  <script src="history.js"></script>
+</body>
+</html>

@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Word Template Extension - Store Screenshots</title>
+  <link rel="stylesheet" href="../extension/modern-styles.css">
+  <style>
+    .demo-screen {
+      width: 1280px;
+      height: 800px;
+      background: linear-gradient(135deg, #E7F3FF 0%, #F5F5F5 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+      margin: 20px 0;
+      border-radius: 12px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+    }
+    
+    .demo-screen::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: url('data:image/svg+xml;utf8,<svg width="60" height="60" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg"><g fill="none" fill-rule="evenodd"><g fill="%232B579A" fill-opacity="0.03"><circle cx="30" cy="30" r="2"/></g></svg>') repeat;
+      pointer-events: none;
+    }
+    
+    .popup-demo {
+      width: 380px;
+      position: relative;
+      z-index: 2;
+      box-shadow: 0 25px 50px rgba(0,0,0,0.15);
+    }
+    
+    .browser-window {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+      overflow: hidden;
+      width: 900px;
+      height: 600px;
+      position: absolute;
+      right: -200px;
+      top: 50%;
+      transform: translateY(-50%);
+      opacity: 0.3;
+    }
+    
+    .browser-header {
+      height: 40px;
+      background: #f5f5f5;
+      border-bottom: 1px solid #ddd;
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+      gap: 8px;
+    }
+    
+    .browser-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+    }
+    
+    .browser-dot.red { background: #ff5f56; }
+    .browser-dot.yellow { background: #ffbd2e; }
+    .browser-dot.green { background: #27ca3f; }
+    
+    .feature-highlight {
+      position: absolute;
+      top: 50px;
+      left: 50px;
+      background: white;
+      padding: 24px;
+      border-radius: 12px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+      max-width: 300px;
+      z-index: 3;
+    }
+    
+    .demo-title {
+      font-size: 2.5rem;
+      font-weight: 700;
+      color: var(--word-blue);
+      text-align: center;
+      margin-bottom: 1rem;
+      text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .demo-subtitle {
+      font-size: 1.2rem;
+      color: var(--gray-600);
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+  </style>
+</head>
+<body>
+  <!-- Main Feature Screenshot -->
+  <div class="demo-screen">
+    <div class="feature-highlight">
+      <h3 style="color: var(--word-blue); margin-bottom: 16px; display: flex; align-items: center; gap: 8px;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+        </svg>
+        Smart Data Extraction
+      </h3>
+      <p style="font-size: 0.9rem; color: var(--gray-600); margin-bottom: 12px;">Automatically extracts:</p>
+      <ul style="font-size: 0.85rem; color: var(--gray-700); margin: 0; padding-left: 20px;">
+        <li>📧 Email addresses</li>
+        <li>📞 Phone numbers</li>
+        <li>📅 Dates & times</li>
+        <li>💰 Currency amounts</li>
+        <li>🏷️ Custom patterns</li>
+      </ul>
+    </div>
+    
+    <div class="popup-demo">
+      <div class="popup-container">
+        <div class="popup-header">
+          <div class="header-icon">
+            <div class="word-logo word-logo-large"></div>
+            <div>
+              <h1 class="mb-0">Word Template Extension</h1>
+              <p class="text-small mb-0" style="color: rgba(255,255,255,0.9);">Transform web data into professional documents</p>
+            </div>
+          </div>
+        </div>
+        
+        <div class="popup-content">
+          <div class="popup-section">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-sm">
+                <div class="status-dot success"></div>
+                <span class="text-small">Connected to native host</span>
+              </div>
+            </div>
+          </div>
+          
+          <div class="popup-section">
+            <div class="grid grid-cols-3 gap-sm">
+              <div class="card p-sm" style="text-align: center;">
+                <div class="text-small text-muted">Templates</div>
+                <div style="font-weight: 600; color: var(--word-blue);">5</div>
+              </div>
+              <div class="card p-sm" style="text-align: center;">
+                <div class="text-small text-muted">Extracted</div>
+                <div style="font-weight: 600; color: var(--word-success);">12</div>
+              </div>
+              <div class="card p-sm" style="text-align: center;">
+                <div class="text-small text-muted">Generated</div>
+                <div style="font-weight: 600; color: var(--word-accent);">3</div>
+              </div>
+            </div>
+          </div>
+          
+          <div class="popup-section">
+            <h3 class="mb-md flex items-center gap-sm">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="var(--word-success)">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+              </svg>
+              Extracted Data
+            </h3>
+            <div class="form-control" style="min-height: 80px; font-family: var(--font-family-mono); font-size: 0.75rem; background: var(--gray-100);">
+EMAIL: john.doe@company.com
+PHONE: +1 (555) 123-4567
+DATE: 2024-08-05
+AMOUNT: $1,299.99
+COMPANY: Tech Solutions Inc.
+ADDRESS: 123 Business Ave, Suite 100
+            </div>
+          </div>
+          
+          <div class="popup-section">
+            <div class="flex gap-sm">
+              <button class="btn btn-primary flex-1">
+                <div class="word-logo" style="width: 16px; height: 16px; font-size: 10px;"></div>
+                Generate Document
+              </button>
+              <button class="btn btn-secondary">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="browser-window">
+      <div class="browser-header">
+        <div class="browser-dot red"></div>
+        <div class="browser-dot yellow"></div>
+        <div class="browser-dot green"></div>
+      </div>
+      <div style="padding: 40px; height: calc(100% - 40px); background: white;">
+        <h2 style="color: var(--gray-800);">Sample Business Website</h2>
+        <p style="color: var(--gray-600);">Contact us at john.doe@company.com or call +1 (555) 123-4567</p>
+        <div style="background: var(--gray-100); padding: 20px; border-radius: 8px; margin: 20px 0;">
+          <strong>Premium Package: $1,299.99</strong><br>
+          Available until 2024-08-05
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Welcome Screen Screenshot -->
+  <div class="demo-screen">
+    <div style="width: 100%; height: 100%; position: relative; z-index: 2;">
+      <div class="demo-title">Welcome to Word Template Extension</div>
+      <div class="demo-subtitle">Transform web data into professional Word documents instantly</div>
+      
+      <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 40px; max-width: 1000px; margin: 0 auto;">
+        <div class="card" style="margin-bottom: 0;">
+          <div class="card-header">
+            <h3 class="card-title">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="var(--word-blue)">
+                <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+              </svg>
+              Smart Data Extraction
+            </h3>
+            <p class="card-description">Automatically detect and extract emails, phone numbers, dates, currency amounts, and more from any webpage with intelligent pattern recognition.</p>
+          </div>
+        </div>
+        
+        <div class="card" style="margin-bottom: 0;">
+          <div class="card-header">
+            <h3 class="card-title">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="var(--word-success)">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z"/>
+                <polyline points="14,2 14,8 20,8"/>
+              </svg>
+              Template Processing
+            </h3>
+            <p class="card-description">Use your own Word templates with placeholder variables like {{EMAIL}}, {{PHONE}}, {{DATE}} that get automatically populated with extracted data.</p>
+          </div>
+        </div>
+        
+        <div class="card" style="margin-bottom: 0;">
+          <div class="card-header">
+            <h3 class="card-title">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="var(--word-accent)">
+                <path d="M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/>
+              </svg>
+              One-Click Generation
+            </h3>
+            <p class="card-description">Generate professional documents instantly with a single click. No manual copy-pasting required - just extract, select template, and generate!</p>
+          </div>
+        </div>
+        
+        <div class="card" style="margin-bottom: 0;">
+          <div class="card-header">
+            <h3 class="card-title">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="var(--word-warning)">
+                <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/>
+              </svg>
+              Privacy First
+            </h3>
+            <p class="card-description">All processing happens locally on your computer using native messaging. Your data never leaves your machine, ensuring complete privacy and security.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Settings Screen Screenshot -->
+  <div class="demo-screen">
+    <div style="width: 100%; padding: 40px; position: relative; z-index: 2;">
+      <div class="demo-title" style="font-size: 2rem; margin-bottom: 2rem;">Powerful Configuration Options</div>
+      
+      <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 30px; max-width: 1100px; margin: 0 auto;">
+        <div class="card" style="margin-bottom: 0;">
+          <div class="card-header">
+            <h3 class="card-title">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="var(--word-blue)">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z"/>
+              </svg>
+              Template Configuration
+            </h3>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Default Template</label>
+            <select class="form-control">
+              <option>Business Letter Template</option>
+              <option>Invoice Template</option>
+              <option>Contact Form Template</option>
+            </select>
+          </div>
+        </div>
+        
+        <div class="card" style="margin-bottom: 0;">
+          <div class="card-header">
+            <h3 class="card-title">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="var(--word-success)">
+                <path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4z"/>
+              </svg>
+              Document Generation
+            </h3>
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px;">
+            <label class="flex items-center gap-sm">
+              <div class="toggle-switch">
+                <input type="checkbox" checked>
+                <span class="toggle-slider"></span>
+              </div>
+              <span class="form-label mb-0">Auto-open documents</span>
+            </label>
+            <label class="flex items-center gap-sm">
+              <div class="toggle-switch">
+                <input type="checkbox" checked>
+                <span class="toggle-slider"></span>
+              </div>
+              <span class="form-label mb-0">Include metadata</span>
+            </label>
+          </div>
+        </div>
+        
+        <div class="card" style="margin-bottom: 0;">
+          <div class="card-header">
+            <h3 class="card-title">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="var(--word-accent)">
+                <path d="M9 3V1h6v2h5v2h-2v16c0 1.1-.9 2-2 2H8c-1.1 0-2-.9-2-2V5H4V3h5z"/>
+              </svg>
+              Data Extraction
+            </h3>
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;">
+            <label class="flex items-center gap-xs">
+              <div class="toggle-switch" style="transform: scale(0.8);">
+                <input type="checkbox" checked>
+                <span class="toggle-slider"></span>
+              </div>
+              <span style="font-size: 0.8rem;">Extract emails</span>
+            </label>
+            <label class="flex items-center gap-xs">
+              <div class="toggle-switch" style="transform: scale(0.8);">
+                <input type="checkbox" checked>
+                <span class="toggle-slider"></span>
+              </div>
+              <span style="font-size: 0.8rem;">Extract phones</span>
+            </label>
+            <label class="flex items-center gap-xs">
+              <div class="toggle-switch" style="transform: scale(0.8);">
+                <input type="checkbox" checked>
+                <span class="toggle-slider"></span>
+              </div>
+              <span style="font-size: 0.8rem;">Extract currency</span>
+            </label>
+            <label class="flex items-center gap-xs">
+              <div class="toggle-switch" style="transform: scale(0.8);">
+                <input type="checkbox" checked>
+                <span class="toggle-slider"></span>
+              </div>
+              <span style="font-size: 0.8rem;">Extract dates</span>
+            </label>
+          </div>
+        </div>
+        
+        <div class="card" style="margin-bottom: 0;">
+          <div class="card-header">
+            <h3 class="card-title">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="var(--word-warning)">
+                <path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.89 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6z"/>
+              </svg>
+              Custom Patterns
+            </h3>
+          </div>
+          <textarea class="form-control" rows="3" placeholder="productIds:/PRD-\d{4,6}/g&#10;orderNumbers:/ORD[A-Z0-9]{8}/gi" style="font-family: var(--font-family-mono); font-size: 0.75rem;"></textarea>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

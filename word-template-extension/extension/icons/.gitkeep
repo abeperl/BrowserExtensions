@@ -1,0 +1,11 @@
+# Icons Directory
+
+This directory is reserved for extension icons.
+
+Required icon sizes for Chrome/Edge extensions:
+- icon16.png (16x16 pixels) - Used in the extension management page
+- icon32.png (32x32 pixels) - Used in the extension management page
+- icon48.png (48x48 pixels) - Used in the extension management page
+- icon128.png (128x128 pixels) - Used during installation and in the Chrome Web Store
+
+Icons should be in PNG format and follow the extension's visual design.

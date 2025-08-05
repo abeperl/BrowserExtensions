@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audio Generator for Scan Overlay Extension</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .description {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            border-left: 4px solid #2196f3;
+        }
+        .audio-generator {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .audio-generator h3 {
+            margin-top: 0;
+            color: #555;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 14px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+        .controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin: 10px 0;
+        }
+        .controls label {
+            font-weight: bold;
+            min-width: 80px;
+        }
+        .controls input, .controls select {
+            padding: 5px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+        }
+        .status {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .instructions {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 4px;
+            padding: 15px;
+            margin-top: 20px;
+        }
+        .generated-files {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔊 Audio Generator for Scan Overlay Extension</h1>
+        
+        <div class="description">
+            <p><strong>Purpose:</strong> This tool generates audio files for the Scan Overlay Extension's feedback system.</p>
+            <p>The extension uses different audio cues to provide immediate feedback during scanning operations.</p>
+        </div>
+
+        <!-- Scan Sound -->
+        <div class="audio-generator">
+            <h3>📱 Scan Sound (scan.mp3)</h3>
+            <p>Quick beep when an item is scanned</p>
+            <div class="controls">
+                <label>Frequency:</label>
+                <input type="range" id="scanFreq" min="200" max="2000" value="800">
+                <span id="scanFreqValue">800 Hz</span>
+            </div>
+            <div class="controls">
+                <label>Duration:</label>
+                <input type="range" id="scanDuration" min="50" max="500" value="150">
+                <span id="scanDurationValue">150 ms</span>
+            </div>
+            <button onclick="generateScanSound()">Generate & Test</button>
+            <button onclick="downloadSound('scan')">Download scan.mp3</button>
+            <div id="scanStatus" class="status" style="display: none;"></div>
+        </div>
+
+        <!-- Success Sound -->
+        <div class="audio-generator">
+            <h3>✅ Success Sound (taskCompleted.mp3)</h3>
+            <p>Positive tone when a task completes successfully</p>
+            <div class="controls">
+                <label>Type:</label>
+                <select id="successType">
+                    <option value="chord">Rising Chord</option>
+                    <option value="ding">Single Ding</option>
+                    <option value="chime">Two-Tone Chime</option>
+                </select>
+            </div>
+            <button onclick="generateSuccessSound()">Generate & Test</button>
+            <button onclick="downloadSound('success')">Download taskCompleted.mp3</button>
+            <div id="successStatus" class="status" style="display: none;"></div>
+        </div>
+
+        <!-- Error Sound -->
+        <div class="audio-generator">
+            <h3>❌ Error Sound (error.mp3)</h3>
+            <p>Alert tone for errors or failures</p>
+            <div class="controls">
+                <label>Type:</label>
+                <select id="errorType">
+                    <option value="buzz">Buzz</option>
+                    <option value="descending">Descending Tone</option>
+                    <option value="double-beep">Double Beep</option>
+                </select>
+            </div>
+            <button onclick="generateErrorSound()">Generate & Test</button>
+            <button onclick="downloadSound('error')">Download error.mp3</button>
+            <div id="errorStatus" class="status" style="display: none;"></div>
+        </div>
+
+        <!-- Warning Sound -->  
+        <div class="audio-generator">
+            <h3>⚠️ Warning Sound (warning.mp3)</h3>
+            <p>Caution tone for warnings or confirmations</p>
+            <div class="controls">
+                <label>Pattern:</label>
+                <select id="warningPattern">
+                    <option value="pulse">Pulsing Tone</option>
+                    <option value="triple">Triple Beep</option>
+                    <option value="warble">Warble</option>
+                </select>
+            </div>
+            <button onclick="generateWarningSound()">Generate & Test</button>
+            <button onclick="downloadSound('warning')">Download warning.mp3</button>
+            <div id="warningStatus" class="status" style="display: none;"></div>
+        </div>
+
+        <div class="instructions">
+            <h3>📝 Instructions:</h3>
+            <ol>
+                <li>Click "Generate & Test" for each sound to preview it</li>
+                <li>Adjust the settings until you're happy with each sound</li>
+                <li>Click "Download" to save each audio file</li>
+                <li>Move the downloaded files to the <code>audio/</code> folder in your extension</li>
+                <li>Replace the existing files if they exist</li>
+            </ol>
+        </div>
+
+        <div class="generated-files">
+            <h3>📁 Required Files:</h3>
+            <ul>
+                <li><strong>scan.mp3</strong> - Quick scanning feedback</li>
+                <li><strong>taskCompleted.mp3</strong> - Success confirmation</li>
+                <li><strong>error.mp3</strong> - Error alert</li>
+                <li><strong>warning.mp3</strong> - Warning/caution tone</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        // Audio context for generating sounds
+        let audioContext;
+        let generatedAudio = {};
+
+        // Initialize audio context
+        function initAudioContext() {
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            return audioContext;
+        }
+
+        // Update frequency display
+        document.getElementById('scanFreq').addEventListener('input', function() {
+            document.getElementById('scanFreqValue').textContent = this.value + ' Hz';
+        });
+
+        document.getElementById('scanDuration').addEventListener('input', function() {
+            document.getElementById('scanDurationValue').textContent = this.value + ' ms';
+        });
+
+        // Generate scan sound
+        function generateScanSound() {
+            const freq = parseInt(document.getElementById('scanFreq').value);
+            const duration = parseInt(document.getElementById('scanDuration').value) / 1000;
+            
+            const audioBuffer = createBeep(freq, duration, 0.3);
+            generatedAudio.scan = audioBuffer;
+            playAudioBuffer(audioBuffer);
+            showStatus('scanStatus', 'Scan sound generated successfully!', 'success');
+        }
+
+        // Generate success sound
+        function generateSuccessSound() {
+            const type = document.getElementById('successType').value;
+            let audioBuffer;
+
+            switch (type) {
+                case 'chord':
+                    audioBuffer = createChord([523, 659, 784], 0.6, 0.2); // C, E, G
+                    break;
+                case 'ding':
+                    audioBuffer = createBeep(1000, 0.3, 0.3);
+                    break;
+                case 'chime':
+                    audioBuffer = createSequence([800, 1200], [0.2, 0.3], 0.3);
+                    break;
+            }
+
+            generatedAudio.success = audioBuffer;
+            playAudioBuffer(audioBuffer);
+            showStatus('successStatus', 'Success sound generated successfully!', 'success');
+        }
+
+        // Generate error sound
+        function generateErrorSound() {
+            const type = document.getElementById('errorType').value;
+            let audioBuffer;
+
+            switch (type) {
+                case 'buzz':
+                    audioBuffer = createBuzz(200, 0.4, 0.4);
+                    break;
+                case 'descending':
+                    audioBuffer = createSweep(800, 300, 0.5, 0.4);
+                    break;
+                case 'double-beep':
+                    audioBuffer = createSequence([400, 400], [0.15, 0.15], 0.4, 0.1);
+                    break;
+            }
+
+            generatedAudio.error = audioBuffer;
+            playAudioBuffer(audioBuffer);
+            showStatus('errorStatus', 'Error sound generated successfully!', 'success');
+        }
+
+        // Generate warning sound
+        function generateWarningSound() {
+            const pattern = document.getElementById('warningPattern').value;
+            let audioBuffer;
+
+            switch (pattern) {
+                case 'pulse':
+                    audioBuffer = createPulse(600, 0.8, 4, 0.3);
+                    break;
+                case 'triple':
+                    audioBuffer = createSequence([600, 600, 600], [0.1, 0.1, 0.1], 0.3, 0.1);
+                    break;
+                case 'warble':
+                    audioBuffer = createWarble(500, 700, 0.6, 0.3);
+                    break;
+            }
+
+            generatedAudio.warning = audioBuffer;
+            playAudioBuffer(audioBuffer);
+            showStatus('warningStatus', 'Warning sound generated successfully!', 'success');
+        }
+
+        // Create a simple beep
+        function createBeep(frequency, duration, volume = 0.3) {
+            const ctx = initAudioContext();
+            const sampleRate = ctx.sampleRate;
+            const numSamples = Math.floor(sampleRate * duration);
+            const buffer = ctx.createBuffer(1, numSamples, sampleRate);
+            const data = buffer.getChannelData(0);
+
+            for (let i = 0; i < numSamples; i++) {
+                const t = i / sampleRate;
+                const envelope = Math.exp(-t * 3); // Fade out
+                data[i] = Math.sin(2 * Math.PI * frequency * t) * volume * envelope;
+            }
+
+            return buffer;
+        }
+
+        // Create a chord (multiple frequencies)
+        function createChord(frequencies, duration, volume = 0.3) {
+            const ctx = initAudioContext();
+            const sampleRate = ctx.sampleRate;
+            const numSamples = Math.floor(sampleRate * duration);
+            const buffer = ctx.createBuffer(1, numSamples, sampleRate);
+            const data = buffer.getChannelData(0);
+
+            for (let i = 0; i < numSamples; i++) {
+                const t = i / sampleRate;
+                const envelope = Math.exp(-t * 2);
+                let sample = 0;
+                
+                frequencies.forEach(freq => {
+                    sample += Math.sin(2 * Math.PI * freq * t);
+                });
+                
+                data[i] = (sample / frequencies.length) * volume * envelope;
+            }
+
+            return buffer;
+        }
+
+        // Create a sequence of beeps
+        function createSequence(frequencies, durations, volume = 0.3, gap = 0.05) {
+            const ctx = initAudioContext();
+            const sampleRate = ctx.sampleRate;
+            
+            let totalDuration = 0;
+            for (let i = 0; i < durations.length; i++) {
+                totalDuration += durations[i];
+                if (i < durations.length - 1) totalDuration += gap;
+            }
+            
+            const numSamples = Math.floor(sampleRate * totalDuration);
+            const buffer = ctx.createBuffer(1, numSamples, sampleRate);
+            const data = buffer.getChannelData(0);
+            
+            let currentTime = 0;
+            for (let i = 0; i < frequencies.length; i++) {
+                const freq = frequencies[i];
+                const duration = durations[i];
+                const startSample = Math.floor(currentTime * sampleRate);
+                const endSample = Math.floor((currentTime + duration) * sampleRate);
+                
+                for (let j = startSample; j < endSample && j < numSamples; j++) {
+                    const t = (j - startSample) / sampleRate;
+                    const envelope = Math.exp(-t * 5);
+                    data[j] = Math.sin(2 * Math.PI * freq * t) * volume * envelope;
+                }
+                
+                currentTime += duration + gap;
+            }
+            
+            return buffer;
+        }
+
+        // Create a buzz sound (square wave)
+        function createBuzz(frequency, duration, volume = 0.3) {
+            const ctx = initAudioContext();
+            const sampleRate = ctx.sampleRate;
+            const numSamples = Math.floor(sampleRate * duration);
+            const buffer = ctx.createBuffer(1, numSamples, sampleRate);
+            const data = buffer.getChannelData(0);
+
+            for (let i = 0; i < numSamples; i++) {
+                const t = i / sampleRate;
+                const envelope = Math.exp(-t * 2);
+                data[i] = Math.sign(Math.sin(2 * Math.PI * frequency * t)) * volume * envelope;
+            }
+
+            return buffer;
+        }
+
+        // Create a frequency sweep
+        function createSweep(startFreq, endFreq, duration, volume = 0.3) {
+            const ctx = initAudioContext();
+            const sampleRate = ctx.sampleRate;
+            const numSamples = Math.floor(sampleRate * duration);
+            const buffer = ctx.createBuffer(1, numSamples, sampleRate);
+            const data = buffer.getChannelData(0);
+
+            for (let i = 0; i < numSamples; i++) {
+                const t = i / sampleRate;
+                const progress = t / duration;
+                const freq = startFreq + (endFreq - startFreq) * progress;
+                const envelope = Math.exp(-t * 2);
+                data[i] = Math.sin(2 * Math.PI * freq * t) * volume * envelope;
+            }
+
+            return buffer;
+        }
+
+        // Create a pulsing tone
+        function createPulse(frequency, duration, pulses, volume = 0.3) {
+            const ctx = initAudioContext();
+            const sampleRate = ctx.sampleRate;
+            const numSamples = Math.floor(sampleRate * duration);
+            const buffer = ctx.createBuffer(1, numSamples, sampleRate);
+            const data = buffer.getChannelData(0);
+            const pulseFreq = pulses / duration;
+
+            for (let i = 0; i < numSamples; i++) {
+                const t = i / sampleRate;
+                const pulse = Math.sin(2 * Math.PI * pulseFreq * t) > 0 ? 1 : 0;
+                const envelope = Math.exp(-t * 1);
+                data[i] = Math.sin(2 * Math.PI * frequency * t) * volume * envelope * pulse;
+            }
+
+            return buffer;
+        }
+
+        // Create a warbling tone
+        function createWarble(freq1, freq2, duration, volume = 0.3) {
+            const ctx = initAudioContext();
+            const sampleRate = ctx.sampleRate;
+            const numSamples = Math.floor(sampleRate * duration);
+            const buffer = ctx.createBuffer(1, numSamples, sampleRate);
+            const data = buffer.getChannelData(0);
+            const warbleRate = 8; // Hz
+
+            for (let i = 0; i < numSamples; i++) {
+                const t = i / sampleRate;
+                const warble = Math.sin(2 * Math.PI * warbleRate * t);
+                const freq = freq1 + (freq2 - freq1) * (warble + 1) / 2;
+                const envelope = Math.exp(-t * 2);
+                data[i] = Math.sin(2 * Math.PI * freq * t) * volume * envelope;
+            }
+
+            return buffer;
+        }
+
+        // Play audio buffer
+        function playAudioBuffer(buffer) {
+            const ctx = initAudioContext();
+            const source = ctx.createBufferSource();
+            source.buffer = buffer;
+            source.connect(ctx.destination);
+            source.start();
+        }
+
+        // Convert AudioBuffer to WAV and download
+        function downloadSound(type) {
+            if (!generatedAudio[type]) {
+                showStatus(type + 'Status', 'Please generate the sound first!', 'error');
+                return;
+            }
+
+            const wavData = audioBufferToWav(generatedAudio[type]);
+            const blob = new Blob([wavData], { type: 'audio/wav' });
+            
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            
+            switch (type) {
+                case 'scan':
+                    a.download = 'scan.mp3';
+                    break;
+                case 'success':
+                    a.download = 'taskCompleted.mp3';
+                    break;
+                case 'error':
+                    a.download = 'error.mp3';
+                    break;
+                case 'warning':
+                    a.download = 'warning.mp3';
+                    break;
+            }
+            
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            showStatus(type + 'Status', 'Download started! (Note: File will be in WAV format, rename extension to .mp3)', 'success');
+        }
+
+        // Convert AudioBuffer to WAV format
+        function audioBufferToWav(buffer) {
+            const length = buffer.length;
+            const sampleRate = buffer.sampleRate;
+            const arrayBuffer = new ArrayBuffer(44 + length * 2);
+            const view = new DataView(arrayBuffer);
+            const data = buffer.getChannelData(0);
+
+            // WAV header
+            const writeString = (offset, string) => {
+                for (let i = 0; i < string.length; i++) {
+                    view.setUint8(offset + i, string.charCodeAt(i));
+                }
+            };
+
+            writeString(0, 'RIFF');
+            view.setUint32(4, 36 + length * 2, true);
+            writeString(8, 'WAVE');
+            writeString(12, 'fmt ');
+            view.setUint32(16, 16, true);
+            view.setUint16(20, 1, true);
+            view.setUint16(22, 1, true);
+            view.setUint32(24, sampleRate, true);
+            view.setUint32(28, sampleRate * 2, true);
+            view.setUint16(32, 2, true);
+            view.setUint16(34, 16, true);
+            writeString(36, 'data');
+            view.setUint32(40, length * 2, true);
+
+            // Convert float samples to 16-bit PCM
+            let offset = 44;
+            for (let i = 0; i < length; i++, offset += 2) {
+                const sample = Math.max(-1, Math.min(1, data[i]));
+                view.setInt16(offset, sample * 0x7FFF, true);
+            }
+
+            return arrayBuffer;
+        }
+
+        // Show status message
+        function showStatus(elementId, message, type) {
+            const statusEl = document.getElementById(elementId);
+            statusEl.textContent = message;
+            statusEl.className = `status ${type}`;
+            statusEl.style.display = 'block';
+            
+            setTimeout(() => {
+                statusEl.style.display = 'none';
+            }, 5000);
+        }
+
+        // Initialize default sounds on page load
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                generateScanSound();
+                generateSuccessSound();
+                generateErrorSound();
+                generateWarningSound();
+            }, 500);
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Regex</title>
+</head>
+<body>
+    <span class="form-text sku" data-name="sku" data-bind="sku">TB1013LBB</span>
+    
+    <script>
+        const html = document.body.innerHTML;
+        console.log('HTML content:', html);
+        
+        // Test your regex patterns
+        const pnamePattern = /(?<=<span[^>]*>)[^<]+(?=<\/span>)/gi;
+        const orderPattern = /(SS|SK|SM|SP|SO|ORDER)\d+/gi;
+        const productPattern = /<text[^>]*[^>]*>(.*?)<\/text>/gi;
+        
+        console.log('PNAME pattern:', pnamePattern);
+        console.log('PNAME matches:', html.match(pnamePattern));
+        
+        // Test simplified version without lookbehind
+        const simplePnamePattern = /<span[^>]*>([^<]+)<\/span>/gi;
+        console.log('Simple PNAME pattern:', simplePnamePattern);
+        console.log('Simple PNAME matches:', html.match(simplePnamePattern));
+        
+        // Test if lookbehind is supported
+        try {
+            const testLookbehind = /(?<=test)ing/;
+            console.log('Lookbehind supported: YES');
+        } catch (e) {
+            console.log('Lookbehind supported: NO');
+        }
+    </script>
+</body>
+</html>

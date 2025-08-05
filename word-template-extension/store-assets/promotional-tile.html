@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Word Template Extension - Promotional Tile</title>
+  <style>
+    :root {
+      --word-blue: #2B579A;
+      --word-blue-light: #E7F3FF;
+      --word-blue-hover: #1E3F73;
+      --word-accent: #0078D4;
+      --word-success: #107C10;
+      --gray-100: #F5F5F5;
+      --gray-600: #757575;
+      --gray-800: #424242;
+    }
+
+    .promo-tile {
+      width: 440px;
+      height: 280px;
+      background: linear-gradient(135deg, var(--word-blue) 0%, var(--word-blue-hover) 100%);
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+      margin: 20px;
+    }
+
+    .promo-tile::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: url('data:image/svg+xml;utf8,<svg width="60" height="60" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg"><g fill="none" fill-rule="evenodd"><g fill="%23ffffff" fill-opacity="0.05"><circle cx="30" cy="30" r="2"/></g></svg>') repeat;
+      pointer-events: none;
+    }
+
+    .promo-content {
+      text-align: center;
+      color: white;
+      z-index: 2;
+      position: relative;
+    }
+
+    .promo-logo {
+      width: 80px;
+      height: 80px;
+      background: white;
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 20px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+      font-size: 36px;
+      font-weight: 700;
+      color: var(--word-blue);
+    }
+
+    .promo-title {
+      font-size: 28px;
+      font-weight: 700;
+      margin-bottom: 8px;
+      text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    }
+
+    .promo-subtitle {
+      font-size: 16px;
+      opacity: 0.9;
+      margin-bottom: 20px;
+      font-weight: 400;
+    }
+
+    .promo-features {
+      display: flex;
+      justify-content: center;
+      gap: 30px;
+      font-size: 14px;
+      opacity: 0.8;
+    }
+
+    .promo-feature {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .icon-128 {
+      width: 128px;
+      height: 128px;
+      background: linear-gradient(135deg, var(--word-blue) 0%, var(--word-blue-hover) 100%);
+      border-radius: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 60px;
+      font-weight: 700;
+      box-shadow: 0 15px 35px rgba(0,0,0,0.2);
+      margin: 20px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .icon-128::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: url('data:image/svg+xml;utf8,<svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><g fill="none" fill-rule="evenodd"><g fill="%23ffffff" fill-opacity="0.08"><circle cx="20" cy="20" r="1.5"/></g></svg>') repeat;
+      pointer-events: none;
+    }
+
+    .icon-128::after {
+      content: 'W';
+      position: relative;
+      z-index: 2;
+      text-shadow: 0 3px 6px rgba(0,0,0,0.3);
+    }
+  </style>
+</head>
+<body style="background: #f0f0f0; margin: 0; padding: 20px; font-family: 'Segoe UI', sans-serif;">
+  
+  <!-- Chrome Web Store Promotional Tile (440x280) -->
+  <div class="promo-tile">
+    <div class="promo-content">
+      <div class="promo-logo">W</div>
+      <div class="promo-title">Word Template Extension</div>
+      <div class="promo-subtitle">Transform web data into professional documents</div>
+      <div class="promo-features">
+        <div class="promo-feature">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+          </svg>
+          Smart Extraction
+        </div>
+        <div class="promo-feature">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z"/>
+          </svg>
+          Custom Templates
+        </div>
+        <div class="promo-feature">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9z"/>
+          </svg>
+          One-Click
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- App Icon (128x128) -->
+  <div class="icon-128"></div>
+
+  <!-- Square Promotional Tile (400x400) -->
+  <div style="width: 400px; height: 400px; background: linear-gradient(135deg, var(--word-blue) 0%, var(--word-blue-hover) 100%); border-radius: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; overflow: hidden; box-shadow: 0 25px 50px rgba(0,0,0,0.2); margin: 20px; color: white; text-align: center;">
+    <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: url('data:image/svg+xml;utf8,<svg width=\"80\" height=\"80\" viewBox=\"0 0 80 80\" xmlns=\"http://www.w3.org/2000/svg\"><g fill=\"none\" fill-rule=\"evenodd\"><g fill=\"%23ffffff\" fill-opacity=\"0.03\"><circle cx=\"40\" cy=\"40\" r=\"2\"/></g></svg>') repeat; pointer-events: none;"></div>
+    
+    <div style="position: relative; z-index: 2;">
+      <div style="width: 120px; height: 120px; background: white; border-radius: 24px; display: flex; align-items: center; justify-content: center; margin: 0 auto 30px; box-shadow: 0 15px 35px rgba(0,0,0,0.2); font-size: 54px; font-weight: 700; color: var(--word-blue);">W</div>
+      
+      <h1 style="font-size: 32px; font-weight: 700; margin-bottom: 16px; text-shadow: 0 3px 6px rgba(0,0,0,0.3);">Word Template<br>Extension</h1>
+      
+      <p style="font-size: 18px; opacity: 0.9; margin-bottom: 30px; line-height: 1.4;">Transform web data into<br>professional documents<br>instantly</p>
+      
+      <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; max-width: 280px;">
+        <div style="text-align: center; font-size: 14px;">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" style="margin-bottom: 8px;">
+            <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+          </svg>
+          <div>Smart<br>Extraction</div>
+        </div>
+        <div style="text-align: center; font-size: 14px;">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" style="margin-bottom: 8px;">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z"/>
+          </svg>
+          <div>Custom<br>Templates</div>
+        </div>
+        <div style="text-align: center; font-size: 14px;">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" style="margin-bottom: 8px;">
+            <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/>
+          </svg>
+          <div>Privacy<br>First</div>
+        </div>
+        <div style="text-align: center; font-size: 14px;">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" style="margin-bottom: 8px;">
+            <path d="M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9z"/>
+          </svg>
+          <div>One-Click<br>Generation</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>
