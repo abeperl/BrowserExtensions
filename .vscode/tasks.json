@@ -1,0 +1,10 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Zip Extension Files",
+			"type": "shell",
+			"command": "Compress-Archive -Path c:\\Users\\User\\source\\repos\\BrowserExtensions\\scan-overlay-extension\\* -DestinationPath c:\\Users\\User\\source\\repos\\BrowserExtensions\\scan-overlay-extension.zip -Force"
+		}
+	]
+}

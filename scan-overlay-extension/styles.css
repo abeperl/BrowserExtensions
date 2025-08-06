@@ -657,3 +657,61 @@ input:checked + .slider:before {
   background: #d1ecf1;
   color: #0c5460;
 }
+
+/* Page notification suppression - Hide all common notification elements */
+.notification,
+.toast,
+.alert:not(.soe-overlay):not([class*="soe-"]),
+.message:not([class*="soe-"]),
+.popup:not([class*="soe-"]),
+.bubble:not([class*="soe-"]),
+.status-message,
+.success-message,
+.error-message,
+.warning-message,
+.info-message,
+.scan-result,
+.result-popup,
+.feedback-bubble,
+.flash-message,
+.snackbar,
+.banner,
+.callout,
+[role="alert"]:not([class*="soe-"]),
+[role="status"]:not([class*="soe-"]),
+[aria-live]:not([class*="soe-"]),
+.modal:not([class*="soe-"]),
+.dialog:not([class*="soe-"]),
+.overlay:not([class*="soe-"]):not(.soe-overlay) {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  z-index: -1 !important;
+}
+
+/* Ensure our overlays are always visible */
+.soe-overlay,
+.soe-overlay *,
+[class*="soe-"] {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+
+/* Additional suppression for common frameworks */
+.ui-dialog,
+.ui-tooltip,
+.ui-widget-overlay,
+.sweet-alert,
+.swal-overlay,
+.bootbox,
+.bootstrap-dialog,
+.react-toast,
+.vue-notification,
+.ng-toast {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+}

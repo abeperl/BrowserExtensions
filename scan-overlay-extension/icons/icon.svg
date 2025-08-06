@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <!-- Background circle -->
+  <circle cx="64" cy="64" r="60" fill="#4285F4" stroke="#1a73e8" stroke-width="2"/>
+  
+  <!-- Scanner frame -->
+  <rect x="24" y="32" width="80" height="64" fill="none" stroke="#ffffff" stroke-width="3" rx="4"/>
+  
+  <!-- Scanning lines -->
+  <g opacity="0.8">
+    <rect x="30" y="42" width="68" height="2" fill="#ffffff"/>
+    <rect x="30" y="52" width="68" height="2" fill="#ffffff"/>
+    <rect x="30" y="62" width="68" height="2" fill="#ffffff"/>
+    <rect x="30" y="72" width="68" height="2" fill="#ffffff"/>
+    <rect x="30" y="82" width="68" height="2" fill="#ffffff"/>
+  </g>
+  
+  <!-- Scanner beam -->
+  <rect x="28" y="58" width="72" height="4" fill="#FFD700" opacity="0.7"/>
+  
+  <!-- Corner indicators -->
+  <g fill="#FFD700" stroke="#ffffff" stroke-width="1">
+    <rect x="22" y="30" width="6" height="6" rx="1"/>
+    <rect x="100" y="30" width="6" height="6" rx="1"/>
+    <rect x="22" y="92" width="6" height="6" rx="1"/>
+    <rect x="100" y="92" width="6" height="6" rx="1"/>
+  </g>
+</svg>
