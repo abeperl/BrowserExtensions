@@ -10,6 +10,8 @@ let overlayDuration = 2000; // Default, can be updated from settings
 let overlayDismissKey = 'Escape';
 let overlayAudioEnabled = true;
 let overlayColorScheme = 'default'; // or 'high-contrast', etc.
+let lastAudioPlayback = { state: '', timestamp: 0 };
+const AUDIO_DEBOUNCE_TIME = 500; // ms to prevent multiple audio files
 
 // Overlay templates
 function getOverlayHTML({ state, value, itemId, statusId, error, status }) {
@@ -68,18 +70,29 @@ function removeOverlay() {
   } catch (e) { /* ignore */ }
 }
 
-// Audio feedback
+// Audio feedback with debouncing
 function playAudio(state) {
+  const now = Date.now();
+  
+  // Prevent playing the same audio multiple times within debounce period
+  if (now - lastAudioPlayback.timestamp < AUDIO_DEBOUNCE_TIME && 
+      lastAudioPlayback.state === state) {
+    return;
+  }
+  
+  lastAudioPlayback = { state, timestamp: now };
+  
   let audioFile = '';
   switch (state) {
     case 'scan': audioFile = 'audio/scan.mp3'; break;
     case 'presubmit': audioFile = 'audio/warning.mp3'; break;
-    case 'success': audioFile = 'audio/success.mp3'; break;
+    case 'success': audioFile = 'audio/taskCompleted.mp3'; break;
     case 'error': audioFile = 'audio/error.mp3'; break;
     default: return;
   }
   const audio = new Audio(chrome.runtime.getURL(audioFile));
-  audio.play();
+  audio.volume = 0.5; // Set moderate volume
+  audio.play().catch(e => console.log('Audio playback failed:', e));
 }
 
 // Keyboard shortcut for dismissal

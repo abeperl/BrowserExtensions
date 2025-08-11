@@ -93,6 +93,10 @@ function getInputFields() {
 	return { itemInput, statusInput };
 }
 
+// === State tracking to prevent duplicate events ===
+let lastProcessedInput = { itemId: '', statusId: '', timestamp: 0 };
+const DEBOUNCE_TIME = 100; // ms to prevent duplicate processing
+
 // === Monitor input fields for scan events ===
 function monitorScanFields() {
 	const { itemInput, statusInput } = getInputFields();
@@ -124,19 +128,12 @@ function monitorScanFields() {
 			handleScanInput('itemId', e.target.value);
 		}, { capture: true });
 		
+		// Only handle keydown for Enter, remove keypress to prevent duplicate handling
 		newItemInput.addEventListener('keydown', (e) => {
 			if (e.key === 'Enter') {
 				e.preventDefault();
 				e.stopImmediatePropagation();
 				handleScanInput('itemId', e.target.value);
-			}
-		}, { capture: true });
-		
-		// Block form submissions originating from this input
-		newItemInput.addEventListener('keypress', (e) => {
-			if (e.key === 'Enter') {
-				e.preventDefault();
-				e.stopImmediatePropagation();
 			}
 		}, { capture: true });
 		
@@ -167,19 +164,12 @@ function monitorScanFields() {
 			handleScanInput('statusId', e.target.value);
 		}, { capture: true });
 		
+		// Only handle keydown for Enter, remove keypress to prevent duplicate handling
 		newStatusInput.addEventListener('keydown', (e) => {
 			if (e.key === 'Enter') {
 				e.preventDefault();
 				e.stopImmediatePropagation();
 				handleScanInput('statusId', e.target.value);
-			}
-		}, { capture: true });
-		
-		// Block form submissions originating from this input
-		newStatusInput.addEventListener('keypress', (e) => {
-			if (e.key === 'Enter') {
-				e.preventDefault();
-				e.stopImmediatePropagation();
 			}
 		}, { capture: true });
 		
@@ -193,6 +183,22 @@ function monitorScanFields() {
 
 // === Handle scan input ===
 function handleScanInput(type, value) {
+	const now = Date.now();
+	const currentState = { itemId: scanState.itemId, statusId: scanState.statusId };
+	currentState[type] = value;
+	
+	// Prevent duplicate processing within debounce time
+	if (now - lastProcessedInput.timestamp < DEBOUNCE_TIME && 
+	    lastProcessedInput.itemId === currentState.itemId && 
+	    lastProcessedInput.statusId === currentState.statusId) {
+		if (settings.debugMode) {
+			console.log('handleScanInput debounced', type, value);
+		}
+		return;
+	}
+	
+	lastProcessedInput = { ...currentState, timestamp: now };
+	
 	if (settings.debugMode) {
 		console.log('handleScanInput', type, value);
 	}
