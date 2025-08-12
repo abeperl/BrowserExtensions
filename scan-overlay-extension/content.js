@@ -107,6 +107,9 @@ function monitorScanFields() {
 		}
 		return false;
 	}
+	
+	// Also monitor the save button
+	monitorSaveButton();
 	if (!itemInput.dataset.soeListener) {
 		// Remove all existing event listeners by cloning the element
 		const newItemInput = itemInput.cloneNode(true);
@@ -115,17 +118,17 @@ function monitorScanFields() {
 		// Add our controlled event listeners with capture=true to intercept before other handlers
 		newItemInput.addEventListener('input', (e) => {
 			e.stopImmediatePropagation();
-			handleScanInput('itemId', e.target.value);
+			handleScanInput('itemId', e.target.value, false);
 		}, { capture: true });
 		
 		newItemInput.addEventListener('change', (e) => {
 			e.stopImmediatePropagation();
-			handleScanInput('itemId', e.target.value);
+			handleScanInput('itemId', e.target.value, false);
 		}, { capture: true });
 		
 		newItemInput.addEventListener('blur', (e) => {
 			e.stopImmediatePropagation();
-			handleScanInput('itemId', e.target.value);
+			handleScanInput('itemId', e.target.value, false);
 		}, { capture: true });
 		
 		// Only handle keydown for Enter, remove keypress to prevent duplicate handling
@@ -133,7 +136,7 @@ function monitorScanFields() {
 			if (e.key === 'Enter') {
 				e.preventDefault();
 				e.stopImmediatePropagation();
-				handleScanInput('itemId', e.target.value);
+				handleScanInput('itemId', e.target.value, true);
 			}
 		}, { capture: true });
 		
@@ -151,17 +154,17 @@ function monitorScanFields() {
 		// Add our controlled event listeners with capture=true to intercept before other handlers
 		newStatusInput.addEventListener('input', (e) => {
 			e.stopImmediatePropagation();
-			handleScanInput('statusId', e.target.value);
+			handleScanInput('statusId', e.target.value, false);
 		}, { capture: true });
 		
 		newStatusInput.addEventListener('change', (e) => {
 			e.stopImmediatePropagation();
-			handleScanInput('statusId', e.target.value);
+			handleScanInput('statusId', e.target.value, false);
 		}, { capture: true });
 		
 		newStatusInput.addEventListener('blur', (e) => {
 			e.stopImmediatePropagation();
-			handleScanInput('statusId', e.target.value);
+			handleScanInput('statusId', e.target.value, false);
 		}, { capture: true });
 		
 		// Only handle keydown for Enter, remove keypress to prevent duplicate handling
@@ -169,7 +172,7 @@ function monitorScanFields() {
 			if (e.key === 'Enter') {
 				e.preventDefault();
 				e.stopImmediatePropagation();
-				handleScanInput('statusId', e.target.value);
+				handleScanInput('statusId', e.target.value, true);
 			}
 		}, { capture: true });
 		
@@ -181,44 +184,116 @@ function monitorScanFields() {
 	return true;
 }
 
+// === Monitor save button ===
+function monitorSaveButton() {
+	const saveButton = document.querySelector('#scan-status-save');
+	if (saveButton && !saveButton.dataset.soeListener) {
+		// Remove existing listeners and add our controlled one
+		const newSaveButton = saveButton.cloneNode(true);
+		saveButton.parentNode.replaceChild(newSaveButton, saveButton);
+		
+		newSaveButton.addEventListener('click', (e) => {
+			e.preventDefault();
+			e.stopImmediatePropagation();
+			
+			if (settings.debugMode) {
+				console.log('Save button clicked - intercepted');
+			}
+			
+			// Trigger validation and submission
+			handleScanInput('save', 'button_clicked', true);
+		}, { capture: true });
+		
+		newSaveButton.dataset.soeListener = '1';
+		if (settings.debugMode) {
+			console.log('Attached controlled listener to save button');
+		}
+	}
+}
+
+// === Client-side validation (mimics page's validation logic) ===
+function validateScanData(itemId, statusId) {
+	try {
+		// Check if item exists in the page (like the original: $(".item-row .product-info[data-lineitemid='" + skuVal + "']"))
+		const itemRow = document.querySelector(`.item-row .product-info[data-lineitemid='${itemId}']`);
+		
+		if (!itemRow || itemRow.length === 0) {
+			return { isValid: false, error: 'No Record Found' };
+		}
+		
+		// Check if status exists in dropdown (like the original: ".item-status-dropdown option[data-text='"+statusVal+"']")
+		const itemStatus = itemRow.parentElement.querySelector(`.item-status-dropdown option[data-text='${statusId.toLowerCase()}']`);
+		
+		if (!itemStatus || itemStatus.length === 0) {
+			return { isValid: false, error: 'No Status Found' };
+		}
+		
+		return { isValid: true };
+		
+	} catch (error) {
+		if (settings.debugMode) {
+			console.log('Validation error:', error);
+		}
+		// If validation fails due to DOM structure differences, assume it's valid and let API handle it
+		return { isValid: true };
+	}
+}
+
 // === Handle scan input ===
-function handleScanInput(type, value) {
+function handleScanInput(type, value, isSubmit = false) {
 	const now = Date.now();
 	const currentState = { itemId: scanState.itemId, statusId: scanState.statusId };
-	currentState[type] = value;
 	
-	// Prevent duplicate processing within debounce time
-	if (now - lastProcessedInput.timestamp < DEBOUNCE_TIME && 
-	    lastProcessedInput.itemId === currentState.itemId && 
-	    lastProcessedInput.statusId === currentState.statusId) {
-		if (settings.debugMode) {
-			console.log('handleScanInput debounced', type, value);
+	// Handle save button click differently - don't update scan state
+	if (type !== 'save') {
+		currentState[type] = value;
+		
+		// Prevent duplicate processing within debounce time
+		if (now - lastProcessedInput.timestamp < DEBOUNCE_TIME && 
+		    lastProcessedInput.itemId === currentState.itemId && 
+		    lastProcessedInput.statusId === currentState.statusId) {
+			if (settings.debugMode) {
+				console.log('handleScanInput debounced', type, value);
+			}
+			return;
 		}
-		return;
+		
+		scanState[type] = value;
+		scanState.lastScan = value;
+		// Add to scan history if new
+		if (value && (!scanState.scanHistory.length || scanState.scanHistory[scanState.scanHistory.length-1] !== value)) {
+			scanState.scanHistory.push(value);
+		}
 	}
 	
 	lastProcessedInput = { ...currentState, timestamp: now };
 	
 	if (settings.debugMode) {
-		console.log('handleScanInput', type, value);
+		console.log('handleScanInput', type, value, 'isSubmit:', isSubmit);
 	}
-	scanState[type] = value;
-	scanState.lastScan = value;
-	// Add to scan history if new
-	if (value && (!scanState.scanHistory.length || scanState.scanHistory[scanState.scanHistory.length-1] !== value)) {
-		scanState.scanHistory.push(value);
-	}
-	// Only show pre-submit overlay if both fields are filled, and this is the second field to be completed
-	const otherType = type === 'itemId' ? 'statusId' : 'itemId';
-	if (scanState.itemId && scanState.statusId && value && scanState[otherType]) {
-		window.postMessage({ type: 'SHOW_PRESUBMIT_OVERLAY', itemId: scanState.itemId, statusId: scanState.statusId, progress: scanState.scanHistory.length }, '*');
-		// Log scan event to background for history
-		chrome.runtime.sendMessage({
-			type: 'LOG_SCAN',
-			itemId: scanState.itemId,
-			statusId: scanState.statusId,
-			result: 'scanned',
-		});
+	
+	// Only show pre-submit overlay when user indicates they're ready to submit (Enter key or Save button)
+	// or when there's an error
+	if (isSubmit && scanState.itemId && scanState.statusId) {
+		// Perform client-side validation like the page does
+		const validationResult = validateScanData(scanState.itemId, scanState.statusId);
+		
+		if (validationResult.isValid) {
+			window.postMessage({ type: 'SHOW_PRESUBMIT_OVERLAY', itemId: scanState.itemId, statusId: scanState.statusId, progress: scanState.scanHistory.length }, '*');
+			// Log scan event to background for history
+			chrome.runtime.sendMessage({
+				type: 'LOG_SCAN',
+				itemId: scanState.itemId,
+				statusId: scanState.statusId,
+				result: 'scanned',
+			});
+		} else {
+			// Show validation error overlay instead of letting page show snackbar
+			window.postMessage({ type: 'SHOW_ERROR_OVERLAY', error: validationResult.error, progress: scanState.scanHistory.length }, '*');
+		}
+	} else if (isSubmit && (!scanState.itemId || !scanState.statusId)) {
+		// Show error overlay if user tries to submit with missing fields
+		window.postMessage({ type: 'SHOW_ERROR_OVERLAY', error: 'Both fields required', progress: scanState.scanHistory.length }, '*');
 	}
 }
 
@@ -531,6 +606,23 @@ function overridePageNotificationMethods() {
 			error: () => {},
 			warning: () => {},
 			info: () => {}
+		};
+	}
+	
+	// Override snackbar.show() method to suppress validation error messages
+	if (window.snackbar && typeof window.snackbar.show === 'function') {
+		const originalSnackbarShow = window.snackbar.show;
+		window.snackbar.show = function(message, type) {
+			if (settings.debugMode) {
+				console.log('Snackbar suppressed:', message, type);
+			}
+			// Suppress scan-related error messages
+			if (message === 'No Record Found' || message === 'No Status Found') {
+				// Don't show the snackbar - our overlay will handle this
+				return;
+			}
+			// Allow other snackbar messages to pass through
+			return originalSnackbarShow.apply(this, arguments);
 		};
 	}
 	

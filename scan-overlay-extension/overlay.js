@@ -47,10 +47,8 @@ function showOverlay(params) {
   overlay.focus();
   // Play audio feedback
   if (overlayAudioEnabled) playAudio(params.state);
-  // Dismiss overlay after duration (except for error overlays, which require manual dismissal)
-  if (params.state !== 'error') {
-    overlayTimeout = setTimeout(removeOverlay, overlayDuration);
-  }
+  // Dismiss overlay after duration (all overlays now auto-dismiss)
+  overlayTimeout = setTimeout(removeOverlay, overlayDuration);
 }
 
 function removeOverlay() {
@@ -85,7 +83,7 @@ function playAudio(state) {
   let audioFile = '';
   switch (state) {
     case 'scan': audioFile = 'audio/scan.mp3'; break;
-    case 'presubmit': audioFile = 'audio/warning.mp3'; break;
+    case 'presubmit': audioFile = 'audio/scan.mp3'; break; // Use scan sound instead of warning for presubmit
     case 'success': audioFile = 'audio/taskCompleted.mp3'; break;
     case 'error': audioFile = 'audio/error.mp3'; break;
     default: return;
