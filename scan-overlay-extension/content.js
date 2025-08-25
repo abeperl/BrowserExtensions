@@ -1,12 +1,9 @@
-
 // content.js
 // Main content script for Scan Overlay Extension
 // Handles overlay display, scan monitoring, API interception, and feedback
 
-// === CONFIGURABLE SELECTORS (loaded from settings) ===
-let ITEM_ID_SELECTOR = '#product-scan';
-let STATUS_ID_SELECTOR = '#status-scan';
-let API_URL_PATTERN = '/api/scan';
+// === CURRENT SITE CONFIG ===
+let currentSiteConfig = null;
 let settings = {
   audioEnabled: true,
   overlayDuration: 2000,
@@ -15,27 +12,70 @@ let settings = {
   interceptFormSubmit: true
 };
 
+// === URL MATCHING AND INITIALIZATION ===
+function findMatchingSiteConfig(url, siteConfigs) {
+  if (!siteConfigs || !Array.isArray(siteConfigs)) {
+    return null;
+  }
+  
+  return siteConfigs.find(config => {
+    if (!config.enabled) return false;
+    
+    try {
+      const pattern = new RegExp(config.urlPattern);
+      return pattern.test(url);
+    } catch (e) {
+      if (settings.debugMode) {
+        console.warn('Invalid regex pattern in site config:', config.urlPattern, e);
+      }
+      return false;
+    }
+  });
+}
+
+function shouldInitializeOnCurrentPage() {
+  const currentUrl = window.location.href;
+  
+  // Check if we have a matching site configuration
+  if (!currentSiteConfig) {
+    if (settings.debugMode) {
+      console.log('No matching site configuration for URL:', currentUrl);
+    }
+    return false;
+  }
+  
+  if (settings.debugMode) {
+    console.log('Site config found for URL:', currentUrl, currentSiteConfig.name);
+  }
+  
+  return true;
+}
+
 // === SETTINGS MANAGEMENT ===
 async function loadSettings() {
   try {
     const result = await chrome.storage.sync.get('scanOverlaySettings');
     const savedSettings = result.scanOverlaySettings || {};
     
-    // Update selectors
-    ITEM_ID_SELECTOR = savedSettings.itemIdSelector || '#product-scan';
-    STATUS_ID_SELECTOR = savedSettings.statusIdSelector || '#status-scan';
-    API_URL_PATTERN = savedSettings.apiUrlPattern || '/api/scan';
-    
-    // Update settings
+    // Update global settings
     settings.audioEnabled = savedSettings.audioEnabled !== false;
     settings.overlayDuration = savedSettings.overlayDuration || 2000;
     settings.debugMode = savedSettings.debugMode || false;
     settings.autoFocusAfterScan = savedSettings.autoFocusAfterScan !== false;
     settings.interceptFormSubmit = savedSettings.interceptFormSubmit !== false;
     
+    // Find matching site configuration for current URL
+    const currentUrl = window.location.href;
+    currentSiteConfig = findMatchingSiteConfig(currentUrl, savedSettings.siteConfigs);
+    
     if (settings.debugMode) {
       console.log('Scan overlay settings loaded:', settings);
-      console.log('Selectors - Item:', ITEM_ID_SELECTOR, 'Status:', STATUS_ID_SELECTOR);
+      if (currentSiteConfig) {
+        console.log('Using site config:', currentSiteConfig.name);
+        console.log('Selectors - Item:', currentSiteConfig.itemIdSelector, 'Status:', currentSiteConfig.statusIdSelector);
+      } else {
+        console.log('No matching site configuration found for URL:', currentUrl);
+      }
     }
     
     // Update overlay settings
@@ -44,32 +84,48 @@ async function loadSettings() {
       window.soeOverlay.setAudio(settings.audioEnabled);
     }
     
+    return currentSiteConfig !== null; // Return whether we should be active on this page
+    
   } catch (error) {
     console.error('Error loading scan overlay settings:', error);
+    return false;
   }
 }
 
 // Expose settings update function for popup
 window.scanOverlayExtension = {
   updateSettings: function(newSettings) {
-    ITEM_ID_SELECTOR = newSettings.itemIdSelector || ITEM_ID_SELECTOR;
-    STATUS_ID_SELECTOR = newSettings.statusIdSelector || STATUS_ID_SELECTOR;
-    API_URL_PATTERN = newSettings.apiUrlPattern || API_URL_PATTERN;
-    
+    // Update global settings
     Object.assign(settings, newSettings);
+    
+    // Find new matching site configuration
+    const currentUrl = window.location.href;
+    currentSiteConfig = findMatchingSiteConfig(currentUrl, newSettings.siteConfigs);
     
     if (settings.debugMode) {
       console.log('Settings updated:', settings);
+      if (currentSiteConfig) {
+        console.log('New site config:', currentSiteConfig.name);
+      }
     }
     
-    // Re-initialize with new settings
-    monitorScanFields();
+    // Re-initialize with new settings if we have a matching config
+    if (currentSiteConfig) {
+      initializeExtensionFeatures();
+    } else {
+      // Clean up if no longer matching
+      cleanupExtensionFeatures();
+    }
     
     // Update overlay settings
     if (window.soeOverlay) {
       window.soeOverlay.setDuration(settings.overlayDuration);
       window.soeOverlay.setAudio(settings.audioEnabled);
     }
+  },
+  
+  getCurrentSiteConfig: function() {
+    return currentSiteConfig;
   }
 };
 
@@ -86,10 +142,12 @@ let scanState = {
 	overlayActive: false,
 };
 
-// === Utility: Find input fields ===
+// === Utility: Find input fields using current site config ===
 function getInputFields() {
-	const itemInput = document.querySelector(ITEM_ID_SELECTOR);
-	const statusInput = document.querySelector(STATUS_ID_SELECTOR);
+  if (!currentSiteConfig) return { itemInput: null, statusInput: null };
+  
+	const itemInput = document.querySelector(currentSiteConfig.itemIdSelector);
+	const statusInput = document.querySelector(currentSiteConfig.statusIdSelector);
 	return { itemInput, statusInput };
 }
 
@@ -99,11 +157,13 @@ const DEBOUNCE_TIME = 100; // ms to prevent duplicate processing
 
 // === Monitor input fields for scan events ===
 function monitorScanFields() {
+  if (!currentSiteConfig) return false;
+  
 	const { itemInput, statusInput } = getInputFields();
 	if (!itemInput || !statusInput) {
 		if (settings.debugMode) {
 			console.log('Scan fields not found, will observe DOM for changes...');
-			console.log('Looking for:', ITEM_ID_SELECTOR, 'and', STATUS_ID_SELECTOR);
+			console.log('Looking for:', currentSiteConfig.itemIdSelector, 'and', currentSiteConfig.statusIdSelector);
 		}
 		return false;
 	}
@@ -111,74 +171,60 @@ function monitorScanFields() {
 	// Also monitor the save button
 	monitorSaveButton();
 	if (!itemInput.dataset.soeListener) {
-		// Remove all existing event listeners by cloning the element
-		const newItemInput = itemInput.cloneNode(true);
-		itemInput.parentNode.replaceChild(newItemInput, itemInput);
-		
-		// Add our controlled event listeners with capture=true to intercept before other handlers
-		newItemInput.addEventListener('input', (e) => {
-			e.stopImmediatePropagation();
+		// Add our monitoring listeners without removing existing ones
+		// Use passive listeners that don't interfere with original functionality
+		itemInput.addEventListener('input', (e) => {
 			handleScanInput('itemId', e.target.value, false);
-		}, { capture: true });
+		}, { passive: true });
 		
-		newItemInput.addEventListener('change', (e) => {
-			e.stopImmediatePropagation();
+		itemInput.addEventListener('change', (e) => {
 			handleScanInput('itemId', e.target.value, false);
-		}, { capture: true });
+		}, { passive: true });
 		
-		newItemInput.addEventListener('blur', (e) => {
-			e.stopImmediatePropagation();
+		itemInput.addEventListener('blur', (e) => {
 			handleScanInput('itemId', e.target.value, false);
-		}, { capture: true });
+		}, { passive: true });
 		
-		// Only handle keydown for Enter, remove keypress to prevent duplicate handling
-		newItemInput.addEventListener('keydown', (e) => {
+		// For Enter key, intercept only for our overlay logic but don't prevent default
+		itemInput.addEventListener('keydown', (e) => {
 			if (e.key === 'Enter') {
-				e.preventDefault();
-				e.stopImmediatePropagation();
 				handleScanInput('itemId', e.target.value, true);
+				// Don't prevent default - let original handlers run
 			}
-		}, { capture: true });
+		}, { passive: true });
 		
-		newItemInput.dataset.soeListener = '1';
+		itemInput.dataset.soeListener = '1';
 		if (settings.debugMode) {
-			console.log('Attached controlled listeners to', ITEM_ID_SELECTOR);
+			console.log('Attached monitoring listeners to', currentSiteConfig.itemIdSelector);
 		}
 	}
 	
 	if (!statusInput.dataset.soeListener) {
-		// Remove all existing event listeners by cloning the element
-		const newStatusInput = statusInput.cloneNode(true);
-		statusInput.parentNode.replaceChild(newStatusInput, statusInput);
-		
-		// Add our controlled event listeners with capture=true to intercept before other handlers
-		newStatusInput.addEventListener('input', (e) => {
-			e.stopImmediatePropagation();
+		// Add our monitoring listeners without removing existing ones
+		// Use passive listeners that don't interfere with original functionality
+		statusInput.addEventListener('input', (e) => {
 			handleScanInput('statusId', e.target.value, false);
-		}, { capture: true });
+		}, { passive: true });
 		
-		newStatusInput.addEventListener('change', (e) => {
-			e.stopImmediatePropagation();
+		statusInput.addEventListener('change', (e) => {
 			handleScanInput('statusId', e.target.value, false);
-		}, { capture: true });
+		}, { passive: true });
 		
-		newStatusInput.addEventListener('blur', (e) => {
-			e.stopImmediatePropagation();
+		statusInput.addEventListener('blur', (e) => {
 			handleScanInput('statusId', e.target.value, false);
-		}, { capture: true });
+		}, { passive: true });
 		
-		// Only handle keydown for Enter, remove keypress to prevent duplicate handling
-		newStatusInput.addEventListener('keydown', (e) => {
+		// For Enter key, intercept only for our overlay logic but don't prevent default
+		statusInput.addEventListener('keydown', (e) => {
 			if (e.key === 'Enter') {
-				e.preventDefault();
-				e.stopImmediatePropagation();
 				handleScanInput('statusId', e.target.value, true);
+				// Don't prevent default - let original handlers run
 			}
-		}, { capture: true });
+		}, { passive: true });
 		
-		newStatusInput.dataset.soeListener = '1';
+		statusInput.dataset.soeListener = '1';
 		if (settings.debugMode) {
-			console.log('Attached controlled listeners to', STATUS_ID_SELECTOR);
+			console.log('Attached monitoring listeners to', currentSiteConfig.statusIdSelector);
 		}
 	}
 	return true;
@@ -188,25 +234,49 @@ function monitorScanFields() {
 function monitorSaveButton() {
 	const saveButton = document.querySelector('#scan-status-save');
 	if (saveButton && !saveButton.dataset.soeListener) {
-		// Remove existing listeners and add our controlled one
-		const newSaveButton = saveButton.cloneNode(true);
-		saveButton.parentNode.replaceChild(newSaveButton, saveButton);
-		
-		newSaveButton.addEventListener('click', (e) => {
-			e.preventDefault();
-			e.stopImmediatePropagation();
+		// Add our monitoring listener without interfering with original handlers
+		saveButton.addEventListener('click', (e) => {
+			const { itemInput, statusInput } = getInputFields();
+			const itemId = itemInput ? itemInput.value.trim() : '';
+			const statusId = statusInput ? statusInput.value.trim().toLowerCase() : '';
 			
 			if (settings.debugMode) {
-				console.log('Save button clicked - intercepted');
+				console.log('Save button clicked - monitoring', { itemId, statusId });
 			}
 			
-			// Trigger validation and submission
-			handleScanInput('save', 'button_clicked', true);
-		}, { capture: true });
+			// Update scan state for monitoring
+			scanState.itemId = itemId;
+			scanState.statusId = statusId;
+			scanState.lastScan = itemId;
+			
+			// Add to scan history if new
+			if (itemId && (!scanState.scanHistory.length || scanState.scanHistory[scanState.scanHistory.length-1] !== itemId)) {
+				scanState.scanHistory.push(itemId);
+			}
+			
+			// Show pre-submit overlay alongside original functionality
+			if (itemId && statusId) {
+				window.postMessage({ type: 'SHOW_PRESUBMIT_OVERLAY', itemId: scanState.itemId, statusId: scanState.statusId, progress: scanState.scanHistory.length }, '*');
+				
+				// Log scan event to background for history
+				chrome.runtime.sendMessage({
+					type: 'LOG_SCAN',
+					itemId: scanState.itemId,
+					statusId: scanState.statusId,
+					result: 'scanned',
+				});
+			}
+			
+			if (settings.debugMode) {
+				console.log('Save button monitoring complete - allowing original execution');
+			}
+			
+			// Don't prevent default - let original website handle validation and submission
+		}, { passive: true });
 		
-		newSaveButton.dataset.soeListener = '1';
+		saveButton.dataset.soeListener = '1';
 		if (settings.debugMode) {
-			console.log('Attached controlled listener to save button');
+			console.log('Attached validation listener to save button');
 		}
 	}
 }
@@ -299,63 +369,87 @@ function handleScanInput(type, value, isSubmit = false) {
 
 // === Intercept API submission (form submit or XHR/fetch) ===
 function interceptApiSubmission() {
-	// Intercept ALL form submissions with capture=true to prevent them
+  if (!currentSiteConfig) return;
+  
+	// Monitor form submissions without interfering with original functionality
 	document.addEventListener('submit', (e) => {
 		const form = e.target;
-		const itemInput = document.querySelector(ITEM_ID_SELECTOR);
-		const statusInput = document.querySelector(STATUS_ID_SELECTOR);
+		const { itemInput, statusInput } = getInputFields();
 		
 		if (form && (form.contains(itemInput) || form.contains(statusInput))) {
-			e.preventDefault();
-			e.stopImmediatePropagation();
+			const itemId = itemInput ? itemInput.value.trim() : '';
+			const statusId = statusInput ? statusInput.value.trim().toLowerCase() : '';
+			
 			if (settings.debugMode) {
-				console.log('Form submission blocked and intercepted');
+				console.log('Form submission detected - monitoring', { itemId, statusId });
 			}
-			// Show pre-submit overlay and handle submission ourselves
-			handleControlledSubmission();
+			
+			// Update scan state for monitoring
+			scanState.itemId = itemId;
+			scanState.statusId = statusId;
+			scanState.lastScan = itemId;
+			
+			// Add to scan history if new
+			if (itemId && (!scanState.scanHistory.length || scanState.scanHistory[scanState.scanHistory.length-1] !== itemId)) {
+				scanState.scanHistory.push(itemId);
+			}
+			
+			// Show pre-submit overlay alongside original form handling
+			if (itemId && statusId) {
+				window.postMessage({ type: 'SHOW_PRESUBMIT_OVERLAY', itemId: scanState.itemId, statusId: scanState.statusId, progress: scanState.scanHistory.length }, '*');
+				
+				// Log scan event to background for history
+				chrome.runtime.sendMessage({
+					type: 'LOG_SCAN',
+					itemId: scanState.itemId,
+					statusId: scanState.statusId,
+					result: 'scanned',
+				});
+			}
+			
+			if (settings.debugMode) {
+				console.log('Form submission monitoring complete - allowing original handling');
+			}
+			
+			// Don't prevent default - let original website handle the form
 		}
-	}, { capture: true });
+	}, { passive: true });
 
-	// Intercept fetch calls completely
+	// Monitor fetch calls but only intercept if we need to show overlays
 	const origFetch = window.fetch;
 	window.fetch = async function(...args) {
 		const url = args[0];
-		const isRelevantCall = typeof url === 'string' && url.includes(API_URL_PATTERN);
+		const isRelevantCall = typeof url === 'string' && url.includes(currentSiteConfig.apiUrlPattern);
 		
-		if (isRelevantCall) {
+		if (isRelevantCall && scanState.itemId && scanState.statusId) {
 			if (settings.debugMode) {
-				console.log('Fetch API call completely intercepted:', url);
+				console.log('Fetch API call monitored:', url);
 			}
 			
-			// Show pre-submit overlay
-			window.postMessage({ type: 'SHOW_PRESUBMIT_OVERLAY', itemId: scanState.itemId, statusId: scanState.statusId, progress: scanState.scanHistory.length }, '*');
-			
 			try {
-				// Make the actual request but control the response handling
+				// Make the actual request and let it proceed normally
 				const resp = await origFetch.apply(this, args);
 				
 				if (resp.ok) {
-					// Parse response to prevent page from handling it
-					const respData = await resp.clone().text();
-					
-					// Show success overlay instead of letting page show its bubble
+					// Show success overlay in addition to page's success handling
 					window.postMessage({ type: 'SHOW_SUCCESS_OVERLAY', itemId: scanState.itemId, statusId: scanState.statusId, progress: scanState.scanHistory.length }, '*');
 					chrome.runtime.sendMessage({
 						type: 'LOG_SCAN',
 						itemId: scanState.itemId,
 						statusId: scanState.statusId,
 						result: 'success',
-						responseData: respData
 					});
-					clearScanFields();
 					
-					// Return a modified response that won't trigger page's success handlers
-					return new Response('{"intercepted": true, "success": true}', {
-						status: 200,
-						statusText: 'OK',
-						headers: resp.headers
-					});
+					// Clear scan fields after showing overlay
+					setTimeout(() => {
+						clearScanFields();
+					}, 100);
+					
+					if (settings.debugMode) {
+						console.log('Fetch success - showing overlay alongside normal page behavior');
+					}
 				} else {
+					// Show error overlay alongside page's error handling
 					window.postMessage({ type: 'SHOW_ERROR_OVERLAY', error: 'API Error', status: resp.status, progress: scanState.scanHistory.length }, '*');
 					chrome.runtime.sendMessage({
 						type: 'LOG_SCAN',
@@ -363,16 +457,17 @@ function interceptApiSubmission() {
 						statusId: scanState.statusId,
 						result: 'error',
 					});
-					clearScanFields();
 					
-					// Return a modified error response
-					return new Response('{"intercepted": true, "error": true}', {
-						status: resp.status,
-						statusText: resp.statusText,
-						headers: resp.headers
-					});
+					if (settings.debugMode) {
+						console.log('Fetch error - showing overlay alongside normal page behavior');
+					}
 				}
+				
+				// Return the original response unchanged so page can handle it normally
+				return resp;
+				
 			} catch (err) {
+				// Show error overlay alongside page's error handling
 				window.postMessage({ type: 'SHOW_ERROR_OVERLAY', error: err.message, progress: scanState.scanHistory.length }, '*');
 				chrome.runtime.sendMessage({
 					type: 'LOG_SCAN',
@@ -380,16 +475,17 @@ function interceptApiSubmission() {
 					statusId: scanState.statusId,
 					result: 'error',
 				});
-				clearScanFields();
-				throw new Error('Request intercepted - ' + err.message);
+				
+				// Re-throw the error so page can handle it normally
+				throw err;
 			}
 		} else {
-			// Let non-relevant calls pass through normally
+			// Let all other calls pass through normally
 			return origFetch.apply(this, args);
 		}
 	};
 
-	// Intercept XMLHttpRequest calls
+	// Monitor XMLHttpRequest calls but allow normal execution
 	const origXHR = window.XMLHttpRequest;
 	window.XMLHttpRequest = function() {
 		const xhr = new origXHR();
@@ -399,25 +495,24 @@ function interceptApiSubmission() {
 		let isRelevantCall = false;
 		
 		xhr.open = function(method, url, ...args) {
-			isRelevantCall = typeof url === 'string' && url.includes(API_URL_PATTERN);
+			isRelevantCall = typeof url === 'string' && url.includes(currentSiteConfig.apiUrlPattern);
 			if (isRelevantCall && settings.debugMode) {
-				console.log('XHR call intercepted:', method, url);
+				console.log('XHR call monitored:', method, url);
 			}
 			return origOpen.apply(this, [method, url, ...args]);
 		};
 		
 		xhr.send = function(data) {
-			if (isRelevantCall) {
-				// Show pre-submit overlay
-				window.postMessage({ type: 'SHOW_PRESUBMIT_OVERLAY', itemId: scanState.itemId, statusId: scanState.statusId, progress: scanState.scanHistory.length }, '*');
-				
-				// Override the response handlers
+			if (isRelevantCall && scanState.itemId && scanState.statusId) {
+				// Store original handlers
 				const origOnLoad = xhr.onload;
 				const origOnError = xhr.onerror;
 				const origOnReadyStateChange = xhr.onreadystatechange;
 				
+				// Enhance the response handlers to also show our overlays
 				xhr.onload = function() {
 					if (xhr.status >= 200 && xhr.status < 300) {
+						// Show success overlay in addition to page's handling
 						window.postMessage({ type: 'SHOW_SUCCESS_OVERLAY', itemId: scanState.itemId, statusId: scanState.statusId, progress: scanState.scanHistory.length }, '*');
 						chrome.runtime.sendMessage({
 							type: 'LOG_SCAN',
@@ -426,7 +521,17 @@ function interceptApiSubmission() {
 							result: 'success',
 							responseData: xhr.responseText
 						});
+						
+						// Clear scan fields after showing overlay
+						setTimeout(() => {
+							clearScanFields();
+						}, 100);
+						
+						if (settings.debugMode) {
+							console.log('XHR success - showing overlay alongside normal page behavior');
+						}
 					} else {
+						// Show error overlay alongside page's error handling
 						window.postMessage({ type: 'SHOW_ERROR_OVERLAY', error: 'API Error', status: xhr.status, progress: scanState.scanHistory.length }, '*');
 						chrome.runtime.sendMessage({
 							type: 'LOG_SCAN',
@@ -434,12 +539,20 @@ function interceptApiSubmission() {
 							statusId: scanState.statusId,
 							result: 'error',
 						});
+						
+						if (settings.debugMode) {
+							console.log('XHR error - showing overlay alongside normal page behavior');
+						}
 					}
-					clearScanFields();
-					// Don't call original onload to prevent page's success bubble
+					
+					// Call original onload handler if it exists
+					if (origOnLoad) {
+						origOnLoad.apply(this, arguments);
+					}
 				};
 				
 				xhr.onerror = function() {
+					// Show error overlay alongside page's error handling
 					window.postMessage({ type: 'SHOW_ERROR_OVERLAY', error: 'Network Error', progress: scanState.scanHistory.length }, '*');
 					chrome.runtime.sendMessage({
 						type: 'LOG_SCAN',
@@ -447,18 +560,21 @@ function interceptApiSubmission() {
 						statusId: scanState.statusId,
 						result: 'error',
 					});
-					clearScanFields();
-					// Don't call original onerror
+					
+					if (settings.debugMode) {
+						console.log('XHR network error - showing overlay alongside normal page behavior');
+					}
+					
+					// Call original onerror handler if it exists
+					if (origOnError) {
+						origOnError.apply(this, arguments);
+					}
 				};
 				
 				xhr.onreadystatechange = function() {
-					// Only handle final state, and don't call original handler
-					if (xhr.readyState === 4) {
-						if (xhr.status >= 200 && xhr.status < 300) {
-							// Success already handled in onload
-						} else if (xhr.status !== 0) {
-							// Error already handled in onload
-						}
+					// Call original handler to allow normal page behavior
+					if (origOnReadyStateChange) {
+						origOnReadyStateChange.apply(this, arguments);
 					}
 				};
 			}
@@ -506,171 +622,79 @@ function clearScanFields() {
 	scanState.overlayActive = false;
 }
 
-// Suppress page notifications and bubbles
-function suppressPageNotifications() {
-	// Hide common notification/bubble selectors
-	const commonNotificationSelectors = [
-		'.notification', '.toast', '.alert', '.message', '.popup',
-		'.bubble', '.status-message', '.success-message', '.error-message',
-		'[role="alert"]', '[role="status"]', '[aria-live]',
-		'.scan-result', '.result-popup', '.feedback-bubble'
-	];
-	
-	// Observer to hide notifications as they appear
-	const notificationObserver = new MutationObserver((mutations) => {
-		mutations.forEach((mutation) => {
-			mutation.addedNodes.forEach((node) => {
-				if (node.nodeType === Node.ELEMENT_NODE) {
-					// Check if the added node matches notification patterns
-					commonNotificationSelectors.forEach(selector => {
-						try {
-							if (node.matches && node.matches(selector)) {
-								node.style.display = 'none';
-								if (settings.debugMode) {
-									console.log('Suppressed page notification:', selector);
-								}
-							}
-							// Also check child elements
-							const childNotifications = node.querySelectorAll(selector);
-							childNotifications.forEach(el => {
-								el.style.display = 'none';
-								if (settings.debugMode) {
-									console.log('Suppressed child notification:', selector);
-								}
-							});
-						} catch (e) {
-							// Ignore selector errors
-						}
-					});
-				}
-			});
-		});
-	});
-	
-	notificationObserver.observe(document.body, {
-		childList: true,
-		subtree: true
-	});
-	
-	// Also hide any existing notifications
-	commonNotificationSelectors.forEach(selector => {
-		try {
-			document.querySelectorAll(selector).forEach(el => {
-				el.style.display = 'none';
-				if (settings.debugMode) {
-					console.log('Suppressed existing notification:', selector);
-				}
-			});
-		} catch (e) {
-			// Ignore selector errors
-		}
-	});
+// === Initialize extension features ===
+function initializeExtensionFeatures() {
+  if (!currentSiteConfig) return;
+  
+  // Initialize monitoring mechanisms (non-invasive)
+  interceptApiSubmission();
+  
+  // Always observe for scan fields, as dialogs may open/close repeatedly
+  const observer = new MutationObserver(() => {
+    const attached = monitorScanFields();
+    if (attached && settings.debugMode) {
+      console.log('Scan fields found and listeners attached via MutationObserver');
+    }
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
+  
+  // Also try once at init in case fields are already present
+  monitorScanFields();
+  
+  if (settings.debugMode) {
+    console.log('Scan overlay extension features initialized for:', currentSiteConfig.name);
+  }
 }
 
-// Override common notification methods
-function overridePageNotificationMethods() {
-	// Override alert, confirm, prompt
-	const originalAlert = window.alert;
-	const originalConfirm = window.confirm;
-	const originalPrompt = window.prompt;
-	
-	window.alert = function(message) {
-		if (settings.debugMode) {
-			console.log('Alert suppressed:', message);
-		}
-		// Show our overlay instead if it's scan-related
-		if (message && (message.includes('scan') || message.includes('success') || message.includes('error'))) {
-			window.postMessage({ type: 'SHOW_SUCCESS_OVERLAY', itemId: scanState.itemId, statusId: scanState.statusId, progress: scanState.scanHistory.length }, '*');
-		}
-	};
-	
-	window.confirm = function(message) {
-		if (settings.debugMode) {
-			console.log('Confirm suppressed:', message);
-		}
-		return true; // Default to true for scan operations
-	};
-	
-	window.prompt = function(message) {
-		if (settings.debugMode) {
-			console.log('Prompt suppressed:', message);
-		}
-		return null;
-	};
-	
-	// Override common toast/notification libraries
-	if (window.toastr) {
-		const originalToastr = window.toastr;
-		window.toastr = {
-			success: () => {},
-			error: () => {},
-			warning: () => {},
-			info: () => {}
-		};
-	}
-	
-	// Override snackbar.show() method to suppress validation error messages
-	if (window.snackbar && typeof window.snackbar.show === 'function') {
-		const originalSnackbarShow = window.snackbar.show;
-		window.snackbar.show = function(message, type) {
-			if (settings.debugMode) {
-				console.log('Snackbar suppressed:', message, type);
-			}
-			// Suppress scan-related error messages
-			if (message === 'No Record Found' || message === 'No Status Found') {
-				// Don't show the snackbar - our overlay will handle this
-				return;
-			}
-			// Allow other snackbar messages to pass through
-			return originalSnackbarShow.apply(this, arguments);
-		};
-	}
-	
-	// Override other common notification patterns
-	const originalConsoleLog = console.log;
-	const originalConsoleError = console.error;
-	
-	// Don't completely disable console, but filter scan-related messages if needed
-	console.log = function(...args) {
-		const message = args.join(' ');
-		if (!message.includes('scan-related-suppression-keyword')) {
-			originalConsoleLog.apply(console, args);
-		}
-	};
+// === Cleanup extension features ===
+function cleanupExtensionFeatures() {
+  // Remove event listeners and reset state
+  scanState = {
+    itemId: '',
+    statusId: '',
+    lastScan: '',
+    scanHistory: [],
+    overlayActive: false,
+  };
+  
+  // Reset processed input tracking
+  lastProcessedInput = { itemId: '', statusId: '', timestamp: 0 };
+  
+  if (settings.debugMode) {
+    console.log('Scan overlay extension features cleaned up');
+  }
 }
-
 
 // === Initialize content script ===
 async function init() {
-	// Load settings first
-	await loadSettings();
-	
-	// Initialize all interception and suppression mechanisms
-	suppressPageNotifications();
-	overridePageNotificationMethods();
-	interceptApiSubmission();
-	
-	// Always observe for scan fields, as dialogs may open/close repeatedly
-	const observer = new MutationObserver(() => {
-		const attached = monitorScanFields();
-		if (attached && settings.debugMode) {
-			console.log('Scan fields found and listeners attached via MutationObserver');
-		}
-	});
-	observer.observe(document.body, { childList: true, subtree: true });
-	
-	// Also try once at init in case fields are already present
-	monitorScanFields();
+	// Load settings and check if we should be active on this page
+	const shouldBeActive = await loadSettings();
+  
+  if (!shouldBeActive) {
+    if (settings.debugMode) {
+      console.log('Extension not active on this page - no matching site configuration');
+    }
+    return;
+  }
+  
+  // Initialize extension features
+  initializeExtensionFeatures();
 	
 	// Listen for settings changes
 	chrome.storage.onChanged.addListener((changes, namespace) => {
 		if (namespace === 'sync' && changes.scanOverlaySettings) {
-			loadSettings();
+			loadSettings().then(shouldBeActive => {
+        if (shouldBeActive) {
+          initializeExtensionFeatures();
+        } else {
+          cleanupExtensionFeatures();
+        }
+      });
 		}
 	});
 	
 	if (settings.debugMode) {
-		console.log('Scan overlay extension fully initialized with complete interception');
+		console.log('Scan overlay extension fully initialized with URL-based filtering');
 	}
 }
 

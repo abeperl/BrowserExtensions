@@ -82,10 +82,10 @@ function playAudio(state) {
   
   let audioFile = '';
   switch (state) {
-    case 'scan': audioFile = 'audio/scan.mp3'; break;
-    case 'presubmit': audioFile = 'audio/scan.mp3'; break; // Use scan sound instead of warning for presubmit
-    case 'success': audioFile = 'audio/taskCompleted.mp3'; break;
-    case 'error': audioFile = 'audio/error.mp3'; break;
+    case 'scan': audioFile = 'audio/scan.wav'; break;
+    case 'presubmit': audioFile = 'audio/scan.wav'; break; // Use scan sound instead of warning for presubmit
+    case 'success': audioFile = 'audio/taskCompleted.wav'; break;
+    case 'error': audioFile = 'audio/error.wav'; break;
     default: return;
   }
   const audio = new Audio(chrome.runtime.getURL(audioFile));

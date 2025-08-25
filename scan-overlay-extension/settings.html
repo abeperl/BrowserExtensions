@@ -13,31 +13,20 @@
     </header>
 
     <div class="settings-content">
-      <!-- XPath Configuration -->
+      <!-- Site Configurations -->
       <section class="settings-section">
-        <h2>Field Selectors</h2>
-        <p class="section-description">Configure CSS selectors for scan input fields</p>
+        <h2>Site Configurations</h2>
+        <p class="section-description">Configure URL patterns and selectors for specific sites</p>
+        
+        <div class="site-configs-container">
+          <div id="siteConfigsList"></div>
+          <button type="button" id="addSiteConfig" class="btn btn-secondary">Add New Site Configuration</button>
+        </div>
         
         <div class="input-group">
-          <label for="itemIdSelector">Item ID Selector:</label>
-          <input type="text" id="itemIdSelector" placeholder="#product-scan" class="selector-input">
-          <span class="input-help">CSS selector for the item ID input field</span>
+          <button type="button" id="testCurrentSite" class="btn btn-secondary">Test Current Site</button>
+          <div id="siteTestResult" class="test-result"></div>
         </div>
-        
-        <div class="input-group">
-          <label for="statusIdSelector">Status ID Selector:</label>
-          <input type="text" id="statusIdSelector" placeholder="#status-scan" class="selector-input">
-          <span class="input-help">CSS selector for the status ID input field</span>
-        </div>
-
-        <div class="input-group">
-          <label for="apiUrlPattern">API URL Pattern:</label>
-          <input type="text" id="apiUrlPattern" placeholder="/api/scan" class="selector-input">
-          <span class="input-help">URL pattern to intercept for API calls</span>
-        </div>
-
-        <button type="button" id="testSelectors" class="btn btn-secondary">Test Selectors</button>
-        <div id="selectorTestResult" class="test-result"></div>
       </section>
 
       <!-- Overlay Settings -->

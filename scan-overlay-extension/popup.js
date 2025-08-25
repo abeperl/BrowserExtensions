@@ -59,34 +59,48 @@ class PopupManager {
       const result = await chrome.storage.sync.get('scanOverlaySettings');
       const settings = result.scanOverlaySettings || {};
       
-      const itemSelector = settings.itemIdSelector || '#product-scan';
-      const statusSelector = settings.statusIdSelector || '#status-scan';
+      // Find matching site configuration for current URL
+      const currentUrl = tab.url;
+      const matchingSiteConfig = this.findMatchingSiteConfig(currentUrl, settings.siteConfigs);
+      
+      if (!matchingSiteConfig) {
+        this.updateFieldStatus('itemFieldStatus', false);
+        this.updateFieldStatus('statusFieldStatus', false);
+        this.updateConnectionStatus(false, 'No site configuration for this URL');
+        this.updateSiteConfigInfo(null, currentUrl);
+        return;
+      }
+      
+      this.updateSiteConfigInfo(matchingSiteConfig, currentUrl);
 
       const results = await chrome.scripting.executeScript({
         target: { tabId: tab.id },
-        func: (item, status) => {
+        func: (item, status, configName) => {
           try {
             const itemEl = document.querySelector(item);
             const statusEl = document.querySelector(status);
             return {
               itemFound: !!itemEl,
-              statusFound: !!statusEl
+              statusFound: !!statusEl,
+              configName: configName,
+              url: window.location.href
             };
           } catch (error) {
-            return { itemFound: false, statusFound: false, error: error.message };
+            return { itemFound: false, statusFound: false, error: error.message, configName: configName };
           }
         },
-        args: [itemSelector, statusSelector]
+        args: [matchingSiteConfig.itemIdSelector, matchingSiteConfig.statusIdSelector, matchingSiteConfig.name]
       });
 
       const fieldResult = results[0].result;
       this.updateFieldStatus('itemFieldStatus', fieldResult.itemFound);
       this.updateFieldStatus('statusFieldStatus', fieldResult.statusFound);
-      this.updateConnectionStatus(fieldResult.itemFound || fieldResult.statusFound);
+      this.updateConnectionStatus(fieldResult.itemFound || fieldResult.statusFound, 
+        `Using config: ${fieldResult.configName}`);
 
     } catch (error) {
       console.error('Error checking field status:', error);
-      this.updateConnectionStatus(false);
+      this.updateConnectionStatus(false, 'Error checking fields');
     }
   }
 
@@ -98,7 +112,7 @@ class PopupManager {
     }
   }
 
-  updateConnectionStatus(connected) {
+  updateConnectionStatus(connected, statusMessage = null) {
     const statusDot = document.getElementById('connectionStatus');
     const statusText = document.getElementById('statusText');
     
@@ -107,7 +121,7 @@ class PopupManager {
     }
     
     if (statusText) {
-      statusText.textContent = connected ? 'Active' : 'No fields detected';
+      statusText.textContent = statusMessage || (connected ? 'Active' : 'No fields detected');
     }
   }
 
@@ -208,6 +222,46 @@ class PopupManager {
         }
       });
     });
+  }
+
+  findMatchingSiteConfig(url, siteConfigs) {
+    if (!siteConfigs || !Array.isArray(siteConfigs)) {
+      return null;
+    }
+    
+    return siteConfigs.find(config => {
+      if (!config.enabled) return false;
+      
+      try {
+        const pattern = new RegExp(config.urlPattern);
+        return pattern.test(url);
+      } catch (e) {
+        console.warn('Invalid regex pattern in site config:', config.urlPattern, e);
+        return false;
+      }
+    });
+  }
+  
+  updateSiteConfigInfo(siteConfig, currentUrl) {
+    // You can add UI elements in popup.html to show site config info
+    const siteConfigInfo = document.getElementById('siteConfigInfo');
+    if (siteConfigInfo) {
+      if (siteConfig) {
+        siteConfigInfo.innerHTML = `
+          <div class="site-config-active">
+            <strong>${siteConfig.name}</strong>
+            <div class="site-config-pattern">${siteConfig.urlPattern}</div>
+          </div>
+        `;
+      } else {
+        siteConfigInfo.innerHTML = `
+          <div class="site-config-inactive">
+            No matching site configuration
+            <div class="current-url">${currentUrl}</div>
+          </div>
+        `;
+      }
+    }
   }
 
   bindEvents() {

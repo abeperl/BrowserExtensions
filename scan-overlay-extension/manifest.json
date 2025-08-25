@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Scan Overlay Extension",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Enhances scanning workflows with advanced overlays, feedback, and accessibility features.",
   "permissions": [
     "storage",
@@ -39,7 +39,7 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["audio/*.mp3", "icons/*.png"],
+      "resources": ["audio/*.wav", "audio/*.mp3", "icons/*.png"],
       "matches": ["<all_urls>"]
     }
   ]

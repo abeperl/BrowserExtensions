@@ -347,6 +347,175 @@ input:checked + .slider:before {
   border-bottom: none;
 }
 
+/* Site Configuration Styles */
+.site-configs-container {
+  margin-bottom: 20px;
+}
+
+.site-config-item {
+  background: white;
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  padding: 20px;
+  position: relative;
+}
+
+.site-config-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.site-config-title {
+  font-weight: 600;
+  color: #495057;
+  margin: 0;
+}
+
+.site-config-url {
+  font-size: 12px;
+  color: #6c757d;
+  font-family: 'Courier New', monospace;
+  margin: 4px 0 0 0;
+}
+
+.site-config-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.btn-small {
+  padding: 4px 8px;
+  font-size: 12px;
+  border-radius: 4px;
+}
+
+.btn-danger {
+  background-color: #dc3545;
+  color: white;
+  border: none;
+}
+
+.btn-danger:hover {
+  background-color: #c82333;
+}
+
+.site-config-form {
+  display: grid;
+  gap: 16px;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.form-row.full-width {
+  grid-template-columns: 1fr;
+}
+
+.site-config-item .input-group {
+  margin-bottom: 0;
+}
+
+.site-config-collapsed .site-config-form {
+  display: none;
+}
+
+.toggle-collapse {
+  background: none;
+  border: none;
+  color: #007bff;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+}
+
+.site-config-status {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 500;
+  margin-left: 8px;
+}
+
+.site-config-status.active {
+  background-color: #d4edda;
+  color: #155724;
+}
+
+.site-config-status.inactive {
+  background-color: #f8d7da;
+  color: #721c24;
+}
+
+/* Site Configuration Display in Popup */
+.site-config-section {
+  padding: 16px;
+  background: white;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.site-config-section h3 {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #495057;
+}
+
+.site-config-display {
+  font-size: 12px;
+}
+
+.site-config-active {
+  padding: 8px 12px;
+  background-color: #d4edda;
+  border: 1px solid #c3e6cb;
+  border-radius: 6px;
+}
+
+.site-config-active strong {
+  font-weight: 600;
+  color: #155724;
+}
+
+.site-config-pattern {
+  font-family: 'Courier New', monospace;
+  color: #6c757d;
+  margin-top: 4px;
+  font-size: 11px;
+}
+
+.site-config-inactive {
+  padding: 8px 12px;
+  background-color: #f8d7da;
+  border: 1px solid #f5c6cb;
+  border-radius: 6px;
+  color: #721c24;
+}
+
+.site-config-loading {
+  padding: 8px 12px;
+  background-color: #e2e3e5;
+  border: 1px solid #d6d8db;
+  border-radius: 6px;
+  color: #6c757d;
+  font-style: italic;
+}
+
+.current-url {
+  font-family: 'Courier New', monospace;
+  font-size: 10px;
+  margin-top: 4px;
+  word-break: break-all;
+}
+
 /* Actions Section */
 .actions-section {
   padding: 16px;
