@@ -1,7 +1,13 @@
 {
   "permissions": {
     "allow": [
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "WebFetch(domain:github.com)",
+      "Bash(chmod:*)",
+      "Read(//c//**)",
+      "Bash(find:*)",
+      "Bash(powershell:*)",
+      "Read(//c/Users/User/.claude/**)"
     ],
     "deny": []
   }

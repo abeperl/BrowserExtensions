@@ -11,9 +11,15 @@ class SettingsManager {
           name: 'Default Configuration',
           urlPattern: '.*', // Regex pattern for matching URLs
           enabled: true,
-          itemIdSelector: '#product-scan',
-          statusIdSelector: '#status-scan',
-          apiUrlPattern: '/api/scan'
+          inputSelector: '#product-scan, #status-scan', // Generic input selector
+          apiUrlPattern: '/api/scan',
+          // Modal resize settings
+          enableModalResize: false,
+          modalSelector: '.modal-box, .modal, [role="dialog"]',
+          modalWidth: '800px',
+          modalHeight: '600px',
+          modalMinWidth: '600px',
+          modalMinHeight: '400px'
         }
       ],
       
@@ -53,18 +59,60 @@ class SettingsManager {
       
       // Migrate old settings format if needed
       if (settings.itemIdSelector && !settings.siteConfigs) {
+        // Combine old selectors into single inputSelector
+        const inputSelectors = [];
+        if (settings.itemIdSelector) inputSelectors.push(settings.itemIdSelector);
+        if (settings.statusIdSelector) inputSelectors.push(settings.statusIdSelector);
+        
         settings.siteConfigs = [{
           id: 'migrated',
           name: 'Migrated Configuration',
           urlPattern: '.*',
           enabled: true,
-          itemIdSelector: settings.itemIdSelector,
-          statusIdSelector: settings.statusIdSelector,
-          apiUrlPattern: settings.apiUrlPattern
+          inputSelector: inputSelectors.join(', '),
+          apiUrlPattern: settings.apiUrlPattern || '/api/scan'
         }];
         delete settings.itemIdSelector;
         delete settings.statusIdSelector;
         delete settings.apiUrlPattern;
+      }
+      
+      // Migrate existing siteConfigs with separate selectors
+      if (settings.siteConfigs) {
+        settings.siteConfigs = settings.siteConfigs.map(config => {
+          const updatedConfig = { ...config };
+          
+          // Migrate old selector format
+          if (config.itemIdSelector || config.statusIdSelector) {
+            const inputSelectors = [];
+            if (config.itemIdSelector) inputSelectors.push(config.itemIdSelector);
+            if (config.statusIdSelector) inputSelectors.push(config.statusIdSelector);
+            
+            updatedConfig.inputSelector = config.inputSelector || inputSelectors.join(', ');
+          }
+          
+          // Add default modal resize settings if missing
+          if (updatedConfig.enableModalResize === undefined) {
+            updatedConfig.enableModalResize = false;
+          }
+          if (!updatedConfig.modalSelector) {
+            updatedConfig.modalSelector = '.modal-box, .modal, [role="dialog"]';
+          }
+          if (!updatedConfig.modalWidth) {
+            updatedConfig.modalWidth = '800px';
+          }
+          if (!updatedConfig.modalHeight) {
+            updatedConfig.modalHeight = '600px';
+          }
+          if (!updatedConfig.modalMinWidth) {
+            updatedConfig.modalMinWidth = '600px';
+          }
+          if (!updatedConfig.modalMinHeight) {
+            updatedConfig.modalMinHeight = '400px';
+          }
+          
+          return updatedConfig;
+        });
       }
       
       // Ensure siteConfigs exists
@@ -181,20 +229,30 @@ class SettingsManager {
       
       const results = await chrome.scripting.executeScript({
         target: { tabId: tab.id },
-        func: (item, status, api, url, configName) => {
-          const itemEl = document.querySelector(item);
-          const statusEl = document.querySelector(status);
+        func: (inputSelector, modalSelector, enableModalResize, api, url, configName) => {
+          const inputElements = document.querySelectorAll(inputSelector);
+          const foundElements = Array.from(inputElements).map(el => 
+            el.tagName + (el.id ? '#' + el.id : '') + (el.className ? '.' + Array.from(el.classList).join('.') : '')
+          );
+          
+          const modalElements = enableModalResize ? document.querySelectorAll(modalSelector) : [];
+          const foundModals = Array.from(modalElements).map(el => 
+            el.tagName + (el.id ? '#' + el.id : '') + (el.className ? '.' + Array.from(el.classList).join('.') : '')
+          );
           
           return {
             url: url,
-            itemFound: !!itemEl,
-            statusFound: !!statusEl,
-            itemEl: itemEl ? itemEl.tagName + (itemEl.id ? '#' + itemEl.id : '') : null,
-            statusEl: statusEl ? statusEl.tagName + (statusEl.id ? '#' + statusEl.id : '') : null,
-            configName: configName
+            inputsFound: inputElements.length,
+            foundElements: foundElements,
+            modalSelector: modalSelector,
+            modalsFound: modalElements.length,
+            foundModals: foundModals,
+            enableModalResize: enableModalResize,
+            configName: configName,
+            selector: inputSelector
           };
         },
-        args: [matchingConfig.itemIdSelector, matchingConfig.statusIdSelector, matchingConfig.apiUrlPattern, currentUrl, matchingConfig.name]
+        args: [matchingConfig.inputSelector, matchingConfig.modalSelector, matchingConfig.enableModalResize, matchingConfig.apiUrlPattern, currentUrl, matchingConfig.name]
       });
 
       const result = results[0].result;
@@ -202,12 +260,35 @@ class SettingsManager {
       let html = '<div class="test-results">';
       html += `<div class="test-item info">Config: ${result.configName}</div>`;
       html += `<div class="test-item info">URL: ${currentUrl}</div>`;
-      html += `<div class="test-item ${result.itemFound ? 'success' : 'error'}">`;  
-      html += `Item Selector: ${result.itemFound ? '✓ Found' : '✗ Not found'} ${result.itemEl || ''}`;
+      html += `<div class="test-item info">Input Selector: ${result.selector}</div>`;
+      html += `<div class="test-item ${result.inputsFound > 0 ? 'success' : 'error'}">`;  
+      html += `Input Fields: ${result.inputsFound > 0 ? '✓ Found ' + result.inputsFound : '✗ Not found'}`;
       html += '</div>';
-      html += `<div class="test-item ${result.statusFound ? 'success' : 'error'}">`;  
-      html += `Status Selector: ${result.statusFound ? '✓ Found' : '✗ Not found'} ${result.statusEl || ''}`;
-      html += '</div>';
+      
+      // Modal resize testing
+      if (result.enableModalResize) {
+        html += `<div class="test-item info">Modal Selector: ${result.modalSelector}</div>`;
+        html += `<div class="test-item ${result.modalsFound > 0 ? 'success' : 'info'}">`;  
+        html += `Modal Elements: ${result.modalsFound > 0 ? '✓ Found ' + result.modalsFound : 'None found (will be detected when they appear)'}`;
+        html += '</div>';
+        
+        if (result.foundModals && result.foundModals.length > 0) {
+          html += '<div class="test-item info">Found Modal Elements:</div>';
+          result.foundModals.forEach(el => {
+            html += `<div class="test-item info" style="margin-left: 20px;">• ${el}</div>`;
+          });
+        }
+      } else {
+        html += `<div class="test-item info">Modal Resize: Disabled</div>`;
+      }
+      
+      // Input elements found
+      if (result.foundElements && result.foundElements.length > 0) {
+        html += '<div class="test-item info">Found Input Elements:</div>';
+        result.foundElements.forEach(el => {
+          html += `<div class="test-item info" style="margin-left: 20px;">• ${el}</div>`;
+        });
+      }
       html += '</div>';
       
       resultDiv.innerHTML = html;
@@ -377,7 +458,7 @@ class SettingsManager {
         </div>
         <div class="site-config-actions">
           <button class="btn-small toggle-collapse" data-index="${index}">Edit</button>
-          <button class="btn-small btn-danger" onclick="settingsManager.removeSiteConfig(${index})">Delete</button>
+          <button class="btn-small btn-danger delete-config" data-index="${index}">Delete</button>
         </div>
       </div>
       <div class="site-config-form">
@@ -401,14 +482,11 @@ class SettingsManager {
             <span class="input-help">Regular expression to match URLs where this config should be active</span>
           </div>
         </div>
-        <div class="form-row">
+        <div class="form-row full-width">
           <div class="input-group">
-            <label>Item ID Selector:</label>
-            <input type="text" data-config="itemIdSelector" data-index="${index}" value="${config.itemIdSelector}" placeholder="#product-scan">
-          </div>
-          <div class="input-group">
-            <label>Status ID Selector:</label>
-            <input type="text" data-config="statusIdSelector" data-index="${index}" value="${config.statusIdSelector}" placeholder="#status-scan">
+            <label>Input Field Selector:</label>
+            <input type="text" data-config="inputSelector" data-index="${index}" value="${config.inputSelector || ''}" placeholder="#scan-input, .scan-field, [data-scan]">
+            <span class="input-help">CSS selector(s) for input fields to monitor (comma-separated for multiple)</span>
           </div>
         </div>
         <div class="form-row full-width">
@@ -416,6 +494,45 @@ class SettingsManager {
             <label>API URL Pattern:</label>
             <input type="text" data-config="apiUrlPattern" data-index="${index}" value="${config.apiUrlPattern}" placeholder="/api/scan">
             <span class="input-help">URL pattern to intercept for API calls</span>
+          </div>
+        </div>
+        
+        <!-- Modal Resize Settings -->
+        <div class="form-section">
+          <h5>Modal Resize Settings</h5>
+          <div class="form-row">
+            <div class="input-group">
+              <label class="checkbox-label">
+                <input type="checkbox" data-config="enableModalResize" data-index="${index}" ${config.enableModalResize ? 'checked' : ''}>
+                <span class="checkmark"></span>
+                Enable Modal Resize
+              </label>
+            </div>
+            <div class="input-group">
+              <label>Modal Selector:</label>
+              <input type="text" data-config="modalSelector" data-index="${index}" value="${config.modalSelector || ''}" placeholder=".modal-box, .modal, [role=dialog]">
+              <span class="input-help">CSS selector for modal/popup elements to resize</span>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="input-group">
+              <label>Modal Width:</label>
+              <input type="text" data-config="modalWidth" data-index="${index}" value="${config.modalWidth || ''}" placeholder="800px">
+            </div>
+            <div class="input-group">
+              <label>Modal Height:</label>
+              <input type="text" data-config="modalHeight" data-index="${index}" value="${config.modalHeight || ''}" placeholder="600px">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="input-group">
+              <label>Min Width:</label>
+              <input type="text" data-config="modalMinWidth" data-index="${index}" value="${config.modalMinWidth || ''}" placeholder="600px">
+            </div>
+            <div class="input-group">
+              <label>Min Height:</label>
+              <input type="text" data-config="modalMinHeight" data-index="${index}" value="${config.modalMinHeight || ''}" placeholder="400px">
+            </div>
           </div>
         </div>
       </div>
@@ -426,6 +543,12 @@ class SettingsManager {
     toggleButton.addEventListener('click', () => {
       div.classList.toggle('site-config-collapsed');
       toggleButton.textContent = div.classList.contains('site-config-collapsed') ? 'Edit' : 'Collapse';
+    });
+    
+    // Add delete button listener
+    const deleteButton = div.querySelector('.delete-config');
+    deleteButton.addEventListener('click', () => {
+      this.removeSiteConfig(parseInt(deleteButton.dataset.index));
     });
     
     // Add input change listeners
@@ -447,9 +570,14 @@ class SettingsManager {
       name: 'New Site Configuration',
       urlPattern: 'https://example\\.com/.*',
       enabled: true,
-      itemIdSelector: '#product-scan',
-      statusIdSelector: '#status-scan',
-      apiUrlPattern: '/api/scan'
+      inputSelector: '#scan-input',
+      apiUrlPattern: '/api/scan',
+      enableModalResize: false,
+      modalSelector: '.modal-box, .modal, [role="dialog"]',
+      modalWidth: '800px',
+      modalHeight: '600px',
+      modalMinWidth: '600px',
+      modalMinHeight: '400px'
     };
     
     this.currentSettings.siteConfigs.push(newConfig);
@@ -490,9 +618,14 @@ class SettingsManager {
         name: div.querySelector('[data-config="name"]').value,
         urlPattern: div.querySelector('[data-config="urlPattern"]').value,
         enabled: div.querySelector('[data-config="enabled"]').checked,
-        itemIdSelector: div.querySelector('[data-config="itemIdSelector"]').value,
-        statusIdSelector: div.querySelector('[data-config="statusIdSelector"]').value,
-        apiUrlPattern: div.querySelector('[data-config="apiUrlPattern"]').value
+        inputSelector: div.querySelector('[data-config="inputSelector"]').value,
+        apiUrlPattern: div.querySelector('[data-config="apiUrlPattern"]').value,
+        enableModalResize: div.querySelector('[data-config="enableModalResize"]').checked,
+        modalSelector: div.querySelector('[data-config="modalSelector"]').value,
+        modalWidth: div.querySelector('[data-config="modalWidth"]').value,
+        modalHeight: div.querySelector('[data-config="modalHeight"]').value,
+        modalMinWidth: div.querySelector('[data-config="modalMinWidth"]').value,
+        modalMinHeight: div.querySelector('[data-config="modalMinHeight"]').value
       };
       configs.push(config);
     });

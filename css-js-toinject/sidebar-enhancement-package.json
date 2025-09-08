@@ -1,0 +1,542 @@
+{
+  "info": {
+    "lastEmitterId": "sidebar_enhancement_v1",
+    "updatedAt": 1725368400000,
+    "version": 1
+  },
+  "libs": [],
+  "malchus_general_v1": {
+    "css": "/* ===== SIMPLE SIDEBAR FIX - USE EXISTING FUNCTIONALITY ===== */\n\n/* Force the mobile hamburger button to always be visible */\nbutton[data-bs-toggle=\"offcanvas\"],\n.navbar-toggler,\n.btn[data-bs-toggle=\"offcanvas\"],\n#mobile_btn {\n    display: block !important;\n    visibility: visible !important;\n    opacity: 1 !important;\n    position: fixed !important;\n    top: 15px !important;\n    left: 15px !important;\n    z-index: 1000 !important;\n    background: #ff8c00 !important;\n    border: none !important;\n    border-radius: 6px !important;\n    padding: 8px 12px !important;\n    cursor: pointer !important;\n    transition: all 0.2s ease !important;\n    box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;\n}\n\n/* Ensure the hamburger icon is visible */\nbutton[data-bs-toggle=\"offcanvas\"] .navbar-toggler-icon,\n.navbar-toggler .navbar-toggler-icon,\n.btn[data-bs-toggle=\"offcanvas\"] .navbar-toggler-icon,\n#mobile_btn .navbar-toggler-icon,\n#mobile_btn span {\n    display: block !important;\n    width: 24px !important;\n    height: 2px !important;\n    background: white !important;\n}\n\n/* Hover effect for the button */\nbutton[data-bs-toggle=\"offcanvas\"]:hover,\n.navbar-toggler:hover,\n.btn[data-bs-toggle=\"offcanvas\"]:hover,\n#mobile_btn:hover {\n    background: #e07700 !important;\n    transform: scale(1.05) !important;\n}\n\n/* Make sure sidebar offcanvas works properly */\n.offcanvas,\n.offcanvas.offcanvas-start,\n#sidebar.offcanvas {\n    position: fixed !important;\n    top: 0 !important;\n    left: 0 !important;\n    width: 300px !important;\n    height: 100vh !important;\n    background: white !important;\n    z-index: 1055 !important;\n    transform: translateX(-100%) !important;\n    transition: transform 0.3s ease-in-out !important;\n}\n\n/* When sidebar is shown */\n.offcanvas.show,\n.offcanvas.showing,\n#sidebar.offcanvas.show {\n    transform: translateX(0) !important;\n}\n\n/* Backdrop for sidebar */\n.offcanvas-backdrop {\n    position: fixed !important;\n    top: 0 !important;\n    left: 0 !important;\n    width: 100vw !important;\n    height: 100vh !important;\n    background: rgba(0, 0, 0, 0.5) !important;\n    z-index: 1050 !important;\n}\n\n/* Ensure sidebar content is visible */\n.offcanvas .offcanvas-body,\n#sidebar .offcanvas-body,\n#sidebar .sidebar-menu {\n    padding: 1rem !important;\n    overflow-y: auto !important;\n}\n\n.offcanvas .offcanvas-body ul,\n#sidebar .sidebar-menu,\n#sidebar .sidebar-menu ul {\n    list-style: none !important;\n    margin: 0 !important;\n    padding: 0 !important;\n}\n\n.offcanvas .offcanvas-body li,\n#sidebar .sidebar-menu li {\n    margin-bottom: 0.5rem !important;\n}\n\n.offcanvas .offcanvas-body a,\n#sidebar .sidebar-menu a {\n    display: flex !important;\n    align-items: center !important;\n    padding: 0.75rem 1rem !important;\n    color: #6c757d !important;\n    text-decoration: none !important;\n    border-radius: 0.375rem !important;\n    transition: all 0.2s ease !important;\n    gap: 0.75rem !important;\n}\n\n.offcanvas .offcanvas-body a:hover,\n#sidebar .sidebar-menu a:hover {\n    background: #f8f9fa !important;\n    color: #ff8c00 !important;\n}\n\n/* Close button in sidebar */\n.offcanvas .btn-close,\n#sidebar .btn-close {\n    position: absolute !important;\n    top: 15px !important;\n    right: 15px !important;\n    background: transparent !important;\n    border: none !important;\n    font-size: 1.5rem !important;\n    opacity: 0.7 !important;\n}\n\n/* Don't affect main content positioning - let Bootstrap handle it */\n.main-content,\n.dashboard-wrp {\n    transition: none !important;\n    margin-left: 0 !important;\n    width: 100% !important;\n}\n\n/* Submenu arrows and functionality */\n.sidebar-menu a[data-bs-toggle=\"collapse\"]::after,\n.sidebar-menu a[aria-expanded]::after {\n    content: \"▶\" !important;\n    margin-left: auto !important;\n    font-size: 12px !important;\n    transition: transform 0.2s ease !important;\n}\n\n.sidebar-menu a[aria-expanded=\"true\"]::after {\n    transform: rotate(90deg) !important;\n}\n\n.sidebar-menu .collapse {\n    transition: height 0.2s ease !important;\n}\n\n.sidebar-menu .collapse.show {\n    display: block !important;\n}\n\n.sidebar-menu .collapse ul {\n    padding-left: 1rem !important;\n    margin-top: 0.5rem !important;\n}\n\n.sidebar-menu .collapse a {\n    padding: 0.5rem 1rem !important;\n    font-size: 0.875rem !important;\n    color: #8c8c8c !important;\n}",
+    "error": "",
+    "js": "// ===== SIMPLE SIDEBAR FIX - USE EXISTING BOOTSTRAP FUNCTIONALITY =====\n\n(function() {\n    'use strict';\n    \n    console.log('🎯 Simple Sidebar Fix - Using existing functionality');\n    \n    // Manual toggle function\n    function manualToggleSidebar(sidebar) {\n        console.log('📱 Using manual toggle');\n        const isVisible = sidebar.classList.contains('show') || \n                          sidebar.style.transform === 'translateX(0px)' ||\n                          sidebar.style.visibility === 'visible';\n        \n        if (isVisible) {\n            // Hide sidebar\n            sidebar.classList.remove('show');\n            sidebar.classList.add('hide');\n            sidebar.style.transform = 'translateX(-100%)';\n            sidebar.style.visibility = 'hidden';\n            \n            // Remove backdrop if it exists\n            const backdrop = document.querySelector('.offcanvas-backdrop');\n            if (backdrop) backdrop.remove();\n            \n            console.log('🙈 Sidebar hidden');\n        } else {\n            // Show sidebar\n            sidebar.classList.add('show');\n            sidebar.classList.remove('hide');\n            sidebar.style.transform = 'translateX(0px)';\n            sidebar.style.visibility = 'visible';\n            \n            // Add backdrop\n            const backdrop = document.createElement('div');\n            backdrop.className = 'offcanvas-backdrop fade show';\n            backdrop.style.cssText = `\n                position: fixed;\n                top: 0;\n                left: 0;\n                width: 100vw;\n                height: 100vh;\n                background: rgba(0, 0, 0, 0.5);\n                z-index: 1050;\n            `;\n            backdrop.addEventListener('click', () => {\n                manualToggleSidebar(sidebar);\n            });\n            document.body.appendChild(backdrop);\n            \n            console.log('👀 Sidebar shown');\n        }\n    }\n    \n    // Find and enhance the existing mobile button\n    function enhanceExistingButton() {\n        // Look for various button selectors used by the site\n        const buttonSelectors = [\n            'button[data-bs-toggle=\"offcanvas\"]',\n            '.navbar-toggler',\n            '#mobile_btn',\n            '.btn[data-bs-toggle=\"offcanvas\"]',\n            'button[aria-controls=\"sidebar\"]'\n        ];\n        \n        let foundButton = null;\n        \n        for (const selector of buttonSelectors) {\n            foundButton = document.querySelector(selector);\n            if (foundButton) {\n                console.log(`✅ Found existing button: ${selector}`);\n                break;\n            }\n        }\n        \n        if (foundButton) {\n            // Make sure it's always visible\n            foundButton.style.display = 'block';\n            foundButton.style.visibility = 'visible';\n            foundButton.style.opacity = '1';\n            \n            // Ensure it has proper positioning\n            foundButton.style.position = 'fixed';\n            foundButton.style.top = '15px';\n            foundButton.style.left = '15px';\n            foundButton.style.zIndex = '1000';\n            \n            // Add some styling to make it look nice\n            if (!foundButton.style.background || foundButton.style.background === '') {\n                foundButton.style.background = '#ff8c00';\n                foundButton.style.border = 'none';\n                foundButton.style.borderRadius = '6px';\n                foundButton.style.padding = '8px 12px';\n                foundButton.style.cursor = 'pointer';\n                foundButton.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';\n            }\n            \n            // Check if button actually has functionality\n            console.log('🔍 Button attributes:', {\n                'data-bs-toggle': foundButton.getAttribute('data-bs-toggle'),\n                'data-bs-target': foundButton.getAttribute('data-bs-target'),\n                'aria-controls': foundButton.getAttribute('aria-controls'),\n                'onclick': foundButton.onclick,\n                'listeners': foundButton.getEventListeners ? foundButton.getEventListeners() : 'unavailable'\n            });\n            \n            // Add manual click functionality if bootstrap isn't working\n            foundButton.addEventListener('click', function(e) {\n                e.preventDefault();\n                e.stopPropagation();\n                console.log('🔄 Button clicked - attempting to toggle sidebar');\n                \n                const sidebar = document.querySelector('#sidebar, .offcanvas');\n                if (sidebar) {\n                    console.log('📍 Found sidebar:', sidebar);\n                    \n                    // Try Bootstrap's offcanvas toggle\n                    if (window.bootstrap && window.bootstrap.Offcanvas) {\n                        console.log('🅱️ Using Bootstrap offcanvas');\n                        const offcanvasInstance = window.bootstrap.Offcanvas.getInstance(sidebar) || \n                                                new window.bootstrap.Offcanvas(sidebar);\n                        offcanvasInstance.toggle();\n                    } else {\n                        // Manual toggle\n                        console.log('📱 Using manual toggle');\n                        const isVisible = sidebar.classList.contains('show') || \n                                        sidebar.style.transform === 'translateX(0px)' ||\n                                        !sidebar.classList.contains('hide');\n                        \n                        if (isVisible) {\n                            sidebar.classList.remove('show');\n                            sidebar.classList.add('hide');\n                            sidebar.style.transform = 'translateX(-100%)';\n                            sidebar.style.visibility = 'hidden';\n                        } else {\n                            sidebar.classList.add('show');\n                            sidebar.classList.remove('hide');\n                            sidebar.style.transform = 'translateX(0px)';\n                            sidebar.style.visibility = 'visible';\n                        }\n                    }\n                } else {\n                    console.error('❌ Sidebar not found for toggle');\n                }\n            });\n            \n            // Add keyboard shortcut\n            document.addEventListener('keydown', function(e) {\n                if (e.altKey && e.key === 'm') {\n                    e.preventDefault();\n                    foundButton.click();\n                }\n            });\n            \n            console.log('✅ Enhanced existing sidebar button with manual functionality');\n            return true;\n        }\n        \n        return false;\n    }\n    \n    // Ensure Bootstrap's offcanvas functionality works\n    function ensureOffcanvasWorks() {\n        const sidebar = document.querySelector('#sidebar, .offcanvas');\n        if (sidebar) {\n            // Make sure it has the right classes for Bootstrap offcanvas\n            if (!sidebar.classList.contains('offcanvas')) {\n                sidebar.classList.add('offcanvas', 'offcanvas-start');\n            }\n            \n            console.log('✅ Ensured sidebar has offcanvas classes');\n        }\n    }\n    \n    // Initialize the simple fix\n    function initSimpleFix() {\n        console.log('🚀 Initializing Simple Sidebar Fix...');\n        \n        // Try to enhance existing button\n        if (enhanceExistingButton()) {\n            ensureOffcanvasWorks();\n            console.log('✅ Simple sidebar fix complete - using existing functionality!');\n        } else {\n            // Retry in case elements haven't loaded yet\n            setTimeout(() => {\n                if (enhanceExistingButton()) {\n                    ensureOffcanvasWorks();\n                    console.log('✅ Simple sidebar fix complete (delayed) - using existing functionality!');\n                } else {\n                    console.warn('⚠️ Could not find existing sidebar button');\n                }\n            }, 1000);\n        }\n        \n        // Global API for manual control if needed\n        window.simpleSidebar = {\n            findButton: enhanceExistingButton,\n            toggle: function() {\n                const btn = document.querySelector('button[data-bs-toggle=\"offcanvas\"], #mobile_btn');\n                if (btn) btn.click();\n            }\n        };\n    }\n    \n    // Initialize when DOM is ready\n    if (document.readyState === 'loading') {\n        document.addEventListener('DOMContentLoaded', initSimpleFix);\n    } else {\n        initSimpleFix();\n    }\n    \n    // Fallback initialization\n    setTimeout(initSimpleFix, 500);\n    \n})();
+
+(function() {
+    'use strict';
+    
+    let currentState = 'expanded';
+    let forceActive = false;
+    let styleSheets = [];
+    let mutationObserver = null;
+    
+    // Ultra-high specificity CSS with multiple redundant selectors
+    const ROBUST_CSS = `
+        /* EMERGENCY CSS RESET - MAXIMUM SPECIFICITY */
+        html body:not(.xxx):not(.yyy) #sidebar,
+        html[lang] body:not(.xxx):not(.yyy) #sidebar,
+        html[data-lang] body:not(.xxx):not(.yyy) #sidebar {
+            position: fixed !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 250px !important;
+            height: 100vh !important;
+            background: white !important;
+            z-index: 999 !important;
+            transform: translateX(0) !important;
+            transition: all 0.3s ease !important;
+            overflow: visible !important;
+            border-right: 1px solid #e2e8f0 !important;
+        }
+        
+        /* COLLAPSED STATE - 60PX WIDTH */
+        html body.sidebar-collapsed:not(.xxx):not(.yyy) #sidebar,
+        html[lang] body.sidebar-collapsed:not(.xxx):not(.yyy) #sidebar,
+        html[data-lang] body.sidebar-collapsed:not(.xxx):not(.yyy) #sidebar {
+            width: 60px !important;
+        }
+        
+        /* HIDDEN STATE - COMPLETELY OFF SCREEN */
+        html body.sidebar-hidden:not(.xxx):not(.yyy) #sidebar,
+        html[lang] body.sidebar-hidden:not(.xxx):not(.yyy) #sidebar,
+        html[data-lang] body.sidebar-hidden:not(.xxx):not(.yyy) #sidebar {
+            transform: translateX(-100%) !important;
+            width: 250px !important;
+        }
+        
+        /* SIDEBAR INNER VISIBILITY */
+        html body:not(.xxx):not(.yyy) #sidebar .sidebar-inner,
+        html[lang] body:not(.xxx):not(.yyy) #sidebar .sidebar-inner,
+        html[data-lang] body:not(.xxx):not(.yyy) #sidebar .sidebar-inner {
+            height: 100% !important;
+            width: 100% !important;
+            overflow-y: auto !important;
+            padding: 0 !important;
+        }
+        
+        /* MENU ITEMS VISIBILITY */
+        html body:not(.xxx):not(.yyy) #sidebar .sidebar-menu,
+        html[lang] body:not(.xxx):not(.yyy) #sidebar .sidebar-menu,
+        html[data-lang] body:not(.xxx):not(.yyy) #sidebar .sidebar-menu {
+            display: block !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+            padding: 1rem 0 !important;
+        }
+        
+        html body:not(.xxx):not(.yyy) #sidebar .sidebar-menu li,
+        html[lang] body:not(.xxx):not(.yyy) #sidebar .sidebar-menu li,
+        html[data-lang] body:not(.xxx):not(.yyy) #sidebar .sidebar-menu li {
+            display: block !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+        
+        html body:not(.xxx):not(.yyy) #sidebar .sidebar-menu a,
+        html[lang] body:not(.xxx):not(.yyy) #sidebar .sidebar-menu a,
+        html[data-lang] body:not(.xxx):not(.yyy) #sidebar .sidebar-menu a {
+            display: flex !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+            padding: 0.75rem 1rem !important;
+            color: #64748b !important;
+            text-decoration: none !important;
+            font-size: 0.875rem !important;
+            align-items: center !important;
+            gap: 0.75rem !important;
+            width: 100% !important;
+            box-sizing: border-box !important;
+            border-radius: 0 25px 25px 0 !important;
+            margin: 0.125rem 0.5rem 0.125rem 0 !important;
+            transition: all 0.2s ease !important;
+        }
+        
+        /* COLLAPSED MENU TEXT HIDING */
+        html body.sidebar-collapsed:not(.xxx):not(.yyy) #sidebar .sidebar-menu a span,
+        html[lang] body.sidebar-collapsed:not(.xxx):not(.yyy) #sidebar .sidebar-menu a span,
+        html[data-lang] body.sidebar-collapsed:not(.xxx):not(.yyy) #sidebar .sidebar-menu a span {
+            opacity: 0 !important;
+            width: 0 !important;
+            overflow: hidden !important;
+        }
+        
+        /* MAIN CONTENT POSITIONING - ULTRA HIGH SPECIFICITY */
+        html body:not(.sidebar-collapsed):not(.sidebar-hidden):not(.xxx):not(.yyy) .dashboard-wrp,
+        html[lang] body:not(.sidebar-collapsed):not(.sidebar-hidden):not(.xxx):not(.yyy) .dashboard-wrp,
+        html[data-lang] body:not(.sidebar-collapsed):not(.sidebar-hidden):not(.xxx):not(.yyy) .dashboard-wrp,
+        html body:not(.sidebar-collapsed):not(.sidebar-hidden):not(.xxx):not(.yyy) .page-wrapper,
+        html[lang] body:not(.sidebar-collapsed):not(.sidebar-hidden):not(.xxx):not(.yyy) .page-wrapper {
+            margin-left: 250px !important;
+            width: calc(100vw - 250px) !important;
+            max-width: calc(100vw - 250px) !important;
+            transition: all 0.3s ease !important;
+            min-height: 100vh !important;
+        }
+        
+        /* COLLAPSED CONTENT POSITIONING */
+        html body.sidebar-collapsed:not(.xxx):not(.yyy) .dashboard-wrp,
+        html[lang] body.sidebar-collapsed:not(.xxx):not(.yyy) .dashboard-wrp,
+        html[data-lang] body.sidebar-collapsed:not(.xxx):not(.yyy) .dashboard-wrp,
+        html body.sidebar-collapsed:not(.xxx):not(.yyy) .page-wrapper,
+        html[lang] body.sidebar-collapsed:not(.xxx):not(.yyy) .page-wrapper {
+            margin-left: 60px !important;
+            width: calc(100vw - 60px) !important;
+            max-width: calc(100vw - 60px) !important;
+        }
+        
+        /* HIDDEN CONTENT POSITIONING */
+        html body.sidebar-hidden:not(.xxx):not(.yyy) .dashboard-wrp,
+        html[lang] body.sidebar-hidden:not(.xxx):not(.yyy) .dashboard-wrp,
+        html[data-lang] body.sidebar-hidden:not(.xxx):not(.yyy) .dashboard-wrp,
+        html body.sidebar-hidden:not(.xxx):not(.yyy) .page-wrapper,
+        html[lang] body.sidebar-hidden:not(.xxx):not(.yyy) .page-wrapper {
+            margin-left: 0 !important;
+            width: 100vw !important;
+            max-width: 100vw !important;
+        }
+        
+        /* TOGGLE BUTTON POSITIONING */
+        html body:not(.xxx):not(.yyy) #toggle-sidenav,
+        html[lang] body:not(.xxx):not(.yyy) #toggle-sidenav,
+        html[data-lang] body:not(.xxx):not(.yyy) #toggle-sidenav {
+            position: fixed !important;
+            top: 20px !important;
+            left: 260px !important;
+            z-index: 1001 !important;
+            background: #2563eb !important;
+            color: white !important;
+            border: none !important;
+            border-radius: 6px !important;
+            width: 40px !important;
+            height: 40px !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            cursor: pointer !important;
+            font-size: 1rem !important;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1) !important;
+            transition: all 0.2s ease !important;
+        }
+        
+        html body.sidebar-collapsed:not(.xxx):not(.yyy) #toggle-sidenav {
+            left: 70px !important;
+        }
+        
+        html body.sidebar-hidden:not(.xxx):not(.yyy) #toggle-sidenav {
+            left: 20px !important;
+        }
+    `;
+    
+    // Inject CSS with maximum priority
+    function injectRobustCSS() {
+        try {
+            const style = document.createElement('style');
+            style.setAttribute('data-sidebar-robust', 'true');
+            style.setAttribute('type', 'text/css');
+            style.textContent = ROBUST_CSS;
+            
+            if (document.head) {
+                document.head.appendChild(style);
+                styleSheets.push(style);
+                console.log('🛡️ Robust sidebar CSS injected successfully');
+            } else {
+                setTimeout(injectRobustCSS, 100);
+            }
+        } catch(e) {
+            console.error('❌ Failed to inject robust CSS:', e);
+            setTimeout(injectRobustCSS, 200);
+        }
+    }
+    
+    // Force correct inline styles as backup
+    function enforceInlineStyles(state = currentState) {
+        const sidebar = document.getElementById('sidebar');
+        const content = document.querySelector('.dashboard-wrp') || document.querySelector('.page-wrapper');
+        const toggleBtn = document.getElementById('toggle-sidenav');
+        
+        if (!sidebar) {
+            setTimeout(() => enforceInlineStyles(state), 100);
+            return;
+        }
+        
+        // Force sidebar styles
+        switch(state) {
+            case 'collapsed':
+                sidebar.style.cssText = `
+                    position: fixed !important;
+                    left: 0 !important;
+                    top: 0 !important;
+                    width: 60px !important;
+                    height: 100vh !important;
+                    background: white !important;
+                    z-index: 999 !important;
+                    transform: translateX(0) !important;
+                    border-right: 1px solid #e2e8f0 !important;
+                    overflow: visible !important;
+                `;
+                if (content) {
+                    content.style.cssText = `
+                        margin-left: 60px !important;
+                        width: calc(100vw - 60px) !important;
+                        max-width: calc(100vw - 60px) !important;
+                        transition: all 0.3s ease !important;
+                    `;
+                }
+                if (toggleBtn) {
+                    toggleBtn.style.left = '70px !important';
+                }
+                break;
+                
+            case 'hidden':
+                sidebar.style.cssText = `
+                    position: fixed !important;
+                    left: 0 !important;
+                    top: 0 !important;
+                    width: 250px !important;
+                    height: 100vh !important;
+                    background: white !important;
+                    z-index: 999 !important;
+                    transform: translateX(-100%) !important;
+                    border-right: 1px solid #e2e8f0 !important;
+                    overflow: visible !important;
+                `;
+                if (content) {
+                    content.style.cssText = `
+                        margin-left: 0 !important;
+                        width: 100vw !important;
+                        max-width: 100vw !important;
+                        transition: all 0.3s ease !important;
+                    `;
+                }
+                if (toggleBtn) {
+                    toggleBtn.style.left = '20px !important';
+                }
+                break;
+                
+            case 'expanded':
+            default:
+                sidebar.style.cssText = `
+                    position: fixed !important;
+                    left: 0 !important;
+                    top: 0 !important;
+                    width: 250px !important;
+                    height: 100vh !important;
+                    background: white !important;
+                    z-index: 999 !important;
+                    transform: translateX(0) !important;
+                    border-right: 1px solid #e2e8f0 !important;
+                    overflow: visible !important;
+                `;
+                if (content) {
+                    content.style.cssText = `
+                        margin-left: 250px !important;
+                        width: calc(100vw - 250px) !important;
+                        max-width: calc(100vw - 250px) !important;
+                        transition: all 0.3s ease !important;
+                    `;
+                }
+                if (toggleBtn) {
+                    toggleBtn.style.left = '260px !important';
+                }
+                break;
+        }
+        
+        // Force menu items visibility
+        const menuItems = sidebar.querySelectorAll('.sidebar-menu a');
+        menuItems.forEach(item => {
+            item.style.cssText = `
+                display: flex !important;
+                visibility: visible !important;
+                opacity: 1 !important;
+                padding: 0.75rem 1rem !important;
+                color: #64748b !important;
+                align-items: center !important;
+                gap: 0.75rem !important;
+                width: 100% !important;
+            `;
+        });
+        
+        console.log(`🔧 Enforced inline styles for state: ${state}`);
+    }
+    
+    // Set sidebar state with maximum enforcement
+    function setSidebarState(state) {
+        console.log(`🎯 Setting sidebar state to: ${state}`);
+        currentState = state;
+        
+        // Apply CSS classes
+        document.body.classList.remove('sidebar-collapsed', 'sidebar-hidden');
+        if (state === 'collapsed') {
+            document.body.classList.add('sidebar-collapsed');
+        } else if (state === 'hidden') {
+            document.body.classList.add('sidebar-hidden');
+        }
+        
+        // Force inline styles as backup
+        enforceInlineStyles(state);
+        
+        // Save state
+        try {
+            localStorage.setItem('sidebarState', state);
+        } catch(e) {
+            console.warn('Could not save sidebar state');
+        }
+        
+        // Force redraw
+        setTimeout(() => {
+            window.dispatchEvent(new Event('resize'));
+        }, 100);
+    }
+    
+    // Monitor for external changes and fight them
+    function setupDefensiveMonitoring() {
+        // Style monitoring
+        setInterval(() => {
+            if (!forceActive) return;
+            
+            const sidebar = document.getElementById('sidebar');
+            if (sidebar) {
+                const computedStyle = window.getComputedStyle(sidebar);
+                const expectedWidth = currentState === 'collapsed' ? '60px' : 
+                                    currentState === 'hidden' ? '250px' : '250px';
+                const expectedTransform = currentState === 'hidden' ? 'translateX(-100%)' : 'translateX(0px)';
+                
+                if (computedStyle.width !== expectedWidth || 
+                    computedStyle.transform !== expectedTransform) {
+                    console.log('🚨 Sidebar style corruption detected, fixing...');
+                    enforceInlineStyles(currentState);
+                }
+            }
+        }, 500);
+        
+        // Mutation observer for DOM changes
+        if (window.MutationObserver && !mutationObserver) {
+            mutationObserver = new MutationObserver((mutations) => {
+                let needsReinforcement = false;
+                
+                mutations.forEach((mutation) => {
+                    if (mutation.type === 'attributes' && 
+                        mutation.target.id === 'sidebar' &&
+                        (mutation.attributeName === 'style' || mutation.attributeName === 'class')) {
+                        needsReinforcement = true;
+                    }
+                });
+                
+                if (needsReinforcement && forceActive) {
+                    console.log('🔄 DOM mutation detected, reinforcing styles...');
+                    setTimeout(() => enforceInlineStyles(currentState), 50);
+                }
+            });
+            
+            mutationObserver.observe(document.body, {
+                attributes: true,
+                attributeFilter: ['style', 'class'],
+                subtree: true
+            });
+        }
+    }
+    
+    // Setup toggle button event
+    function setupToggleButton() {
+        const toggleBtn = document.getElementById('toggle-sidenav');
+        if (toggleBtn) {
+            toggleBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                switch(currentState) {
+                    case 'expanded':
+                        setSidebarState('collapsed');
+                        break;
+                    case 'collapsed':
+                        setSidebarState('hidden');
+                        break;
+                    case 'hidden':
+                        setSidebarState('expanded');
+                        break;
+                }
+            });
+            
+            // Ensure button is visible
+            toggleBtn.style.cssText = `
+                position: fixed !important;
+                top: 20px !important;
+                z-index: 1001 !important;
+                background: #2563eb !important;
+                color: white !important;
+                border: none !important;
+                border-radius: 6px !important;
+                width: 40px !important;
+                height: 40px !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                cursor: pointer !important;
+                font-size: 1rem !important;
+            `;
+            
+            console.log('✅ Toggle button configured');
+        } else {
+            setTimeout(setupToggleButton, 100);
+        }
+    }
+    
+    // Initialize the robust system
+    function initializeRobustSidebar() {
+        console.log('🚀 Initializing ROBUST Sidebar System...');
+        
+        // Inject CSS immediately
+        injectRobustCSS();
+        
+        // Get saved state
+        let savedState = 'expanded';
+        try {
+            savedState = localStorage.getItem('sidebarState') || 'expanded';
+        } catch(e) {
+            console.warn('Could not read saved state');
+        }
+        
+        // Wait for sidebar to exist
+        const waitForSidebar = setInterval(() => {
+            const sidebar = document.getElementById('sidebar');
+            if (sidebar) {
+                clearInterval(waitForSidebar);
+                
+                // Activate defensive systems
+                forceActive = true;
+                
+                // Set initial state
+                setSidebarState(savedState);
+                
+                // Setup controls
+                setupToggleButton();
+                
+                // Start monitoring
+                setupDefensiveMonitoring();
+                
+                console.log('✅ Robust sidebar system fully activated!');
+                
+                // Global API
+                window.robustSidebar = {
+                    setState: setSidebarState,
+                    getState: () => currentState,
+                    forcefix: () => enforceInlineStyles(currentState),
+                    activate: () => { forceActive = true; },
+                    deactivate: () => { forceActive = false; }
+                };
+            }
+        }, 100);
+        
+        // Emergency timeout
+        setTimeout(() => {
+            clearInterval(waitForSidebar);
+            if (!document.getElementById('sidebar')) {
+                console.error('❌ Sidebar not found after 10 seconds');
+            }
+        }, 10000);
+    }
+    
+    // Multiple initialization strategies
+    if (document.readyState === 'complete') {
+        initializeRobustSidebar();
+    } else if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initializeRobustSidebar);
+    } else {
+        setTimeout(initializeRobustSidebar, 100);
+    }
+    
+    // Final fallback
+    window.addEventListener('load', () => {
+        setTimeout(() => {
+            if (!window.robustSidebar) {
+                console.log('🔄 Fallback initialization...');
+                initializeRobustSidebar();
+            }
+        }, 500);
+    });
+    
+})();\n\n// Enhanced Sidebar Toggle for Your POS System\nfunction initializeSidebarControl() {\n    // Wait for DOM and all scripts to be fully loaded\n    const sidebar = document.getElementById('sidebar');\n    const pageWrapper = document.querySelector('.dashboard-wrp, .page-wrapper, .content-area, .main-wrapper');\n    const existingToggle = document.getElementById('toggle-sidenav');\n    const mobileBtn = document.getElementById('mobile_btn');\n    \n    // Verify required elements exist\n    if (!sidebar) {\n        console.warn('Sidebar element #sidebar not found - retrying in 100ms');\n        setTimeout(initializeSidebarControl, 100);\n        return;\n    }\n    \n    if (!pageWrapper) {\n        console.warn('Page wrapper not found - retrying in 100ms');\n        setTimeout(initializeSidebarControl, 100);\n        return;\n    }\n    \n    console.log('Sidebar elements found, initializing...');\n    \n    // State management\n    let currentState = 'expanded'; // expanded, collapsed, hidden\n    \n    // Set the sidebar to a specific state\n    function setSidebarState(state) {\n        if (!sidebar || !pageWrapper) {\n            console.error('Elements not available for state change');\n            return;\n        }\n        \n        if (currentState === state) return;\n        \n        // Remove all state classes\n        sidebar.classList.remove('collapsed', 'hidden', 'mobile-open');\n        pageWrapper.classList.remove('sidebar-collapsed', 'sidebar-hidden');\n        document.body.classList.remove('sidebar-collapsed', 'sidebar-hidden');\n        \n        const contentAreas = document.querySelectorAll('.content-area, .page-wrapper, .main-wrapper, .content');\n        contentAreas.forEach(area => {\n            area.classList.remove('sidebar-collapsed', 'sidebar-hidden');\n        });\n        \n        // Apply new state\n        switch(state) {\n            case 'collapsed':\n                sidebar.classList.add('collapsed');\n                pageWrapper.classList.add('sidebar-collapsed');\n                document.body.classList.add('sidebar-collapsed');\n                contentAreas.forEach(area => area.classList.add('sidebar-collapsed'));\n                break;\n            case 'hidden':\n                sidebar.classList.add('hidden');\n                pageWrapper.classList.add('sidebar-hidden');\n                document.body.classList.add('sidebar-hidden');\n                contentAreas.forEach(area => area.classList.add('sidebar-hidden'));\n                break;\n            case 'expanded':\n            default:\n                sidebar.classList.remove('collapsed', 'hidden');\n                document.body.classList.remove('sidebar-collapsed', 'sidebar-hidden');\n                contentAreas.forEach(area => area.classList.remove('sidebar-collapsed', 'sidebar-hidden'));\n                break;\n        }\n        \n        currentState = state;\n        try {\n            localStorage.setItem('sidebarState', state);\n        } catch(e) {\n            console.warn('Could not save sidebar state:', e);\n        }\n        \n        setTimeout(() => {\n            if (window.$ && $.fn.DataTable) {\n                $.fn.DataTable.tables({ visible: true, api: true }).columns.adjust();\n            }\n            window.dispatchEvent(new Event('resize'));\n        }, 350);\n        \n        console.log('Sidebar state changed to:', state);\n    }\n    \n    // Handle toggle click\n    function handleToggleClick(e) {\n        if (e) {\n            e.preventDefault();\n            e.stopPropagation();\n        }\n        \n        switch(currentState) {\n            case 'expanded': setSidebarState('collapsed'); break;\n            case 'collapsed': setSidebarState('hidden'); break;\n            case 'hidden': setSidebarState('expanded'); break;\n        }\n    }\n    \n    // Setup submenu toggles\n    function setupSubmenuToggles() {\n        const allLinks = document.querySelectorAll('#sidebar a, .sidebar a, .sidebar-menu a');\n        let foundItems = [];\n        \n        allLinks.forEach(link => {\n            const parent = link.parentElement;\n            const nextSibling = link.nextElementSibling;\n            const hasSubmenu = nextSibling && (\n                nextSibling.tagName === 'UL' || \n                nextSibling.classList.contains('sub-menu') ||\n                nextSibling.classList.contains('dropdown-menu')\n            ) || parent && (\n                parent.querySelector('ul') ||\n                parent.querySelector('.sub-menu') ||\n                parent.querySelector('.dropdown-menu')\n            );\n            \n            if (hasSubmenu) {\n                foundItems.push(link);\n            }\n        });\n        \n        console.log(`Found ${foundItems.length} submenu items`);\n        \n        foundItems.forEach(link => {\n            const newLink = link.cloneNode(true);\n            if (link.parentNode) {\n                link.parentNode.replaceChild(newLink, link);\n            }\n            \n            newLink.addEventListener('click', function(e) {\n                const parent = this.parentElement;\n                const hasSubmenu = parent.querySelector('ul, .sub-menu, .dropdown-menu');\n                \n                if (hasSubmenu && currentState !== 'collapsed') {\n                    e.preventDefault();\n                    e.stopPropagation();\n                    \n                    const isOpen = parent.classList.contains('open') || parent.classList.contains('active');\n                    \n                    // Close all other submenus\n                    document.querySelectorAll('.open, .active').forEach(item => {\n                        if (item !== parent && item.querySelector('ul, .sub-menu')) {\n                            item.classList.remove('open', 'active');\n                        }\n                    });\n                    \n                    // Toggle current submenu\n                    if (isOpen) {\n                        parent.classList.remove('open', 'active');\n                    } else {\n                        parent.classList.add('open', 'active');\n                    }\n                    \n                    console.log(`Toggled submenu for: ${this.textContent.trim()}`);\n                }\n            });\n        });\n        \n        // Add visual indicators\n        foundItems.forEach(link => {\n            const parent = link.parentElement;\n            const hasSubmenu = parent.querySelector('ul, .sub-menu, .dropdown-menu');\n            \n            if (hasSubmenu && !link.querySelector('.dropdown-indicator')) {\n                const indicator = document.createElement('span');\n                indicator.className = 'dropdown-indicator';\n                indicator.innerHTML = '▶';\n                indicator.style.marginLeft = 'auto';\n                indicator.style.fontSize = '12px';\n                indicator.style.transition = 'transform 0.2s ease';\n                link.appendChild(indicator);\n                \n                if (parent.classList.contains('open') || parent.classList.contains('active')) {\n                    indicator.style.transform = 'rotate(90deg)';\n                }\n            }\n        });\n    }\n    \n    // Setup event listeners\n    function setupEventListeners() {\n        if (existingToggle) {\n            existingToggle.addEventListener('click', handleToggleClick);\n            existingToggle.title = `Sidebar Toggle\\nLeft: Toggle\\nAlt+M: Toggle • Alt+C: Collapse • Alt+E: Expand • Alt+H: Hide`;\n            console.log('Added click handler to existing toggle');\n        }\n        \n        setupSubmenuToggles();\n        \n        // Keyboard support\n        document.addEventListener('keydown', function(e) {\n            if (e.altKey && e.key === 'm') {\n                e.preventDefault();\n                handleToggleClick(e);\n            }\n            if (e.altKey && e.key === 'c') {\n                e.preventDefault();\n                setSidebarState('collapsed');\n            }\n            if (e.altKey && e.key === 'e') {\n                e.preventDefault();\n                setSidebarState('expanded');\n            }\n            if (e.altKey && e.key === 'h') {\n                e.preventDefault();\n                setSidebarState('hidden');\n            }\n            if (e.key === 'Escape' && window.innerWidth <= 768 && currentState !== 'hidden') {\n                setSidebarState('hidden');\n            }\n        });\n    }\n    \n    // Initialize\n    function initializeSidebar() {\n        let savedState = 'expanded';\n        try {\n            savedState = localStorage.getItem('sidebarState') || 'expanded';\n        } catch(e) {\n            console.warn('Could not read saved sidebar state:', e);\n        }\n        \n        setSidebarState(savedState);\n        setupEventListeners();\n        console.log('Sidebar initialization complete');\n    }\n    \n    initializeSidebar();\n    \n    // Global API\n    window.sidebarControl = {\n        setState: setSidebarState,\n        getState: () => currentState,\n        toggle: handleToggleClick\n    };\n}\n\n// Start the sidebar system\nfunction startSidebarSystem() {\n    if (document.readyState === 'complete') {\n        initializeSidebarControl();\n    } else {\n        if (document.readyState === 'loading') {\n            document.addEventListener('DOMContentLoaded', function() {\n                setTimeout(() => initializeSidebarControl(), 100);\n            });\n        } else {\n            setTimeout(() => initializeSidebarControl(), 200);\n        }\n    }\n    \n    window.addEventListener('load', function() {\n        setTimeout(() => {\n            if (!window.sidebarControl) {\n                console.log('Fallback sidebar initialization');\n                initializeSidebarControl();\n            }\n        }, 300);\n    });\n}\n\nstartSidebarSystem();\nconsole.log('🚀 Malchus Sidebar Enhancement v1.0.0 loaded successfully!');"
+  },
+  "malchus_socreate_v1": {
+    "css": "",
+    "error": "",
+    "js": "// ===== MALCHUS SO CREATE - TABLE OPTIMIZATION =====\n\n// Check if we're on the SO Create page\nfunction isSOCreatePage() {\n    // Check hash fragment\n    const hash = window.location.hash;\n    const isSOCreate = hash.includes('#SO/socreate') || hash.includes('socreate');\n    \n    // Also check for table presence as fallback\n    const hasSOTable = document.getElementById('so-items-table') !== null;\n    \n    console.log(`SO Create page check: hash=${hash}, isSOCreate=${isSOCreate}, hasSOTable=${hasSOTable}`);\n    return isSOCreate || hasSOTable;\n}\n\n// Wait for the table to be ready\nfunction waitForTable() {\n    if (!isSOCreatePage()) {\n        console.log('Not on SO Create page, skipping table optimization');\n        return;\n    }\n    \n    const table = document.getElementById('so-items-table');\n    if (table) {\n        initializeTableFeatures(table);\n    } else {\n        setTimeout(waitForTable, 100);\n    }\n}\n\n// Initialize all table features\nfunction initializeTableFeatures(table) {\n    console.log('Initializing table features for SO Create page');\n    applyTableStyles();\n    addToggleButton(table);\n    setupColumnToggle(table);\n}\n\n// Apply table styles programmatically\nfunction applyTableStyles() {\n    const tableCSS = `\n        /* SO Items Table Optimization */\n        #so-items-table {\n            width: 100% !important;\n            table-layout: fixed !important;\n            border-collapse: collapse !important;\n            margin: 0 !important;\n            border-spacing: 0 !important;\n        }\n        \n        #so-items-table thead tr,\n        #so-items-table tbody tr {\n            height: auto !important;\n            min-height: auto !important;\n            max-height: none !important;\n            margin: 0 !important;\n            padding: 0 !important;\n            line-height: 1.2 !important;\n        }\n        \n        #so-items-table thead th,\n        #so-items-table tbody td {\n            height: auto !important;\n            min-height: auto !important;\n            max-height: none !important;\n            padding: 4px 6px !important;\n            margin: 0 !important;\n            vertical-align: middle !important;\n            overflow: hidden !important;\n            text-overflow: ellipsis !important;\n            white-space: nowrap !important;\n            line-height: 1.2 !important;\n        }\n        \n        #so-items-table thead th {\n            font-weight: bold !important;\n            font-size: 11px !important;\n            text-align: center !important;\n            border-bottom: 1px solid #ddd !important;\n        }\n        \n        /* Column visibility toggle */\n        #so-items-table.columns-hidden thead th:nth-child(5),\n        #so-items-table.columns-hidden tbody td:nth-child(5),\n        #so-items-table.columns-hidden thead th:nth-child(8),\n        #so-items-table.columns-hidden tbody td:nth-child(8),\n        #so-items-table.columns-hidden thead th:nth-child(9),\n        #so-items-table.columns-hidden tbody td:nth-child(9),\n        #so-items-table.columns-hidden thead th:nth-child(10),\n        #so-items-table.columns-hidden tbody td:nth-child(10) {\n            display: none !important;\n        }\n        \n        /* Form controls - compact */\n        #so-items-table tbody .form-control,\n        #so-items-table tbody input,\n        #so-items-table tbody select,\n        #so-items-table tbody button {\n            height: 20px !important;\n            min-height: 20px !important;\n            max-height: 20px !important;\n            padding: 1px 4px !important;\n            font-size: 11px !important;\n            margin: 0 !important;\n            line-height: 18px !important;\n            border-radius: 2px !important;\n        }\n        \n        /* Toggle button */\n        #so-column-toggle-btn {\n            position: fixed;\n            top: 10px;\n            right: 10px;\n            z-index: 2147483647;\n            padding: 8px 16px;\n            background: #007bff;\n            color: white;\n            border: none;\n            border-radius: 4px;\n            cursor: pointer;\n            font-size: 14px;\n            box-shadow: 0 2px 4px rgba(0,0,0,0.2);\n            pointer-events: auto;\n        }\n        \n        #so-column-toggle-btn:hover {\n            background: #0056b3;\n        }\n        \n        /* Horizontal checkboxes */\n        #so-items-table thead th[class=\"text-center\"],\n        #so-items-table tbody td.handed-over-column {\n            display: flex !important;\n            flex-direction: row !important;\n            flex-wrap: nowrap !important;\n            align-items: center !important;\n            justify-content: center !important;\n            gap: 8px !important;\n        }\n        \n        #so-items-table thead th[class=\"text-center\"] .checkbox-cs,\n        #so-items-table tbody td.handed-over-column .checkbox-cs {\n            display: inline-flex !important;\n            align-items: center !important;\n            justify-content: center !important;\n            margin: 0 !important;\n            padding: 0 !important;\n        }\n    `;\n    \n    const style = document.createElement('style');\n    style.textContent = tableCSS;\n    document.head.appendChild(style);\n    console.log('Table styles applied');\n}\n\n// Add toggle button to the table\nfunction addToggleButton(table) {\n    // Check if button already exists\n    if (document.getElementById('so-column-toggle-btn')) {\n        return;\n    }\n    \n    const button = document.createElement('button');\n    button.id = 'so-column-toggle-btn';\n    button.textContent = 'Hide Details';\n    button.title = 'Toggle visibility of List Price, Unit Disc, Disc %, and Unit Tax columns';\n    \n    button.addEventListener('click', () => {\n        const isHidden = table.classList.toggle('columns-hidden');\n        button.textContent = isHidden ? 'Show Details' : 'Hide Details';\n        console.log(`Table columns ${isHidden ? 'hidden' : 'shown'}`);\n    });\n    \n    document.body.appendChild(button);\n    console.log('Table toggle button added');\n}\n\n// Setup column toggle functionality\nfunction setupColumnToggle(table) {\n    // Initially show all columns\n    console.log('Column toggle setup complete');\n}\n\n// Monitor for hash changes\nfunction monitorHashChanges() {\n    let currentHash = window.location.hash;\n    \n    setInterval(() => {\n        const newHash = window.location.hash;\n        if (newHash !== currentHash) {\n            currentHash = newHash;\n            console.log('Hash changed to:', newHash);\n            \n            // Small delay to allow page to update\n            setTimeout(() => {\n                if (isSOCreatePage()) {\n                    waitForTable();\n                }\n            }, 500);\n        }\n    }, 1000);\n}\n\n// Start table optimization system\nfunction startTableSystem() {\n    console.log('Starting SO Create table optimization system...');\n    \n    if (document.readyState === 'complete') {\n        waitForTable();\n        monitorHashChanges();\n    } else {\n        if (document.readyState === 'loading') {\n            document.addEventListener('DOMContentLoaded', function() {\n                setTimeout(() => {\n                    waitForTable();\n                    monitorHashChanges();\n                }, 200);\n            });\n        } else {\n            setTimeout(() => {\n                waitForTable();\n                monitorHashChanges();\n            }, 300);\n        }\n    }\n    \n    // Fallback check\n    window.addEventListener('load', function() {\n        setTimeout(() => {\n            if (!document.getElementById('so-column-toggle-btn') && isSOCreatePage()) {\n                console.log('Fallback table initialization');\n                waitForTable();\n            }\n        }, 500);\n    });\n}\n\nstartTableSystem();\nconsole.log('🚀 Malchus SO Create Table Optimization v1.0.0 loaded successfully!');"
+  },
+  "sidebar_enhancement_v1": {
+    "css": "/* ===== ENHANCED SIDEBAR & TABLE STYLING PACKAGE ===== */\n\n/* CSS Variables for Consistency */\n:root {\n    --primary-color: #2563eb;\n    --secondary-color: #64748b;\n    --success-color: #16a34a;\n    --warning-color: #f59e0b;\n    --error-color: #dc2626;\n    --background-light: #f8fafc;\n    --background-white: #ffffff;\n    --text-primary: #1e293b;\n    --text-secondary: #64748b;\n    --text-muted: #94a3b8;\n    --border-color: #e2e8f0;\n    --border-focus: #3b82f6;\n    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);\n    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);\n    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);\n    --radius-sm: 4px;\n    --radius-md: 6px;\n    --radius-lg: 8px;\n    --font-sans: -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif;\n    --sidebar-width: 250px;\n}\n\n/* Enhanced Sidebar Styles */\n.sidebar {\n    background-color: var(--background-white);\n    border-right: 1px solid var(--border-color);\n    height: 100vh;\n    width: var(--sidebar-width);\n    position: fixed;\n    left: 0;\n    top: 0;\n    overflow-y: auto;\n    z-index: 999;\n    box-shadow: var(--shadow-sm);\n    transition: transform 0.3s ease-in-out, width 0.3s ease-in-out;\n}\n\n/* Collapsed sidebar state */\n.sidebar.collapsed {\n    width: 60px;\n}\n\n.sidebar.collapsed .menu-text {\n    opacity: 0;\n    width: 0;\n    overflow: hidden;\n}\n\n/* Hidden sidebar state */\n.sidebar.hidden {\n    transform: translateX(-100%);\n}\n\n/* Sidebar menu styles */\n.sidebar-menu {\n    list-style: none;\n    margin: 0;\n    padding: 1rem 0;\n}\n\n.sidebar-menu .menu-item {\n    margin-bottom: 0.25rem;\n    position: relative;\n}\n\n.sidebar-menu a {\n    display: flex;\n    align-items: center;\n    padding: 0.75rem 1rem;\n    color: var(--text-secondary);\n    text-decoration: none;\n    font-size: 0.875rem;\n    font-weight: 500;\n    transition: all 0.2s ease-in-out;\n    gap: 0.75rem;\n    border-radius: 0 25px 25px 0;\n    margin-right: 1rem;\n}\n\n.sidebar-menu a:hover {\n    background-color: var(--background-light);\n    color: var(--primary-color);\n}\n\n.sidebar-menu a.active {\n    background-color: #eff6ff;\n    color: var(--primary-color);\n    font-weight: 600;\n}\n\n/* Submenu styles - Enhanced with better animations */\n.sidebar-menu .sub-menu,\n.sidebar-menu ul,\n.sidebar-menu .dropdown-menu {\n    list-style: none;\n    margin: 0;\n    padding: 0;\n    max-height: 0;\n    opacity: 0;\n    overflow: hidden;\n    transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease-in-out, padding 0.3s ease-in-out;\n    background: linear-gradient(90deg, transparent 0%, rgba(37, 99, 235, 0.05) 50%, transparent 100%);\n    border-left: 2px solid transparent;\n    margin-left: 1rem;\n}\n\n.sidebar-menu .has-sub.open .sub-menu,\n.sidebar-menu .has-sub.active .sub-menu,\n.sidebar-menu .open .sub-menu,\n.sidebar-menu .active .sub-menu,\n.sidebar-menu li.open > ul,\n.sidebar-menu li.active > ul {\n    max-height: 800px;\n    opacity: 1;\n    padding: 0.5rem 0;\n    border-left-color: var(--primary-color);\n}\n\n.sidebar-menu .sub-menu a,\n.sidebar-menu ul a {\n    padding: 0.5rem 1rem 0.5rem 2rem;\n    font-size: 0.8125rem;\n    margin-right: 0.5rem;\n    position: relative;\n    border-radius: 0 20px 20px 0;\n    transition: all 0.2s ease-in-out;\n}\n\n.sidebar-menu .sub-menu a::before,\n.sidebar-menu ul a::before {\n    content: '•';\n    position: absolute;\n    left: 1rem;\n    color: var(--primary-color);\n    font-size: 1rem;\n    opacity: 0.6;\n}\n\n.sidebar-menu .sub-menu a:hover,\n.sidebar-menu ul a:hover {\n    background: rgba(37, 99, 235, 0.1);\n    padding-left: 2.5rem;\n}\n\n/* Submenu toggle indicators */\n.sidebar-menu .has-sub > a::after,\n.sidebar-menu li:has(ul) > a::after,\n.sidebar-menu li:has(.sub-menu) > a::after,\n.dropdown-indicator {\n    content: '▶';\n    margin-left: auto;\n    font-size: 0.75rem;\n    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), color 0.2s ease-in-out;\n    color: var(--text-muted);\n    display: inline-block;\n    width: 12px;\n    text-align: center;\n}\n\n.sidebar-menu .has-sub.open > a::after,\n.sidebar-menu .has-sub.active > a::after,\n.sidebar-menu .open > a::after,\n.sidebar-menu .active > a::after,\n.sidebar-menu li.open > a .dropdown-indicator,\n.sidebar-menu li.active > a .dropdown-indicator,\n.dropdown-indicator.open {\n    transform: rotate(90deg);\n    color: var(--primary-color);\n}\n\n/* TABLE STYLING - Compact and Clean */\n#so-items-table {\n    width: 100% !important;\n    table-layout: fixed !important;\n    border-collapse: collapse !important;\n    margin: 0 !important;\n    border-spacing: 0 !important;\n}\n\n#so-items-table thead tr,\n#so-items-table tbody tr {\n    height: auto !important;\n    min-height: auto !important;\n    max-height: none !important;\n    margin: 0 !important;\n    padding: 0 !important;\n    line-height: 1.2 !important;\n}\n\n#so-items-table thead th,\n#so-items-table tbody td {\n    height: auto !important;\n    min-height: auto !important;\n    max-height: none !important;\n    padding: 4px 6px !important;\n    margin: 0 !important;\n    vertical-align: middle !important;\n    overflow: hidden !important;\n    text-overflow: ellipsis !important;\n    white-space: nowrap !important;\n    line-height: 1.2 !important;\n}\n\n#so-items-table thead th {\n    font-weight: bold !important;\n    font-size: 11px !important;\n    text-align: center !important;\n    border-bottom: 1px solid #ddd !important;\n    padding: 4px 6px !important;\n}\n\n/* Toggle button for table columns */\n#column-toggle-btn {\n    position: fixed;\n    top: 10px;\n    right: 10px;\n    z-index: 2147483647;\n    padding: 8px 16px;\n    background: #007bff;\n    color: white;\n    border: none;\n    border-radius: 4px;\n    cursor: pointer;\n    font-size: 14px;\n    box-shadow: 0 2px 4px rgba(0,0,0,0.2);\n    pointer-events: auto;\n}\n\n#column-toggle-btn:hover {\n    background: #0056b3;\n}\n\n/* Column visibility toggle */\n#so-items-table.columns-hidden thead th:nth-child(5),\n#so-items-table.columns-hidden tbody td:nth-child(5),\n#so-items-table.columns-hidden thead th:nth-child(8),\n#so-items-table.columns-hidden tbody td:nth-child(8),\n#so-items-table.columns-hidden thead th:nth-child(9),\n#so-items-table.columns-hidden tbody td:nth-child(9),\n#so-items-table.columns-hidden thead th:nth-child(10),\n#so-items-table.columns-hidden tbody td:nth-child(10) {\n    display: none !important;\n}\n\n/* Form Controls - Compact */\n#so-items-table tbody .form-control,\n#so-items-table tbody input,\n#so-items-table tbody select,\n#so-items-table tbody button {\n    height: 20px !important;\n    min-height: 20px !important;\n    max-height: 20px !important;\n    padding: 1px 4px !important;\n    font-size: 11px !important;\n    margin: 0 !important;\n    line-height: 18px !important;\n    border-radius: 2px !important;\n}\n\n/* Page Layout Adjustments - Enhanced for Malchus */\n.dashboard-wrp {\n    margin-left: 250px !important;\n    transition: margin-left 0.3s ease-in-out !important;\n    width: calc(100vw - 250px) !important;\n    max-width: calc(100vw - 250px) !important;\n    box-sizing: border-box !important;\n}\n\n/* Collapsed state - 60px sidebar */\nbody.sidebar-collapsed .dashboard-wrp {\n    margin-left: 60px !important;\n    width: calc(100vw - 60px) !important;\n    max-width: calc(100vw - 60px) !important;\n}\n\n/* Hidden state - no sidebar */\nbody.sidebar-hidden .dashboard-wrp {\n    margin-left: 0 !important;\n    width: 100vw !important;\n    max-width: 100vw !important;\n}\n\n/* Fallback for page-wrapper */\n.page-wrapper {\n    margin-left: 250px;\n    min-height: 100vh;\n    transition: margin-left 0.3s ease-in-out;\n}\n\n.page-wrapper.sidebar-collapsed,\nbody.sidebar-collapsed .page-wrapper {\n    margin-left: 60px;\n}\n\n.page-wrapper.sidebar-hidden,\nbody.sidebar-hidden .page-wrapper {\n    margin-left: 0;\n}\n\n/* Mobile responsive */\n@media (max-width: 768px) {\n    .page-wrapper {\n        margin-left: 0;\n    }\n    \n    .sidebar {\n        transform: translateX(-100%);\n        transition: transform 0.3s ease-in-out;\n    }\n    \n    .sidebar.open {\n        transform: translateX(0);\n    }\n}",
+    "error": "",
+    "js": "// ===== ENHANCED SIDEBAR & TABLE MANAGEMENT SYSTEM =====\n\n// Enhanced Sidebar Toggle for Your POS System\nfunction initializeSidebarControl() {\n    // Wait for DOM and all scripts to be fully loaded\n    const sidebar = document.getElementById('sidebar');\n    const pageWrapper = document.querySelector('.dashboard-wrp, .page-wrapper, .content-area, .main-wrapper');\n    const existingToggle = document.getElementById('toggle-sidenav');\n    const mobileBtn = document.getElementById('mobile_btn');\n    \n    // Verify required elements exist\n    if (!sidebar) {\n        console.warn('Sidebar element #sidebar not found - retrying in 100ms');\n        setTimeout(initializeSidebarControl, 100);\n        return;\n    }\n    \n    if (!pageWrapper) {\n        console.warn('Page wrapper not found - retrying in 100ms');\n        setTimeout(initializeSidebarControl, 100);\n        return;\n    }\n    \n    console.log('Sidebar elements found, initializing...');\n    \n    // Remove any auto-created toggle button\n    const autoCreatedToggle = document.querySelector('.sidebar-toggle');\n    if (autoCreatedToggle && autoCreatedToggle.parentNode) {\n        autoCreatedToggle.parentNode.removeChild(autoCreatedToggle);\n    }\n    \n    // State management\n    let currentState = 'expanded'; // expanded, collapsed, hidden\n    \n    // Set the sidebar to a specific state\n    function setSidebarState(state) {\n        if (!sidebar || !pageWrapper) {\n            console.error('Elements not available for state change');\n            return;\n        }\n        \n        // Prevent infinite loops by checking if state is already current\n        if (currentState === state) {\n            return;\n        }\n        \n        // Remove all state classes from sidebar\n        sidebar.classList.remove('collapsed', 'hidden', 'mobile-open');\n        \n        // Remove all state classes from page wrapper and related elements\n        pageWrapper.classList.remove('sidebar-collapsed', 'sidebar-hidden');\n        \n        // Also apply to document body for global CSS targeting\n        document.body.classList.remove('sidebar-collapsed', 'sidebar-hidden');\n        \n        // Find and update all main content areas - Enhanced for Malchus\n        const contentAreas = document.querySelectorAll('.dashboard-wrp, .content-area, .page-wrapper, .main-wrapper, .content');\n        contentAreas.forEach(area => {\n            area.classList.remove('sidebar-collapsed', 'sidebar-hidden');\n        });\n        \n        // Apply new state\n        switch(state) {\n            case 'collapsed':\n                sidebar.classList.add('collapsed');\n                pageWrapper.classList.add('sidebar-collapsed');\n                document.body.classList.add('sidebar-collapsed');\n                contentAreas.forEach(area => {\n                    area.classList.add('sidebar-collapsed');\n                });\n                break;\n            case 'hidden':\n                sidebar.classList.add('hidden');\n                pageWrapper.classList.add('sidebar-hidden');\n                document.body.classList.add('sidebar-hidden');\n                contentAreas.forEach(area => {\n                    area.classList.add('sidebar-hidden');\n                });\n                break;\n            case 'expanded':\n            default:\n                // Default expanded state - no additional classes needed\n                // Force removal of any lingering classes\n                sidebar.classList.remove('collapsed', 'hidden');\n                document.body.classList.remove('sidebar-collapsed', 'sidebar-hidden');\n                contentAreas.forEach(area => {\n                    area.classList.remove('sidebar-collapsed', 'sidebar-hidden');\n                });\n                break;\n        }\n        \n        currentState = state;\n        try {\n            localStorage.setItem('sidebarState', state);\n        } catch(e) {\n            console.warn('Could not save sidebar state:', e);\n        }\n        \n        // Force DataTables to recalculate column widths after layout change\n        setTimeout(() => {\n            if (window.$ && $.fn.DataTable) {\n                $.fn.DataTable.tables({ visible: true, api: true }).columns.adjust();\n            }\n            \n            // Trigger a window resize event to help other components adjust\n            window.dispatchEvent(new Event('resize'));\n        }, 350);\n        \n        console.log('Sidebar state changed to:', state);\n    }\n    \n    // Handle the main toggle click (cycles through states)\n    function handleToggleClick(e) {\n        if (e) {\n            e.preventDefault();\n            e.stopPropagation();\n        }\n        \n        switch(currentState) {\n            case 'expanded':\n                setSidebarState('collapsed');\n                break;\n            case 'collapsed':\n                setSidebarState('hidden');\n                break;\n            case 'hidden':\n                setSidebarState('expanded');\n                break;\n        }\n    }\n    \n    // Setup submenu toggles - Enhanced for multiple selector patterns\n    function setupSubmenuToggles() {\n        // Look for multiple possible patterns for submenu items\n        const submenuSelectors = [\n            '.has-sub > a',           // Original pattern\n            '.submenu > a',           // Alternative pattern\n            '.sidebar-menu li:has(ul) > a', // Items with UL children\n            '.menu-item:has(.sub-menu) > a', // Items with sub-menu class\n            'li:has(.dropdown-menu) > a',    // Bootstrap-style dropdowns\n            'li > a + ul',            // Adjacent sibling pattern\n            '[data-submenu] > a',     // Data attribute pattern\n        ];\n        \n        let foundItems = [];\n        \n        // Fallback: Look for any link that has a sibling UL or parent with submenu indicators\n        const allLinks = document.querySelectorAll('#sidebar a, .sidebar a, .sidebar-menu a');\n        allLinks.forEach(link => {\n            const parent = link.parentElement;\n            const nextSibling = link.nextElementSibling;\n            const hasSubmenu = nextSibling && (\n                nextSibling.tagName === 'UL' || \n                nextSibling.classList.contains('sub-menu') ||\n                nextSibling.classList.contains('dropdown-menu')\n            );\n            \n            // Also check if parent has submenu children\n            const hasSubmenuChildren = parent && (\n                parent.querySelector('ul') ||\n                parent.querySelector('.sub-menu') ||\n                parent.querySelector('.dropdown-menu')\n            );\n            \n            if (hasSubmenu || hasSubmenuChildren) {\n                foundItems.push(link);\n            }\n        });\n        \n        console.log(`Found ${foundItems.length} submenu items`);\n        \n        foundItems.forEach(link => {\n            // Remove any existing event listeners by cloning\n            const newLink = link.cloneNode(true);\n            if (link.parentNode) {\n                link.parentNode.replaceChild(newLink, link);\n            }\n            \n            newLink.addEventListener('click', function(e) {\n                // Only prevent default if we're not in collapsed mode and this is actually a submenu toggle\n                const parent = this.parentElement;\n                const nextSibling = this.nextElementSibling;\n                const hasSubmenu = nextSibling && (\n                    nextSibling.tagName === 'UL' || \n                    nextSibling.classList.contains('sub-menu') ||\n                    nextSibling.classList.contains('dropdown-menu')\n                ) || parent.querySelector('ul, .sub-menu, .dropdown-menu');\n                \n                if (hasSubmenu && currentState !== 'collapsed') {\n                    e.preventDefault();\n                    e.stopPropagation();\n                    \n                    const isOpen = parent.classList.contains('open') || parent.classList.contains('active');\n                    \n                    // Close all other submenus\n                    document.querySelectorAll('.open, .active').forEach(item => {\n                        if (item !== parent && (item.querySelector('ul') || item.querySelector('.sub-menu'))) {\n                            item.classList.remove('open', 'active');\n                        }\n                    });\n                    \n                    // Toggle current submenu\n                    if (isOpen) {\n                        parent.classList.remove('open', 'active');\n                    } else {\n                        parent.classList.add('open', 'active');\n                    }\n                    \n                    console.log(`Toggled submenu for: ${this.textContent.trim()}`);\n                }\n            });\n        });\n        \n        // Add visual indicators for submenu items\n        foundItems.forEach(link => {\n            const parent = link.parentElement;\n            const nextSibling = link.nextElementSibling;\n            const hasSubmenu = nextSibling && (\n                nextSibling.tagName === 'UL' || \n                nextSibling.classList.contains('sub-menu') ||\n                nextSibling.classList.contains('dropdown-menu')\n            ) || parent.querySelector('ul, .sub-menu, .dropdown-menu');\n            \n            if (hasSubmenu && !link.querySelector('.dropdown-indicator')) {\n                // Add dropdown indicator if it doesn't exist\n                const indicator = document.createElement('span');\n                indicator.className = 'dropdown-indicator';\n                indicator.innerHTML = '▶';\n                indicator.style.marginLeft = 'auto';\n                indicator.style.fontSize = '12px';\n                indicator.style.transition = 'transform 0.2s ease';\n                link.appendChild(indicator);\n                \n                // Update indicator based on state\n                if (parent.classList.contains('open') || parent.classList.contains('active')) {\n                    indicator.style.transform = 'rotate(90deg)';\n                }\n            }\n        });\n    }\n    \n    // Setup event listeners\n    function setupEventListeners() {\n        // Main toggle button (desktop)\n        if (existingToggle) {\n            existingToggle.addEventListener('click', handleToggleClick);\n            \n            // Add right-click context menu\n            existingToggle.addEventListener('contextmenu', function(e) {\n                e.preventDefault();\n                if (window.sidebarControl && window.sidebarControl.showConfig) {\n                    window.sidebarControl.showConfig();\n                }\n            });\n            \n            // Add tooltip\n            existingToggle.title = `Sidebar Toggle\\nLeft: Toggle • Right: Settings\\nAlt+M: Toggle • Alt+C: Collapse • Alt+E: Expand • Alt+H: Hide`;\n            \n            console.log('Added click handler to existing toggle');\n        } else {\n            console.warn('Existing toggle button not found');\n        }\n        \n        // Handle submenu toggles\n        setupSubmenuToggles();\n        \n        // Enhanced keyboard support\n        document.addEventListener('keydown', function(e) {\n            // Alt + M to toggle sidebar\n            if (e.altKey && e.key === 'm') {\n                e.preventDefault();\n                handleToggleClick(e);\n            }\n            \n            // Alt + C to collapse sidebar\n            if (e.altKey && e.key === 'c') {\n                e.preventDefault();\n                setSidebarState('collapsed');\n            }\n            \n            // Alt + E to expand sidebar\n            if (e.altKey && e.key === 'e') {\n                e.preventDefault();\n                setSidebarState('expanded');\n            }\n            \n            // Alt + H to hide sidebar\n            if (e.altKey && e.key === 'h') {\n                e.preventDefault();\n                setSidebarState('hidden');\n            }\n            \n            // Escape to close mobile sidebar\n            if (e.key === 'Escape' && window.innerWidth <= 768 && currentState !== 'hidden') {\n                setSidebarState('hidden');\n            }\n        });\n    }\n    \n    // Initialize the sidebar system\n    function initializeSidebar() {\n        // Get saved state or default to expanded\n        let savedState = 'expanded';\n        try {\n            savedState = localStorage.getItem('sidebarState') || 'expanded';\n        } catch(e) {\n            console.warn('Could not read saved sidebar state:', e);\n        }\n        \n        setSidebarState(savedState);\n        setupEventListeners();\n        \n        console.log('Sidebar initialization complete');\n    }\n    \n    // Start initialization\n    initializeSidebar();\n    \n    // Make functions available globally for debugging and API access\n    window.sidebarControl = {\n        setState: setSidebarState,\n        getState: () => currentState,\n        toggle: handleToggleClick\n    };\n}\n\n// TABLE FUNCTIONALITY - Wait for the table to be ready\nfunction waitForTable() {\n    const table = document.getElementById('so-items-table');\n    if (table) {\n        initializeTableFeatures(table);\n    } else {\n        // Retry after a short delay\n        setTimeout(waitForTable, 100);\n    }\n}\n\n// Initialize all table features\nfunction initializeTableFeatures(table) {\n    addToggleButton(table);\n    setupColumnToggle(table);\n}\n\n// Add toggle button to the table\nfunction addToggleButton(table) {\n    // Create the button\n    const button = document.createElement('button');\n    button.id = 'column-toggle-btn';\n    button.textContent = 'Hide Details';\n    button.title = 'Toggle visibility of List Price, Unit Disc, Disc %, and Unit Tax columns';\n\n    // Position the button\n    button.style.position = 'fixed';\n    button.style.top = '10px';\n    button.style.right = '10px';\n    button.style.zIndex = '2147483647';\n    button.style.pointerEvents = 'auto';\n\n    // Add click handler\n    button.addEventListener('click', () => {\n        const isHidden = table.classList.toggle('columns-hidden');\n        button.textContent = isHidden ? 'Show Details' : 'Hide Details';\n    });\n\n    // Add to page\n    document.body.appendChild(button);\n}\n\n// Setup column toggle functionality\nfunction setupColumnToggle(table) {\n    // Initially show all columns\n    // Columns will be hidden only when user clicks the toggle button\n}\n\n// INITIALIZATION SYSTEM\nfunction startEnhancedSystem() {\n    // Initialize both sidebar and table systems\n    if (document.readyState === 'complete') {\n        initializeSidebarControl();\n        waitForTable();\n    } else {\n        if (document.readyState === 'loading') {\n            document.addEventListener('DOMContentLoaded', function() {\n                setTimeout(() => {\n                    initializeSidebarControl();\n                    waitForTable();\n                }, 100);\n            });\n        } else {\n            setTimeout(() => {\n                initializeSidebarControl();\n                waitForTable();\n            }, 200);\n        }\n    }\n    \n    // Fallback initialization\n    window.addEventListener('load', function() {\n        setTimeout(() => {\n            if (!window.sidebarControl) {\n                console.log('Fallback initialization');\n                initializeSidebarControl();\n            }\n            if (!document.getElementById('column-toggle-btn')) {\n                waitForTable();\n            }\n        }, 300);\n    });\n}\n\n// Start the enhanced system\nstartEnhancedSystem();\n\n// Global API for developers\nwindow.enhancedUI = {\n    sidebar: window.sidebarControl,\n    version: '1.0.0',\n    features: ['sidebar-toggle', 'submenu-dropdowns', 'table-column-toggle', 'keyboard-shortcuts', 'mobile-responsive']\n};\n\nconsole.log('🚀 Enhanced Sidebar & Table System v1.0.0 loaded successfully!');"
+  },
+  "rules": [
+    {
+      "id": "malchus_sidebar_general",
+      "name": "Malchus - General Sidebar Enhancement",
+      "enabled": true,
+      "urlPattern": "https://malchus.3plnext.com/*",
+      "css": "sidebar_enhancement_v1",
+      "js": "malchus_general_v1",
+      "description": "Enhanced sidebar with dropdown menus and modern UI for all Malchus pages",
+      "matchType": "glob"
+    },
+    {
+      "id": "malchus_table_socreate",
+      "name": "Malchus - SO Create Table Optimization",
+      "enabled": true,
+      "urlPattern": "https://malchus.3plnext.com/*",
+      "css": "",
+      "js": "malchus_socreate_v1",
+      "description": "Table optimization specifically for SO Create page (detects hash #SO/socreate)",
+      "matchType": "glob"
+    }
+  ]
+}

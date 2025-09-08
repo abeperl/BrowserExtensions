@@ -1,0 +1,359 @@
+/*
+ * Clean table styling for natural heights and horizontal checkboxes
+ */
+
+/* Basic table structure - ensure full width with no empty space */
+#so-items-table {
+    width: 100% !important;
+    table-layout: fixed !important;
+    border-collapse: collapse !important;
+    margin: 0 !important;
+    border-spacing: 0 !important;
+}
+
+/* Compact row heights - minimal padding for tight layout */
+#so-items-table thead tr,
+#so-items-table tbody tr {
+    height: auto !important;
+    min-height: auto !important;
+    max-height: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    line-height: 1.2 !important;
+}
+
+#so-items-table thead th,
+#so-items-table tbody td {
+    height: auto !important;
+    min-height: auto !important;
+    max-height: none !important;
+    padding: 4px 6px !important; /* Reduced padding for tighter rows */
+    margin: 0 !important;
+    vertical-align: middle !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+    line-height: 1.2 !important;
+}
+
+/* Header styling - compact */
+#so-items-table thead th {
+    font-weight: bold !important;
+    font-size: 11px !important; /* Smaller font for compact header */
+    text-align: center !important;
+    border-bottom: 1px solid #ddd !important;
+    padding: 4px 6px !important; /* Match body cell padding */
+}
+
+/* Horizontal checkbox layout - force horizontal not vertical */
+#so-items-table thead th[class="text-center"],
+#so-items-table tbody td.handed-over-column {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 8px !important;
+    white-space: nowrap !important;
+}
+
+#so-items-table thead th[class="text-center"] .checkbox-cs,
+#so-items-table tbody td.handed-over-column .checkbox-cs {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 4px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+#so-items-table tbody td.handed-over-column .checkbox-cs input,
+#so-items-table thead th[class="text-center"] .checkbox-cs input {
+    width: 16px !important;
+    height: 16px !important;
+    margin: 0 !important;
+}
+
+#so-items-table tbody td.handed-over-column .checkbox-cs i,
+#so-items-table thead th[class="text-center"] .checkbox-cs i {
+    font-size: 12px !important;
+    line-height: 1 !important;
+}
+
+/* Column visibility toggle */
+#so-items-table.columns-hidden thead th:nth-child(5),
+#so-items-table.columns-hidden tbody td:nth-child(5),
+#so-items-table.columns-hidden thead th:nth-child(8),
+#so-items-table.columns-hidden tbody td:nth-child(8),
+#so-items-table.columns-hidden thead th:nth-child(9),
+#so-items-table.columns-hidden tbody td:nth-child(9),
+#so-items-table.columns-hidden thead th:nth-child(10),
+#so-items-table.columns-hidden tbody td:nth-child(10) {
+    display: none !important;
+}
+
+/* Ultra-compact form controls to fit tight rows */
+#so-items-table tbody .form-control,
+#so-items-table tbody input,
+#so-items-table tbody select,
+#so-items-table tbody button {
+    height: 20px !important; /* Fixed small height */
+    min-height: 20px !important;
+    max-height: 20px !important;
+    padding: 1px 4px !important; /* Minimal padding */
+    font-size: 11px !important; /* Smaller font */
+    margin: 0 !important;
+    line-height: 18px !important; /* Match height */
+    border-radius: 2px !important;
+}
+
+/* SKU/Title column layout */
+#so-items-table tbody tr td:nth-child(2) {
+    display: flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    min-width: 0 !important;
+}
+
+#so-items-table tbody tr td:nth-child(2) br {
+    display: none !important;
+}
+
+#so-items-table tbody tr td:nth-child(2) .img-wrapper img {
+    max-height: 20px !important; /* Smaller images */
+    max-width: 20px !important;
+    object-fit: contain !important;
+    flex-shrink: 0 !important;
+}
+
+/* Quantity column layout - ultra compact */
+#so-items-table tbody tr td:nth-child(3) {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 1px !important; /* Tighter gap */
+}
+
+#so-items-table tbody tr td:nth-child(3) .btn {
+    width: 18px !important; /* Smaller buttons */
+    height: 18px !important;
+    padding: 0 !important;
+    font-size: 10px !important;
+    line-height: 16px !important;
+    flex-shrink: 0 !important;
+}
+
+#so-items-table tbody tr td:nth-child(3) .item-qty {
+    width: 30px !important; /* Smaller input */
+    height: 18px !important;
+    padding: 0 2px !important;
+    font-size: 10px !important;
+    text-align: center !important;
+    flex-shrink: 0 !important;
+}
+
+/* Right-aligned columns */
+#so-items-table tbody tr td.alignright {
+    text-align: right !important;
+}
+
+#so-items-table tbody tr td.alignright input {
+    text-align: right !important;
+}
+
+/* Form column layout - compact */
+#so-items-table tbody tr td.personalized-column {
+    display: flex !important;
+    align-items: center !important;
+    gap: 2px !important; /* Tighter gap */
+    min-width: 0 !important;
+}
+
+#so-items-table tbody tr td.personalized-column select {
+    font-size: 10px !important; /* Smaller font */
+    height: 20px !important; /* Match other controls */
+    padding: 0 3px !important; /* Less padding */
+    flex-shrink: 1 !important;
+    min-width: 0 !important;
+}
+
+#so-items-table tbody tr td.personalized-column h6 {
+    margin: 0 !important;
+    white-space: nowrap !important;
+    font-size: 10px !important; /* Smaller font */
+    flex-shrink: 0 !important;
+}
+
+#so-items-table tbody tr td.personalized-column .fa {
+    font-size: 10px !important;
+    flex-shrink: 0 !important;
+}
+
+/* Action column layout - compact */
+#so-items-table tbody tr td:last-child {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-around !important;
+    gap: 1px !important; /* Tighter gap */
+}
+
+#so-items-table tbody tr td:last-child .fa,
+#so-items-table tbody tr td:last-child .close-icon {
+    font-size: 10px !important; /* Smaller icons */
+    margin: 0 !important;
+    padding: 0 !important;
+    flex-shrink: 0 !important;
+}
+
+/* Ensure proper table display and alignment */
+#so-items-table thead {
+    display: table-header-group !important;
+    width: 100% !important;
+}
+
+#so-items-table tbody {
+    display: table-row-group !important;
+    width: 100% !important;
+}
+
+#so-items-table thead tr,
+#so-items-table tbody tr {
+    display: table-row !important;
+    width: 100% !important;
+}
+
+#so-items-table thead th,
+#so-items-table tbody td {
+    display: table-cell !important;
+}
+
+/* Ensure table container takes full width without empty space */
+#so-items-scroll {
+    width: 100% !important;
+    overflow-x: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+/* Ensure the table wrapper takes full width */
+#so-items-table {
+    width: 100% !important;
+    margin: 0 auto !important;
+}
+
+/* Fix any container that might be constraining the table */
+#so-items-scroll,
+#so-items-table,
+#so-items-table thead,
+#so-items-table tbody {
+    box-sizing: border-box !important;
+}
+
+/* Box-sizing for consistent layout */
+#so-items-table,
+#so-items-table *,
+#so-items-table *:before,
+#so-items-table *:after {
+    box-sizing: border-box !important;
+}
+
+/* Reset margins and padding on inner elements */
+#so-items-table tbody td img,
+#so-items-table tbody td .fa,
+#so-items-table tbody td i,
+#so-items-table tbody td h6,
+#so-items-table tbody td span,
+#so-items-table tbody td label,
+#so-items-table tbody td .text-block,
+#so-items-table tbody td .close-icon {
+    margin: 0 !important;
+    padding: 0 !important;
+    line-height: 1.2 !important;
+}
+
+/* Column width distribution to prevent empty space */
+#so-items-table thead th:nth-child(1),
+#so-items-table tbody td:nth-child(1) {
+    width: 40px !important;
+    min-width: 40px !important;
+    max-width: 40px !important;
+}
+
+#so-items-table thead th:nth-child(2),
+#so-items-table tbody td:nth-child(2) {
+    width: 150px !important;
+    min-width: 150px !important;
+}
+
+#so-items-table thead th:nth-child(3),
+#so-items-table tbody td:nth-child(3) {
+    width: 80px !important;
+    min-width: 80px !important;
+    max-width: 80px !important;
+}
+
+#so-items-table thead th:nth-child(4),
+#so-items-table tbody td:nth-child(4) {
+    width: 70px !important;
+    min-width: 70px !important;
+}
+
+#so-items-table thead th:nth-child(5),
+#so-items-table tbody td:nth-child(5) {
+    width: 65px !important;
+    min-width: 65px !important;
+}
+
+#so-items-table thead th:nth-child(6),
+#so-items-table tbody td:nth-child(6) {
+    width: 65px !important;
+    min-width: 65px !important;
+}
+
+#so-items-table thead th:nth-child(7),
+#so-items-table tbody td:nth-child(7) {
+    width: 65px !important;
+    min-width: 65px !important;
+}
+
+#so-items-table thead th:nth-child(8),
+#so-items-table tbody td:nth-child(8) {
+    width: 65px !important;
+    min-width: 65px !important;
+}
+
+#so-items-table thead th:nth-child(9),
+#so-items-table tbody td:nth-child(9) {
+    width: 65px !important;
+    min-width: 65px !important;
+}
+
+#so-items-table thead th:nth-child(10),
+#so-items-table tbody td:nth-child(10) {
+    width: 65px !important;
+    min-width: 65px !important;
+}
+
+#so-items-table thead th:nth-child(11),
+#so-items-table tbody td:nth-child(11) {
+    width: 65px !important;
+    min-width: 65px !important;
+}
+
+#so-items-table thead th:nth-child(12),
+#so-items-table tbody td:nth-child(12) {
+    width: 100px !important;
+    min-width: 100px !important;
+}
+
+#so-items-table thead th:nth-child(13),
+#so-items-table tbody td:nth-child(13) {
+    width: 120px !important;
+    min-width: 120px !important;
+}
+
+#so-items-table thead th:nth-child(14),
+#so-items-table tbody td:nth-child(14) {
+    width: 70px !important;
+    min-width: 70px !important;
+}

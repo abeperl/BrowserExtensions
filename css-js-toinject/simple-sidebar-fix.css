@@ -1,0 +1,62 @@
+/* ===== SIDEBAR FIX - MINIMAL, NON-INVASIVE STYLES ===== */
+
+/* Make native data-bs buttons visible but don't reposition them */
+button[data-bs-toggle="offcanvas"],
+button[data-toggle="offcanvas"],
+.navbar-toggler {
+    visibility: visible !important;
+    opacity: 1 !important;
+    z-index: 1000 !important;
+}
+
+/* Styling for the manual button we may inject (kept small and isolated)
+   This is only used when the site has no existing visible button. */
+#enhanced-menu-btn {
+    position: fixed;
+    top: 15px;
+    left: 15px;
+    z-index: 10000;
+    background: #ff8c00;
+    border: none;
+    border-radius: 6px;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 18px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.12);
+}
+
+/* Backdrop we inject */
+.sidebar-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0,0,0,0.35);
+    z-index: 1040;
+}
+
+/* When we open the sidebar, shift the main content to make room.
+   Keep this minimal and target common container selectors; use a CSS variable
+   set by the script to match the sidebar width. This is a best-effort, non-invasive
+   approach — it won't break layout if the page uses non-standard containers. */
+body.enhanced-sidebar-open {
+    --enhanced-sidebar-width: 260px; /* fallback if JS can't compute width */
+}
+body.enhanced-sidebar-open main,
+body.enhanced-sidebar-open .content,
+body.enhanced-sidebar-open .page-wrapper,
+body.enhanced-sidebar-open .content-wrapper,
+body.enhanced-sidebar-open .app-body,
+body.enhanced-sidebar-open .app-content,
+body.enhanced-sidebar-open .wrapper,
+body.enhanced-sidebar-open .container-fluid,
+body.enhanced-sidebar-open #content,
+body.enhanced-sidebar-open .main-content {
+    transition: margin-left 0.25s ease, transform 0.25s ease;
+    margin-left: var(--enhanced-sidebar-width) !important;
+}

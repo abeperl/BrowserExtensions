@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CSS Override Extension - Settings</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="settings-container">
+    <header class="settings-header">
+      <h1>CSS Override Settings</h1>
+      <p>Configure advanced options for the CSS Override Extension</p>
+    </header>
+
+    <div class="settings-content">
+      <section class="settings-section">
+        <h2>General Settings</h2>
+
+        <div class="setting-item">
+          <div class="setting-info">
+            <h3>Enable Extension</h3>
+            <p>Turn the CSS Override Extension on or off globally</p>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="extensionEnabled" checked>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+
+        <div class="setting-item">
+          <div class="setting-info">
+            <h3>Show Notifications</h3>
+            <p>Show notifications when CSS rules are applied or encounter errors</p>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="showNotifications" checked>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </section>
+
+      <section class="settings-section">
+        <h2>CSS File Management</h2>
+
+        <div class="setting-item">
+          <div class="setting-info">
+            <h3>Upload CSS Files</h3>
+            <p>Upload CSS files to use with your rules. These files will be stored locally.</p>
+          </div>
+          <div class="file-upload-area">
+            <input type="file" id="cssFileInput" accept=".css" multiple style="display: none;">
+            <button id="uploadCssBtn" class="btn btn-secondary">Choose CSS Files</button>
+            <div id="fileList" class="file-list">
+              <!-- Uploaded files will appear here -->
+            </div>
+          </div>
+        </div>
+
+        <div class="setting-item">
+          <div class="setting-info">
+            <h3>Manage Uploaded Files</h3>
+            <p>View and manage your uploaded CSS files</p>
+          </div>
+          <div id="uploadedFiles" class="uploaded-files">
+            <!-- Uploaded CSS files will be listed here -->
+          </div>
+        </div>
+      </section>
+
+      <section class="settings-section">
+        <h2>Data Management</h2>
+
+        <div class="setting-item">
+          <div class="setting-info">
+            <h3>Export Rules</h3>
+            <p>Download all your CSS rules as a backup file</p>
+          </div>
+          <button id="exportRules" class="btn btn-secondary">Export</button>
+        </div>
+
+        <div class="setting-item">
+          <div class="setting-info">
+            <h3>Import Rules</h3>
+            <p>Import CSS rules from a backup file</p>
+          </div>
+          <input type="file" id="importFile" accept=".json" style="display: none;">
+          <button id="importRules" class="btn btn-secondary">Import</button>
+        </div>
+
+        <div class="setting-item">
+          <div class="setting-info">
+            <h3>Clear All Rules</h3>
+            <p>Remove all CSS rules (this action cannot be undone)</p>
+          </div>
+          <button id="clearAllRules" class="btn btn-danger">Clear All</button>
+        </div>
+      </section>
+
+      <section class="settings-section">
+        <h2>About</h2>
+
+        <div class="about-info">
+          <p><strong>Version:</strong> 1.0.0</p>
+          <p><strong>Description:</strong> Customize website appearance by injecting custom CSS rules with URL pattern matching.</p>
+          <p><strong>Permissions:</strong></p>
+          <ul>
+            <li><code>storage</code> - Save your CSS rules locally</li>
+            <li><code>activeTab</code> - Access the current tab to apply CSS rules</li>
+            <li><code>scripting</code> - Inject CSS into web pages</li>
+            <li><code>tabs</code> - Monitor tab changes to apply rules automatically</li>
+          </ul>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <script src="settings.js"></script>
+</body>
+</html>

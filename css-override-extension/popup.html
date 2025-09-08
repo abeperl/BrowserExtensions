@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CSS Override Extension</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <h1>CSS Override</h1>
+      <button id="addRuleBtn" class="btn btn-primary">Add Rule</button>
+    </header>
+
+    <div class="rules-list" id="rulesList">
+      <!-- Rules will be dynamically added here -->
+    </div>
+
+    <div class="no-rules" id="noRules">
+      <p>No CSS rules configured yet.</p>
+      <p>Click "Add Rule" to create your first CSS override.</p>
+    </div>
+  </div>
+
+  <!-- Add/Edit Rule Modal -->
+  <div id="ruleModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="modalTitle">Add CSS Rule</h2>
+        <button id="closeModal" class="close-btn">&times;</button>
+      </div>
+
+      <form id="ruleForm">
+        <div class="form-group">
+          <label for="urlPattern">URL Pattern:</label>
+          <input type="text" id="urlPattern" placeholder="e.g., *.example.com/* or https://example.com/page" required>
+          <small>Use * for wildcards. Examples: *.google.com/*, https://example.com/*</small>
+        </div>
+
+        <div class="form-group">
+          <label for="ruleName">Rule Name:</label>
+          <input type="text" id="ruleName" placeholder="Descriptive name for this rule" required>
+        </div>
+
+        <div class="form-group">
+          <label for="cssMode">Mode:</label>
+          <select id="cssMode">
+            <option value="override">Override (add additional styles)</option>
+            <option value="replace">Replace (replace existing styles)</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="cssSource">CSS Source:</label>
+          <select id="cssSource">
+            <option value="custom">Write Custom CSS</option>
+            <option value="uploaded">Use Uploaded File</option>
+          </select>
+        </div>
+
+        <div class="form-group" id="uploadedFileGroup" style="display: none;">
+          <label for="uploadedFileSelect">Select CSS File:</label>
+          <select id="uploadedFileSelect">
+            <option value="">Choose a file...</option>
+            <!-- Uploaded files will be populated here -->
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="cssCode">CSS Code:</label>
+          <textarea id="cssCode" rows="10" placeholder="Enter your CSS code here..." required></textarea>
+          <small>Enter valid CSS code. Example: body { background-color: lightblue; }</small>
+        </div>
+
+        <div class="form-group">
+          <label class="checkbox-label">
+            <input type="checkbox" id="ruleEnabled" checked>
+            Enable this rule
+          </label>
+        </div>
+
+        <div class="form-actions">
+          <button type="button" id="cancelBtn" class="btn btn-secondary">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Rule</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

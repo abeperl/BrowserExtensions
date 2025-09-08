@@ -57,29 +57,29 @@ function removeOverlay() {
   if (overlayTimeout) clearTimeout(overlayTimeout);
   // Focus and select the first scan input after overlay is dismissed
   try {
-    // Use the configurable selector
-    const settings = window.scanOverlayExtension?.settings || {};
-    const selector = settings.itemIdSelector || '#product-scan';
+    // Use the current site config from the extension
+    const siteConfig = window.scanOverlayExtension?.getCurrentSiteConfig?.() || {};
+    const selector = siteConfig.inputSelector || '#product-scan';
     const input = document.querySelector(selector);
-    if (input && (settings.autoFocusAfterScan !== false)) {
+    if (input && window.scanOverlayExtension?.settings?.autoFocusAfterScan !== false) {
       input.focus();
       input.select && input.select();
     }
   } catch (e) { /* ignore */ }
 }
 
-// Audio feedback with debouncing
+// Audio feedback with debouncing and error handling
 function playAudio(state) {
   const now = Date.now();
-  
+
   // Prevent playing the same audio multiple times within debounce period
-  if (now - lastAudioPlayback.timestamp < AUDIO_DEBOUNCE_TIME && 
+  if (now - lastAudioPlayback.timestamp < AUDIO_DEBOUNCE_TIME &&
       lastAudioPlayback.state === state) {
     return;
   }
-  
+
   lastAudioPlayback = { state, timestamp: now };
-  
+
   let audioFile = '';
   switch (state) {
     case 'scan': audioFile = 'audio/scan.wav'; break;
@@ -88,9 +88,34 @@ function playAudio(state) {
     case 'error': audioFile = 'audio/error.wav'; break;
     default: return;
   }
-  const audio = new Audio(chrome.runtime.getURL(audioFile));
-  audio.volume = 0.5; // Set moderate volume
-  audio.play().catch(e => console.log('Audio playback failed:', e));
+
+  try {
+    const audio = new Audio(chrome.runtime.getURL(audioFile));
+    audio.volume = 0.5; // Set moderate volume
+
+    // Add error handling for audio loading/playback
+    audio.addEventListener('error', (e) => {
+      console.warn('Audio playback failed:', e);
+      // Could implement fallback notification here
+    });
+
+    audio.addEventListener('canplaythrough', () => {
+      audio.play().catch(e => {
+        console.warn('Audio play failed:', e);
+        // Silent failure - don't spam console
+      });
+    });
+
+    // Set a timeout to prevent hanging
+    setTimeout(() => {
+      if (audio.readyState < 3) { // HAVE_FUTURE_DATA or HAVE_ENOUGH_DATA
+        console.warn('Audio failed to load within timeout');
+      }
+    }, 3000);
+
+  } catch (error) {
+    console.warn('Failed to create audio element:', error);
+  }
 }
 
 // Keyboard shortcut for dismissal

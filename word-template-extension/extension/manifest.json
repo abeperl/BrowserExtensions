@@ -1,7 +1,7 @@
 ﻿{
     "manifest_version":  3,
     "name":  "Word Template Extension",
-    "version":  "1.0.0",
+    "version":  "1.0.2",
     "description":  "Transform web data into professional Word documents instantly with smart extraction and custom templates.",
     "author":  "Word Template Extension Team",
     "homepage_url":  "https://github.com/wordtemplateextension/extension",

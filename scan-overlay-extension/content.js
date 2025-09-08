@@ -72,7 +72,7 @@ async function loadSettings() {
       console.log('Scan overlay settings loaded:', settings);
       if (currentSiteConfig) {
         console.log('Using site config:', currentSiteConfig.name);
-        console.log('Selectors - Item:', currentSiteConfig.itemIdSelector, 'Status:', currentSiteConfig.statusIdSelector);
+        console.log('Input selector:', currentSiteConfig.inputSelector);
       } else {
         console.log('No matching site configuration found for URL:', currentUrl);
       }
@@ -144,90 +144,121 @@ let scanState = {
 
 // === Utility: Find input fields using current site config ===
 function getInputFields() {
-  if (!currentSiteConfig) return { itemInput: null, statusInput: null };
+  if (!currentSiteConfig || !currentSiteConfig.inputSelector) return [];
   
-	const itemInput = document.querySelector(currentSiteConfig.itemIdSelector);
-	const statusInput = document.querySelector(currentSiteConfig.statusIdSelector);
-	return { itemInput, statusInput };
+	const inputs = document.querySelectorAll(currentSiteConfig.inputSelector);
+	return Array.from(inputs);
 }
 
 // === State tracking to prevent duplicate events ===
-let lastProcessedInput = { itemId: '', statusId: '', timestamp: 0 };
+let lastProcessedInput = { itemId: '', statusId: '', timestamp: 0, eventType: '' };
 const DEBOUNCE_TIME = 100; // ms to prevent duplicate processing
+
+// === Modal close tracking ===
+let isModalClosing = false;
+const MODAL_CLOSE_DEBOUNCE = 500; // ms to suppress overlays after close button click
+
+// === Document-level event delegation to avoid interfering with modal ===
+let documentListenersAttached = false;
+
+function attachDocumentLevelListeners() {
+	if (documentListenersAttached) return;
+	
+	// Use event delegation from document level to avoid interfering with modal event handling
+	document.addEventListener('input', (e) => {
+		if (!currentSiteConfig) return;
+		
+		// Check if the input matches our selector
+		if (e.target.matches && e.target.matches(currentSiteConfig.inputSelector)) {
+			const inputFields = getInputFields();
+			const index = inputFields.indexOf(e.target);
+			if (index >= 0) {
+				// Only update scan state without showing overlay
+				updateScanState('input', e.target.value, index);
+			}
+		}
+	}, { passive: true });
+	
+	document.addEventListener('change', (e) => {
+		if (!currentSiteConfig) return;
+		
+		if (e.target.matches && e.target.matches(currentSiteConfig.inputSelector)) {
+			const inputFields = getInputFields();
+			const index = inputFields.indexOf(e.target);
+			if (index >= 0) {
+				handleScanInput('input', e.target.value, false, index, false);
+			}
+		}
+	}, { passive: true });
+	
+	document.addEventListener('blur', (e) => {
+		if (!currentSiteConfig) return;
+		
+		if (e.target.matches && e.target.matches(currentSiteConfig.inputSelector)) {
+			const inputFields = getInputFields();
+			const index = inputFields.indexOf(e.target);
+			if (index >= 0) {
+				// Longer delay to ensure modal close detection happens first
+				setTimeout(() => {
+					// Additional check: make sure the modal still exists before showing overlay
+					const modalStillExists = document.getElementById('_modal_block_ui');
+					if (!isModalClosing && modalStillExists) {
+						handleScanInput('input', e.target.value, false, index, true);
+					} else if (settings.debugMode) {
+						console.log('Blur overlay suppressed - modal is closing or closed');
+					}
+				}, 200); // Even longer delay
+			}
+		}
+	}, { passive: true });
+	
+	document.addEventListener('keydown', (e) => {
+		if (!currentSiteConfig) return;
+		
+		if (e.key === 'Enter' && e.target.matches && e.target.matches(currentSiteConfig.inputSelector)) {
+			const inputFields = getInputFields();
+			const index = inputFields.indexOf(e.target);
+			if (index >= 0) {
+				handleScanInput('input', e.target.value, true, index);
+				// Don't prevent default - let original handlers run
+			}
+		}
+	}, { passive: true });
+	
+	documentListenersAttached = true;
+	
+	if (settings.debugMode) {
+		console.log('Attached document-level event delegation for scan inputs');
+	}
+}
 
 // === Monitor input fields for scan events ===
 function monitorScanFields() {
   if (!currentSiteConfig) return false;
   
-	const { itemInput, statusInput } = getInputFields();
-	if (!itemInput || !statusInput) {
+	const inputFields = getInputFields();
+	if (inputFields.length === 0) {
 		if (settings.debugMode) {
 			console.log('Scan fields not found, will observe DOM for changes...');
-			console.log('Looking for:', currentSiteConfig.itemIdSelector, 'and', currentSiteConfig.statusIdSelector);
+			console.log('Looking for selector:', currentSiteConfig.inputSelector);
 		}
 		return false;
 	}
 	
-	// Also monitor the save button
+	// Also monitor the save button (only once)
 	monitorSaveButton();
-	if (!itemInput.dataset.soeListener) {
-		// Add our monitoring listeners without removing existing ones
-		// Use passive listeners that don't interfere with original functionality
-		itemInput.addEventListener('input', (e) => {
-			handleScanInput('itemId', e.target.value, false);
-		}, { passive: true });
-		
-		itemInput.addEventListener('change', (e) => {
-			handleScanInput('itemId', e.target.value, false);
-		}, { passive: true });
-		
-		itemInput.addEventListener('blur', (e) => {
-			handleScanInput('itemId', e.target.value, false);
-		}, { passive: true });
-		
-		// For Enter key, intercept only for our overlay logic but don't prevent default
-		itemInput.addEventListener('keydown', (e) => {
-			if (e.key === 'Enter') {
-				handleScanInput('itemId', e.target.value, true);
-				// Don't prevent default - let original handlers run
-			}
-		}, { passive: true });
-		
-		itemInput.dataset.soeListener = '1';
-		if (settings.debugMode) {
-			console.log('Attached monitoring listeners to', currentSiteConfig.itemIdSelector);
-		}
+	
+	// Hook into existing modal close function (only once)
+	hookIntoModalClose();
+	
+	// Use document-level event delegation instead of direct listeners
+	attachDocumentLevelListeners();
+	
+	if (settings.debugMode) {
+		console.log(`Found ${inputFields.length} input fields, using document-level event delegation`);
 	}
 	
-	if (!statusInput.dataset.soeListener) {
-		// Add our monitoring listeners without removing existing ones
-		// Use passive listeners that don't interfere with original functionality
-		statusInput.addEventListener('input', (e) => {
-			handleScanInput('statusId', e.target.value, false);
-		}, { passive: true });
-		
-		statusInput.addEventListener('change', (e) => {
-			handleScanInput('statusId', e.target.value, false);
-		}, { passive: true });
-		
-		statusInput.addEventListener('blur', (e) => {
-			handleScanInput('statusId', e.target.value, false);
-		}, { passive: true });
-		
-		// For Enter key, intercept only for our overlay logic but don't prevent default
-		statusInput.addEventListener('keydown', (e) => {
-			if (e.key === 'Enter') {
-				handleScanInput('statusId', e.target.value, true);
-				// Don't prevent default - let original handlers run
-			}
-		}, { passive: true });
-		
-		statusInput.dataset.soeListener = '1';
-		if (settings.debugMode) {
-			console.log('Attached monitoring listeners to', currentSiteConfig.statusIdSelector);
-		}
-	}
-	return true;
+	return inputFields.length > 0;
 }
 
 // === Monitor save button ===
@@ -235,36 +266,43 @@ function monitorSaveButton() {
 	const saveButton = document.querySelector('#scan-status-save');
 	if (saveButton && !saveButton.dataset.soeListener) {
 		// Add our monitoring listener without interfering with original handlers
-		saveButton.addEventListener('click', (e) => {
-			const { itemInput, statusInput } = getInputFields();
-			const itemId = itemInput ? itemInput.value.trim() : '';
-			const statusId = statusInput ? statusInput.value.trim().toLowerCase() : '';
+		const saveClickHandler = (e) => {
+			const inputFields = getInputFields();
+			const values = inputFields.map(input => input.value.trim());
 			
 			if (settings.debugMode) {
-				console.log('Save button clicked - monitoring', { itemId, statusId });
+				console.log('Save button clicked - monitoring', { values });
 			}
 			
-			// Update scan state for monitoring
-			scanState.itemId = itemId;
-			scanState.statusId = statusId;
-			scanState.lastScan = itemId;
+			// Update scan state for monitoring (use first two values as itemId and statusId for compatibility)
+			scanState.itemId = values[0] || '';
+			scanState.statusId = values[1] || '';
+			scanState.lastScan = values[0] || '';
 			
 			// Add to scan history if new
-			if (itemId && (!scanState.scanHistory.length || scanState.scanHistory[scanState.scanHistory.length-1] !== itemId)) {
-				scanState.scanHistory.push(itemId);
+			if (values[0] && (!scanState.scanHistory.length || scanState.scanHistory[scanState.scanHistory.length-1] !== values[0])) {
+				scanState.scanHistory.push(values[0]);
 			}
 			
 			// Show pre-submit overlay alongside original functionality
-			if (itemId && statusId) {
-				window.postMessage({ type: 'SHOW_PRESUBMIT_OVERLAY', itemId: scanState.itemId, statusId: scanState.statusId, progress: scanState.scanHistory.length }, '*');
+			// But not if modal is closing
+			if (values.some(v => v) && !isModalClosing) {
+				window.postMessage({ 
+					type: 'SHOW_PRESUBMIT_OVERLAY', 
+					itemId: scanState.itemId, 
+					statusId: scanState.statusId, 
+					progress: scanState.scanHistory.length 
+				}, '*');
 				
 				// Log scan event to background for history
 				chrome.runtime.sendMessage({
 					type: 'LOG_SCAN',
 					itemId: scanState.itemId,
 					statusId: scanState.statusId,
-					result: 'scanned',
+					result: 'ready_to_submit',
 				});
+			} else if (values.some(v => v) && isModalClosing && settings.debugMode) {
+				console.log('Save button overlay suppressed - modal is closing');
 			}
 			
 			if (settings.debugMode) {
@@ -272,14 +310,106 @@ function monitorSaveButton() {
 			}
 			
 			// Don't prevent default - let original website handle validation and submission
-		}, { passive: true });
+		};
 		
+		saveButton.addEventListener('click', saveClickHandler, { passive: true });
 		saveButton.dataset.soeListener = '1';
+		
 		if (settings.debugMode) {
 			console.log('Attached validation listener to save button');
 		}
 	}
 }
+
+// === Monitor modal removal from DOM ===
+let modalRemovalObserver = null;
+let modalCloseHooked = false;
+
+function hookIntoModalClose() {
+	// Don't hook multiple times
+	if (modalCloseHooked) return;
+	
+	// Monitor for modal removal from DOM (most reliable approach)
+	if (modalRemovalObserver) {
+		modalRemovalObserver.disconnect();
+	}
+	
+	modalRemovalObserver = new MutationObserver((mutations) => {
+		mutations.forEach((mutation) => {
+			mutation.removedNodes.forEach((removedNode) => {
+				// Check if the removed node is the modal block
+				if (removedNode.nodeType === Node.ELEMENT_NODE && 
+				    (removedNode.id === '_modal_block_ui' || removedNode.classList?.contains('modal-box'))) {
+					
+					if (settings.debugMode) {
+						console.log('Modal removed from DOM - suppressing overlays temporarily', removedNode);
+						console.log('Modal had classes:', Array.from(removedNode.classList || []));
+						console.log('Modal had id:', removedNode.id);
+					}
+					
+					// Set flag to suppress overlays briefly
+					isModalClosing = true;
+					
+					// Clear flag after brief period
+					setTimeout(() => {
+						isModalClosing = false;
+						if (settings.debugMode) {
+							console.log('Modal close period ended - overlays re-enabled');
+						}
+					}, MODAL_CLOSE_DEBOUNCE);
+				}
+			});
+			
+			// Also check if any modals are being hidden instead of removed
+			if (mutation.type === 'attributes' && (mutation.attributeName === 'style' || mutation.attributeName === 'class')) {
+				const target = mutation.target;
+				if (target.id === '_modal_block_ui' || target.classList?.contains('modal-box')) {
+					if (settings.debugMode) {
+						console.log('Modal attributes changed:', target, 'style:', target.style.cssText, 'classes:', Array.from(target.classList || []));
+					}
+					
+					// Check if modal is being hidden
+					const isHidden = target.style.display === 'none' || 
+					                 target.style.visibility === 'hidden' ||
+					                 target.classList.contains('hidden') ||
+					                 target.offsetParent === null;
+					
+					if (isHidden) {
+						if (settings.debugMode) {
+							console.log('Modal was hidden - removing enlargement class and suppressing overlays');
+						}
+						
+						// Remove our enlargement class to ensure it can hide properly
+						target.classList.remove('soe-enlarged-modal');
+						enlargedModals.delete(target);
+						
+						// Suppress overlays
+						isModalClosing = true;
+						setTimeout(() => {
+							isModalClosing = false;
+						}, MODAL_CLOSE_DEBOUNCE);
+					}
+				}
+			}
+		});
+	});
+	
+	// Observe document body for modal removal and style changes
+	modalRemovalObserver.observe(document.body, {
+		childList: true,
+		subtree: true,
+		attributes: true,
+		attributeFilter: ['style', 'class']
+	});
+	
+	modalCloseHooked = true;
+	
+	if (settings.debugMode) {
+		console.log('Monitoring modal DOM removal for overlay suppression');
+	}
+}
+
+// === Escape key monitoring is now handled by hookIntoModalClose() ===
 
 // === Client-side validation (mimics page's validation logic) ===
 function validateScanData(itemId, statusId) {
@@ -309,61 +439,93 @@ function validateScanData(itemId, statusId) {
 	}
 }
 
-// === Handle scan input ===
-function handleScanInput(type, value, isSubmit = false) {
-	const now = Date.now();
-	const currentState = { itemId: scanState.itemId, statusId: scanState.statusId };
-	
-	// Handle save button click differently - don't update scan state
-	if (type !== 'save') {
-		currentState[type] = value;
-		
-		// Prevent duplicate processing within debounce time
-		if (now - lastProcessedInput.timestamp < DEBOUNCE_TIME && 
-		    lastProcessedInput.itemId === currentState.itemId && 
-		    lastProcessedInput.statusId === currentState.statusId) {
-			if (settings.debugMode) {
-				console.log('handleScanInput debounced', type, value);
-			}
-			return;
-		}
-		
-		scanState[type] = value;
-		scanState.lastScan = value;
-		// Add to scan history if new
-		if (value && (!scanState.scanHistory.length || scanState.scanHistory[scanState.scanHistory.length-1] !== value)) {
-			scanState.scanHistory.push(value);
-		}
+// === Update scan state without showing overlays (for input events) ===
+function updateScanState(type, value, fieldIndex = 0) {
+	// Store value in appropriate scan state based on field index
+	if (fieldIndex === 0) {
+		scanState.itemId = value;
+	} else if (fieldIndex === 1) {
+		scanState.statusId = value;
 	}
 	
-	lastProcessedInput = { ...currentState, timestamp: now };
+	// Always update lastScan to the current value
+	scanState.lastScan = value;
 	
 	if (settings.debugMode) {
-		console.log('handleScanInput', type, value, 'isSubmit:', isSubmit);
+		console.log('updateScanState', type, value, 'fieldIndex:', fieldIndex, '(no overlay)');
+	}
+}
+
+// === Handle scan input ===
+function handleScanInput(type, value, isSubmit = false, fieldIndex = 0, isBlur = false) {
+	const now = Date.now();
+	const eventKey = `${type}_${value}_${fieldIndex}_${isSubmit}_${isBlur}`;
+	
+	// Update scan state (in case this wasn't called from input event)
+	updateScanState(type, value, fieldIndex);
+	
+	// Prevent duplicate processing within debounce time with same event
+	if (now - lastProcessedInput.timestamp < DEBOUNCE_TIME && 
+	    lastProcessedInput.itemId === scanState.itemId && 
+	    lastProcessedInput.statusId === scanState.statusId &&
+	    lastProcessedInput.eventType === eventKey) {
+		if (settings.debugMode) {
+			console.log('handleScanInput debounced', type, value);
+		}
+		return;
 	}
 	
-	// Only show pre-submit overlay when user indicates they're ready to submit (Enter key or Save button)
-	// or when there's an error
-	if (isSubmit && scanState.itemId && scanState.statusId) {
-		// Perform client-side validation like the page does
-		const validationResult = validateScanData(scanState.itemId, scanState.statusId);
+	// Add to scan history if new and meaningful
+	if (value && value.trim() && (!scanState.scanHistory.length || scanState.scanHistory[scanState.scanHistory.length-1] !== value)) {
+		scanState.scanHistory.push(value);
+	}
+	
+	lastProcessedInput = { 
+		itemId: scanState.itemId, 
+		statusId: scanState.statusId, 
+		timestamp: now, 
+		eventType: eventKey 
+	};
+	
+	if (settings.debugMode) {
+		console.log('handleScanInput', type, value, 'fieldIndex:', fieldIndex, 'isSubmit:', isSubmit, 'isBlur:', isBlur, 'modalClosing:', isModalClosing);
+	}
+	
+	// Only show scan overlay when user finishes typing (Enter key, blur/exit field, or submit)
+	// Don't show on regular typing (input events)
+	// Also don't show if modal is closing
+	if (value && value.trim() && (isSubmit || isBlur) && !isModalClosing) {
+		window.postMessage({ type: 'SHOW_SCAN_OVERLAY', value: value, progress: scanState.scanHistory.length }, '*');
+		// Log scan event to background for history
+		chrome.runtime.sendMessage({
+			type: 'LOG_SCAN',
+			itemId: scanState.itemId,
+			statusId: scanState.statusId,
+			result: 'scanned',
+		});
+	} else if ((isModalClosing || isSubmit) && settings.debugMode) {
+		console.log('Scan overlay suppressed - modal is closing:', isModalClosing, 'isSubmit:', isSubmit);
+	}
+	
+	// Show pre-submit overlay when user indicates they're ready to submit (Enter key)
+	// But not if modal is closing
+	if (isSubmit && value && value.trim() && !isModalClosing) {
+		window.postMessage({ 
+			type: 'SHOW_PRESUBMIT_OVERLAY', 
+			itemId: scanState.itemId || value, 
+			statusId: scanState.statusId || '', 
+			progress: scanState.scanHistory.length 
+		}, '*');
 		
-		if (validationResult.isValid) {
-			window.postMessage({ type: 'SHOW_PRESUBMIT_OVERLAY', itemId: scanState.itemId, statusId: scanState.statusId, progress: scanState.scanHistory.length }, '*');
-			// Log scan event to background for history
-			chrome.runtime.sendMessage({
-				type: 'LOG_SCAN',
-				itemId: scanState.itemId,
-				statusId: scanState.statusId,
-				result: 'scanned',
-			});
-		} else {
-			// Show validation error overlay instead of letting page show snackbar
-			window.postMessage({ type: 'SHOW_ERROR_OVERLAY', error: validationResult.error, progress: scanState.scanHistory.length }, '*');
-		}
-	} else if (isSubmit && (!scanState.itemId || !scanState.statusId)) {
-		// Show error overlay if user tries to submit with missing fields
-		window.postMessage({ type: 'SHOW_ERROR_OVERLAY', error: 'Both fields required', progress: scanState.scanHistory.length }, '*');
+		// Log scan event to background for history
+		chrome.runtime.sendMessage({
+			type: 'LOG_SCAN',
+			itemId: scanState.itemId || value,
+			statusId: scanState.statusId || '',
+			result: 'ready_to_submit',
+		});
+	} else if (isSubmit && isModalClosing && settings.debugMode) {
+		console.log('Pre-submit overlay suppressed - modal is closing');
 	}
 }
 
@@ -374,14 +536,18 @@ function interceptApiSubmission() {
 	// Monitor form submissions without interfering with original functionality
 	document.addEventListener('submit', (e) => {
 		const form = e.target;
-		const { itemInput, statusInput } = getInputFields();
+		const inputFields = getInputFields();
 		
-		if (form && (form.contains(itemInput) || form.contains(statusInput))) {
-			const itemId = itemInput ? itemInput.value.trim() : '';
-			const statusId = statusInput ? statusInput.value.trim().toLowerCase() : '';
+		// Check if form contains any of our monitored inputs
+		const hasMonitoredInputs = inputFields.some(input => form.contains(input));
+		
+		if (form && hasMonitoredInputs) {
+			const values = inputFields.map(input => input.value.trim());
+			const itemId = values[0] || '';
+			const statusId = values[1] || '';
 			
 			if (settings.debugMode) {
-				console.log('Form submission detected - monitoring', { itemId, statusId });
+				console.log('Form submission detected - monitoring', { values, itemId, statusId });
 			}
 			
 			// Update scan state for monitoring
@@ -395,16 +561,24 @@ function interceptApiSubmission() {
 			}
 			
 			// Show pre-submit overlay alongside original form handling
-			if (itemId && statusId) {
-				window.postMessage({ type: 'SHOW_PRESUBMIT_OVERLAY', itemId: scanState.itemId, statusId: scanState.statusId, progress: scanState.scanHistory.length }, '*');
+			// But not if modal is closing
+			if (values.some(v => v) && !isModalClosing) {
+				window.postMessage({ 
+					type: 'SHOW_PRESUBMIT_OVERLAY', 
+					itemId: scanState.itemId, 
+					statusId: scanState.statusId, 
+					progress: scanState.scanHistory.length 
+				}, '*');
 				
 				// Log scan event to background for history
 				chrome.runtime.sendMessage({
 					type: 'LOG_SCAN',
 					itemId: scanState.itemId,
 					statusId: scanState.statusId,
-					result: 'scanned',
+					result: 'ready_to_submit',
 				});
+			} else if (values.some(v => v) && isModalClosing && settings.debugMode) {
+				console.log('Form submission overlay suppressed - modal is closing');
 			}
 			
 			if (settings.debugMode) {
@@ -611,16 +785,164 @@ function handleControlledSubmission() {
 	}, 1000);
 }
 
-// Clear both scan fields and reset scan state
+// Clear all scan fields and reset scan state
 function clearScanFields() {
-	const { itemInput, statusInput } = getInputFields();
-	if (itemInput) itemInput.value = '';
-	if (statusInput) statusInput.value = '';
+	const inputFields = getInputFields();
+	inputFields.forEach(input => {
+		if (input) input.value = '';
+	});
+	
 	scanState.itemId = '';
 	scanState.statusId = '';
 	scanState.lastScan = '';
 	scanState.overlayActive = false;
 }
+
+// === Modal Resize Feature ===
+let modalObserver = null;
+let enlargedModals = new Set();
+
+function initializeModalResize() {
+  if (!currentSiteConfig || !currentSiteConfig.enableModalResize) {
+    return;
+  }
+  
+  if (settings.debugMode) {
+    console.log('Initializing modal resize feature with selector:', currentSiteConfig.modalSelector);
+  }
+  
+  // Clean up existing observer
+  if (modalObserver) {
+    modalObserver.disconnect();
+  }
+  
+  // Monitor for modal appearance
+  modalObserver = new MutationObserver((mutations) => {
+    mutations.forEach((mutation) => {
+      // Only process childList mutations to avoid interference
+      if (mutation.type === 'childList') {
+        mutation.addedNodes.forEach((node) => {
+          if (node.nodeType === Node.ELEMENT_NODE) {
+            // Check if the added node is a modal or contains modals
+            const modals = node.matches && node.matches(currentSiteConfig.modalSelector) 
+              ? [node] 
+              : Array.from(node.querySelectorAll ? node.querySelectorAll(currentSiteConfig.modalSelector) || [] : []);
+            
+            modals.forEach(modal => {
+              // Only enlarge modals that are visible and contain our target input fields
+              if (!enlargedModals.has(modal) && 
+                  modal.style.display !== 'none' &&
+                  modal.querySelector && 
+                  modal.querySelector(currentSiteConfig.inputSelector)) {
+                
+                enlargeModal(modal);
+                enlargedModals.add(modal);
+                
+                if (settings.debugMode) {
+                  console.log('Modal detected and enlarged (contains target inputs):', modal);
+                }
+              }
+            });
+          }
+        });
+      }
+    });
+  });
+  
+  modalObserver.observe(document.body, { 
+    childList: true, 
+    subtree: true 
+  });
+  
+  // Check for existing modals
+  const existingModals = document.querySelectorAll(currentSiteConfig.modalSelector);
+  existingModals.forEach(modal => {
+    if (!enlargedModals.has(modal) && 
+        modal.style.display !== 'none' &&
+        modal.querySelector && 
+        modal.querySelector(currentSiteConfig.inputSelector)) {
+      
+      enlargeModal(modal);
+      enlargedModals.add(modal);
+      
+      if (settings.debugMode) {
+        console.log('Existing modal found and enlarged (contains target inputs):', modal);
+      }
+    }
+  });
+}
+
+function enlargeModal(modal) {
+  if (!currentSiteConfig || !currentSiteConfig.enableModalResize) {
+    return;
+  }
+  
+  try {
+    // Set CSS custom properties for the modal dimensions
+    modal.style.setProperty('--soe-modal-width', currentSiteConfig.modalWidth || '800px');
+    modal.style.setProperty('--soe-modal-height', currentSiteConfig.modalHeight || '600px');
+    modal.style.setProperty('--soe-modal-min-width', currentSiteConfig.modalMinWidth || '600px');
+    modal.style.setProperty('--soe-modal-min-height', currentSiteConfig.modalMinHeight || '400px');
+    
+    // Add the enlargement class
+    modal.classList.add('soe-enlarged-modal');
+    
+    // Also enhance the backdrop if present
+    const backdrop = modal.parentElement;
+    if (backdrop && (backdrop.classList.contains('loader_block_ui') || backdrop.id === '_modal_block_ui')) {
+      backdrop.classList.add('soe-enlarged-modal-backdrop');
+    }
+    
+    // Set up cleanup when modal is removed
+    const cleanupObserver = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        mutation.removedNodes.forEach((removedNode) => {
+          if (removedNode === modal || (removedNode.contains && removedNode.contains(modal))) {
+            enlargedModals.delete(modal);
+            cleanupObserver.disconnect();
+            
+            if (settings.debugMode) {
+              console.log('Enlarged modal removed from tracking:', modal);
+            }
+          }
+        });
+      });
+    });
+    
+    cleanupObserver.observe(document.body, { childList: true, subtree: true });
+    
+  } catch (error) {
+    console.error('Error enlarging modal:', error);
+  }
+}
+
+function cleanupModalResize() {
+  if (modalObserver) {
+    modalObserver.disconnect();
+    modalObserver = null;
+  }
+  
+  // Remove enlargement from all tracked modals
+  enlargedModals.forEach(modal => {
+    if (modal && modal.classList) {
+      modal.classList.remove('soe-enlarged-modal');
+      modal.style.removeProperty('--soe-modal-width');
+      modal.style.removeProperty('--soe-modal-height');
+      modal.style.removeProperty('--soe-modal-min-width');
+      modal.style.removeProperty('--soe-modal-min-height');
+    }
+  });
+  
+  enlargedModals.clear();
+  
+  if (settings.debugMode) {
+    console.log('Modal resize feature cleaned up');
+  }
+}
+
+// === Track DOM observation state ===
+let domObserver = null;
+let isCheckingFields = false;
 
 // === Initialize extension features ===
 function initializeExtensionFeatures() {
@@ -629,14 +951,63 @@ function initializeExtensionFeatures() {
   // Initialize monitoring mechanisms (non-invasive)
   interceptApiSubmission();
   
+  // Initialize modal resize feature (now safe with DOM removal detection)
+  initializeModalResize();
+  
+  // Clean up existing observer
+  if (domObserver) {
+    domObserver.disconnect();
+  }
+  
   // Always observe for scan fields, as dialogs may open/close repeatedly
-  const observer = new MutationObserver(() => {
-    const attached = monitorScanFields();
-    if (attached && settings.debugMode) {
-      console.log('Scan fields found and listeners attached via MutationObserver');
+  domObserver = new MutationObserver((mutations) => {
+    // Prevent recursive calls
+    if (isCheckingFields) return;
+    
+    let shouldCheck = false;
+    
+    // Only check if new nodes were added (not attributes or text changes)
+    for (const mutation of mutations) {
+      if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+        // Skip mutations caused by our own dataset modifications
+        if (mutation.target && mutation.target.dataset && 
+            (mutation.target.dataset.soeListener || mutation.target.dataset.soeCloseListener)) {
+          continue;
+        }
+        
+        // Check if any added nodes contain input fields or are input fields themselves
+        for (const node of mutation.addedNodes) {
+          if (node.nodeType === Node.ELEMENT_NODE) {
+            // Skip our own modifications
+            if (node.dataset && (node.dataset.soeListener || node.dataset.soeCloseListener)) {
+              continue;
+            }
+            
+            const hasInputs = node.matches && (
+              node.matches(currentSiteConfig.inputSelector) ||
+              (node.querySelector && node.querySelector(currentSiteConfig.inputSelector))
+            );
+            if (hasInputs) {
+              shouldCheck = true;
+              break;
+            }
+          }
+        }
+        if (shouldCheck) break;
+      }
+    }
+    
+    if (shouldCheck) {
+      // Use debounced field checking
+      debounceFieldCheck();
     }
   });
-  observer.observe(document.body, { childList: true, subtree: true });
+  
+  domObserver.observe(document.body, { 
+    childList: true, 
+    subtree: true,
+    attributeFilter: [] // Don't watch attribute changes to prevent triggering on our dataset changes
+  });
   
   // Also try once at init in case fields are already present
   monitorScanFields();
@@ -646,8 +1017,45 @@ function initializeExtensionFeatures() {
   }
 }
 
+// === Debounced field checking ===
+let fieldCheckTimeout = null;
+
+function debounceFieldCheck() {
+  // Cancel any pending check
+  if (fieldCheckTimeout) {
+    clearTimeout(fieldCheckTimeout);
+  }
+  
+  // Schedule new check with debounce
+  fieldCheckTimeout = setTimeout(() => {
+    if (!isCheckingFields) {
+      isCheckingFields = true;
+      try {
+        const attached = monitorScanFields();
+        if (attached && settings.debugMode) {
+          console.log('Scan fields found and listeners attached via debounced check');
+        }
+      } finally {
+        isCheckingFields = false;
+      }
+    }
+  }, 250); // 250ms debounce
+}
+
 // === Cleanup extension features ===
 function cleanupExtensionFeatures() {
+  // Clean up DOM observer
+  if (domObserver) {
+    domObserver.disconnect();
+    domObserver = null;
+  }
+  
+  // Clear any pending field checks
+  if (fieldCheckTimeout) {
+    clearTimeout(fieldCheckTimeout);
+    fieldCheckTimeout = null;
+  }
+  
   // Remove event listeners and reset state
   scanState = {
     itemId: '',
@@ -658,28 +1066,58 @@ function cleanupExtensionFeatures() {
   };
   
   // Reset processed input tracking
-  lastProcessedInput = { itemId: '', statusId: '', timestamp: 0 };
+  lastProcessedInput = { itemId: '', statusId: '', timestamp: 0, eventType: '' };
+  
+  // Reset modal close tracking
+  isModalClosing = false;
+  
+  // Clean up modal removal observer
+  if (modalRemovalObserver) {
+    modalRemovalObserver.disconnect();
+    modalRemovalObserver = null;
+  }
+  modalCloseHooked = false;
+  
+  // Reset field checking state
+  isCheckingFields = false;
+  
+  // Reset document listeners
+  documentListenersAttached = false;
+  
+  // Clean up modal resize feature
+  cleanupModalResize();
   
   if (settings.debugMode) {
     console.log('Scan overlay extension features cleaned up');
   }
 }
 
+// === Cleanup mechanism to prevent memory leaks ===
+function cleanupEventListeners() {
+  // Remove all event listeners that were added with dataset markers
+  const elements = document.querySelectorAll('[data-soe-listener]');
+  elements.forEach(element => {
+    // Note: In a real implementation, you'd need to store references to remove specific listeners
+    // This is a simplified cleanup
+    element.dataset.soeListener = '';
+  });
+}
+
 // === Initialize content script ===
 async function init() {
 	// Load settings and check if we should be active on this page
 	const shouldBeActive = await loadSettings();
-  
+
   if (!shouldBeActive) {
     if (settings.debugMode) {
       console.log('Extension not active on this page - no matching site configuration');
     }
     return;
   }
-  
+
   // Initialize extension features
   initializeExtensionFeatures();
-	
+
 	// Listen for settings changes
 	chrome.storage.onChanged.addListener((changes, namespace) => {
 		if (namespace === 'sync' && changes.scanOverlaySettings) {
@@ -692,7 +1130,12 @@ async function init() {
       });
 		}
 	});
-	
+
+	// Cleanup on page unload
+	window.addEventListener('beforeunload', () => {
+		cleanupExtensionFeatures();
+	});
+
 	if (settings.debugMode) {
 		console.log('Scan overlay extension fully initialized with URL-based filtering');
 	}

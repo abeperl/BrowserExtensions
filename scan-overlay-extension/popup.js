@@ -38,10 +38,37 @@ class PopupManager {
       if (response && response.history) {
         this.scanCount = response.history.length;
         this.updateScanCount();
+        this.displayScanHistory(response.history);
       }
     } catch (error) {
       console.error('Error loading scan count:', error);
     }
+  }
+
+  displayScanHistory(history) {
+    const historyList = document.getElementById('history-list');
+    if (!historyList) return;
+
+    if (!history || history.length === 0) {
+      historyList.innerHTML = '<div class="no-history">No scans in this session</div>';
+      return;
+    }
+
+    // Show last 5 scans
+    const recentScans = history.slice(-5).reverse();
+    historyList.innerHTML = recentScans.map(scan => {
+      const time = new Date(scan.timestamp).toLocaleTimeString();
+      const itemId = scan.itemId || 'N/A';
+      const statusId = scan.statusId || 'N/A';
+      const result = scan.result || 'unknown';
+      
+      return `
+        <div class="soe-history-entry">
+          <div style="font-weight: 500;">${itemId} → ${statusId}</div>
+          <div style="color: #6c757d; font-size: 11px;">${time} • ${result}</div>
+        </div>
+      `;
+    }).join('');
   }
 
   updateScanCount() {
@@ -75,28 +102,32 @@ class PopupManager {
 
       const results = await chrome.scripting.executeScript({
         target: { tabId: tab.id },
-        func: (item, status, configName) => {
+        func: (inputSelector, configName) => {
           try {
-            const itemEl = document.querySelector(item);
-            const statusEl = document.querySelector(status);
+            const inputs = document.querySelectorAll(inputSelector);
             return {
-              itemFound: !!itemEl,
-              statusFound: !!statusEl,
+              inputCount: inputs.length,
+              foundInputs: Array.from(inputs).map(el => ({
+                tag: el.tagName,
+                id: el.id,
+                classes: Array.from(el.classList).join(' ')
+              })),
               configName: configName,
               url: window.location.href
             };
           } catch (error) {
-            return { itemFound: false, statusFound: false, error: error.message, configName: configName };
+            return { inputCount: 0, foundInputs: [], error: error.message, configName: configName };
           }
         },
-        args: [matchingSiteConfig.itemIdSelector, matchingSiteConfig.statusIdSelector, matchingSiteConfig.name]
+        args: [matchingSiteConfig.inputSelector, matchingSiteConfig.name]
       });
 
       const fieldResult = results[0].result;
-      this.updateFieldStatus('itemFieldStatus', fieldResult.itemFound);
-      this.updateFieldStatus('statusFieldStatus', fieldResult.statusFound);
-      this.updateConnectionStatus(fieldResult.itemFound || fieldResult.statusFound, 
-        `Using config: ${fieldResult.configName}`);
+      // For single selector design, show input count instead of separate item/status fields
+      this.updateFieldStatus('itemFieldStatus', fieldResult.inputCount > 0, `${fieldResult.inputCount} input(s) found`);
+      this.updateFieldStatus('statusFieldStatus', false, 'Single selector mode'); // Hide this or repurpose
+      this.updateConnectionStatus(fieldResult.inputCount > 0, 
+        `Using config: ${fieldResult.configName} (${fieldResult.inputCount} inputs)`);
 
     } catch (error) {
       console.error('Error checking field status:', error);
@@ -104,10 +135,10 @@ class PopupManager {
     }
   }
 
-  updateFieldStatus(elementId, found) {
+  updateFieldStatus(elementId, found, customText = null) {
     const element = document.getElementById(elementId);
     if (element) {
-      element.textContent = found ? 'Found' : 'Not detected';
+      element.textContent = customText || (found ? 'Found' : 'Not detected');
       element.className = `field-status-indicator ${found ? 'found' : 'not-found'}`;
     }
   }
@@ -194,12 +225,7 @@ class PopupManager {
       await this.sendMessage({ type: 'CLEAR_SCAN_HISTORY' });
       this.scanCount = 0;
       this.updateScanCount();
-      
-      // Update history display
-      const historyList = document.getElementById('history-list');
-      if (historyList) {
-        historyList.innerHTML = '<div class="no-history">No scans in this session</div>';
-      }
+      this.displayScanHistory([]);
       
     } catch (error) {
       console.error('Error clearing history:', error);
@@ -307,9 +333,10 @@ class PopupManager {
       });
     }
 
-    // Refresh field status periodically
+    // Refresh field status and scan history periodically
     setInterval(() => {
       this.checkFieldStatus();
+      this.loadScanCount(); // This will also refresh the history display
     }, 5000);
   }
 }
