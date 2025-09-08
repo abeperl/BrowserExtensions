@@ -133,6 +133,14 @@ if (settings.debugMode) {
   console.log('Scan overlay content script loaded');
 }
 
+// Temporary debug mode toggle for testing - remove this after debugging
+window.toggleSOEDebug = () => {
+  settings.debugMode = !settings.debugMode;
+  console.log('SOE Debug mode:', settings.debugMode ? 'ENABLED' : 'DISABLED');
+  console.log('To toggle debug mode, run: toggleSOEDebug() in console');
+};
+console.log('SOE Debug toggle available. Run toggleSOEDebug() to enable/disable debug logging');
+
 // === State ===
 let scanState = {
 	itemId: '',
@@ -193,19 +201,36 @@ function attachDocumentLevelListeners() {
 	
 	document.addEventListener('blur', (e) => {
 		if (!currentSiteConfig) return;
-		
+
 		if (e.target.matches && e.target.matches(currentSiteConfig.inputSelector)) {
 			const inputFields = getInputFields();
 			const index = inputFields.indexOf(e.target);
 			if (index >= 0) {
+				if (settings.debugMode) {
+					console.log(`[${Date.now()}] Blur event on input ${index}, value: "${e.target.value}", scheduling overlay check in 200ms`);
+				}
+
 				// Longer delay to ensure modal close detection happens first
 				setTimeout(() => {
-					// Additional check: make sure the modal still exists before showing overlay
+					const timestamp = Date.now();
 					const modalStillExists = document.getElementById('_modal_block_ui');
+
+					if (settings.debugMode) {
+						console.log(`[${timestamp}] Blur timeout fired:`, {
+							modalStillExists: !!modalStillExists,
+							isModalClosing,
+							modalDisplay: modalStillExists ? modalStillExists.style.display : 'N/A',
+							willShowOverlay: !isModalClosing && modalStillExists
+						});
+					}
+
 					if (!isModalClosing && modalStillExists) {
+						if (settings.debugMode) {
+							console.log(`[${timestamp}] Showing blur overlay for input ${index}`);
+						}
 						handleScanInput('input', e.target.value, false, index, true);
 					} else if (settings.debugMode) {
-						console.log('Blur overlay suppressed - modal is closing or closed');
+						console.log(`[${timestamp}] Blur overlay suppressed - modal is closing or closed`);
 					}
 				}, 200); // Even longer delay
 			}
@@ -235,7 +260,7 @@ function attachDocumentLevelListeners() {
 // === Monitor input fields for scan events ===
 function monitorScanFields() {
   if (!currentSiteConfig) return false;
-  
+
 	const inputFields = getInputFields();
 	if (inputFields.length === 0) {
 		if (settings.debugMode) {
@@ -244,20 +269,22 @@ function monitorScanFields() {
 		}
 		return false;
 	}
-	
+
+	// No need to mark inputs for enlargement - using simple CSS approach
+
 	// Also monitor the save button (only once)
 	monitorSaveButton();
-	
+
 	// Hook into existing modal close function (only once)
 	hookIntoModalClose();
-	
+
 	// Use document-level event delegation instead of direct listeners
 	attachDocumentLevelListeners();
-	
+
 	if (settings.debugMode) {
 		console.log(`Found ${inputFields.length} input fields, using document-level event delegation`);
 	}
-	
+
 	return inputFields.length > 0;
 }
 
@@ -335,27 +362,44 @@ function hookIntoModalClose() {
 	}
 	
 	modalRemovalObserver = new MutationObserver((mutations) => {
-		mutations.forEach((mutation) => {
+		const timestamp = Date.now();
+		if (settings.debugMode) {
+			console.log(`[${timestamp}] MutationObserver fired with ${mutations.length} mutations`);
+		}
+
+		mutations.forEach((mutation, mutationIndex) => {
+			if (settings.debugMode) {
+				console.log(`[${timestamp}] Processing mutation ${mutationIndex}:`, {
+					type: mutation.type,
+					target: mutation.target,
+					removedNodes: mutation.removedNodes.length,
+					addedNodes: mutation.addedNodes.length,
+					attributeName: mutation.attributeName
+				});
+			}
+
 			mutation.removedNodes.forEach((removedNode) => {
 				// Check if the removed node is the modal block
-				if (removedNode.nodeType === Node.ELEMENT_NODE && 
+				if (removedNode.nodeType === Node.ELEMENT_NODE &&
 				    (removedNode.id === '_modal_block_ui' || removedNode.classList?.contains('modal-box'))) {
-					
+
 					if (settings.debugMode) {
-						console.log('Modal removed from DOM - suppressing overlays temporarily', removedNode);
-						console.log('Modal had classes:', Array.from(removedNode.classList || []));
-						console.log('Modal had id:', removedNode.id);
+						console.log(`[${timestamp}] Modal removed from DOM - suppressing overlays temporarily`, {
+							id: removedNode.id,
+							classes: Array.from(removedNode.classList || []),
+							isModalClosing: isModalClosing
+						});
 					}
-					
+
 					// Set flag to suppress overlays briefly
 					isModalClosing = true;
-					
+
 					// Clear flag after brief period
 					setTimeout(() => {
-						isModalClosing = false;
 						if (settings.debugMode) {
-							console.log('Modal close period ended - overlays re-enabled');
+							console.log(`[${Date.now()}] Modal removal close period ended - overlays re-enabled`);
 						}
+						isModalClosing = false;
 					}, MODAL_CLOSE_DEBOUNCE);
 				}
 			});
@@ -364,30 +408,73 @@ function hookIntoModalClose() {
 			if (mutation.type === 'attributes' && (mutation.attributeName === 'style' || mutation.attributeName === 'class')) {
 				const target = mutation.target;
 				if (target.id === '_modal_block_ui' || target.classList?.contains('modal-box')) {
+					const timestamp = Date.now();
+					const hiddenFlag = target.dataset.soeModalHidden;
+
 					if (settings.debugMode) {
-						console.log('Modal attributes changed:', target, 'style:', target.style.cssText, 'classes:', Array.from(target.classList || []));
+						console.log(`[${timestamp}] Modal attributes changed:`, {
+							id: target.id,
+							classes: Array.from(target.classList || []),
+							style: target.style.cssText,
+							display: target.style.display,
+							visibility: target.style.visibility,
+							offsetParent: !!target.offsetParent,
+							hiddenFlag: hiddenFlag,
+							isModalClosing: isModalClosing
+						});
 					}
-					
+
 					// Check if modal is being hidden
-					const isHidden = target.style.display === 'none' || 
+					const isHidden = target.style.display === 'none' ||
 					                 target.style.visibility === 'hidden' ||
 					                 target.classList.contains('hidden') ||
 					                 target.offsetParent === null;
-					
-					if (isHidden) {
+
+					// Check if modal is becoming visible
+					const isVisible = !isHidden && target.style.display !== 'none' && target.style.visibility !== 'hidden';
+
+					if (settings.debugMode) {
+						console.log(`[${timestamp}] Modal state analysis:`, {
+							isHidden,
+							isVisible,
+							willProcess: isHidden && hiddenFlag !== 'true'
+						});
+					}
+
+					if (isHidden && hiddenFlag !== 'true') {
 						if (settings.debugMode) {
-							console.log('Modal was hidden - removing enlargement class and suppressing overlays');
+							console.log(`[${timestamp}] Processing modal hide - removing enlargement class and suppressing overlays`);
 						}
-						
+
+						// Mark this modal as processed to prevent loops
+						target.dataset.soeModalHidden = 'true';
+
 						// Remove our enlargement class to ensure it can hide properly
 						target.classList.remove('soe-enlarged-modal');
 						enlargedModals.delete(target);
-						
+
 						// Suppress overlays
 						isModalClosing = true;
 						setTimeout(() => {
+							if (settings.debugMode) {
+								console.log(`[${Date.now()}] Modal close debounce ended, clearing flags`);
+							}
 							isModalClosing = false;
+							// Clear the flag after debounce period in case modal is shown again
+							if (target.dataset) {
+								delete target.dataset.soeModalHidden;
+							}
 						}, MODAL_CLOSE_DEBOUNCE);
+					} else if (isVisible && hiddenFlag === 'true') {
+						// Modal is becoming visible again, clear the flag
+						if (settings.debugMode) {
+							console.log(`[${timestamp}] Modal became visible again - clearing hidden flag`);
+						}
+						delete target.dataset.soeModalHidden;
+					} else if (isHidden && hiddenFlag === 'true') {
+						if (settings.debugMode) {
+							console.log(`[${timestamp}] Modal hide already processed, skipping`);
+						}
 					}
 				}
 			}
@@ -798,146 +885,195 @@ function clearScanFields() {
 	scanState.overlayActive = false;
 }
 
-// === Modal Resize Feature ===
-let modalObserver = null;
-let enlargedModals = new Set();
+// === Simple Modal Enhancement ===
+// The modal is now enlarged via CSS only - no complex JavaScript needed
 
-function initializeModalResize() {
-  if (!currentSiteConfig || !currentSiteConfig.enableModalResize) {
-    return;
+// === Error Snackbar Interception ===
+// Intercept error snackbars and show them as overlays instead
+let errorSnackbarObserver = null;
+let isInterceptingError = false; // Prevent recursive triggering
+
+function initializeErrorSnackbarInterception() {
+  if (errorSnackbarObserver) {
+    errorSnackbarObserver.disconnect();
   }
-  
-  if (settings.debugMode) {
-    console.log('Initializing modal resize feature with selector:', currentSiteConfig.modalSelector);
-  }
-  
-  // Clean up existing observer
-  if (modalObserver) {
-    modalObserver.disconnect();
-  }
-  
-  // Monitor for modal appearance
-  modalObserver = new MutationObserver((mutations) => {
+
+  errorSnackbarObserver = new MutationObserver((mutations) => {
+    // Skip processing if we're currently intercepting an error
+    if (isInterceptingError) {
+      if (settings.debugMode) {
+        console.log('Skipping mutation processing - currently intercepting error');
+      }
+      return;
+    }
+
     mutations.forEach((mutation) => {
-      // Only process childList mutations to avoid interference
-      if (mutation.type === 'childList') {
+      // Skip mutations related to our overlay system
+      if (mutation.target && (
+          mutation.target.id === 'scan-overlay-extension-overlay' ||
+          mutation.target.classList?.contains('soe-overlay') ||
+          mutation.target.closest('#scan-overlay-extension-overlay')
+      )) {
+        if (settings.debugMode) {
+          console.log('Skipping mutation from our overlay system');
+        }
+        return;
+      }
+
+      if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
         mutation.addedNodes.forEach((node) => {
           if (node.nodeType === Node.ELEMENT_NODE) {
-            // Check if the added node is a modal or contains modals
-            const modals = node.matches && node.matches(currentSiteConfig.modalSelector) 
-              ? [node] 
-              : Array.from(node.querySelectorAll ? node.querySelectorAll(currentSiteConfig.modalSelector) || [] : []);
-            
-            modals.forEach(modal => {
-              // Only enlarge modals that are visible and contain our target input fields
-              if (!enlargedModals.has(modal) && 
-                  modal.style.display !== 'none' &&
-                  modal.querySelector && 
-                  modal.querySelector(currentSiteConfig.inputSelector)) {
-                
-                enlargeModal(modal);
-                enlargedModals.add(modal);
-                
-                if (settings.debugMode) {
-                  console.log('Modal detected and enlarged (contains target inputs):', modal);
-                }
-              }
-            });
-          }
-        });
-      }
-    });
-  });
-  
-  modalObserver.observe(document.body, { 
-    childList: true, 
-    subtree: true 
-  });
-  
-  // Check for existing modals
-  const existingModals = document.querySelectorAll(currentSiteConfig.modalSelector);
-  existingModals.forEach(modal => {
-    if (!enlargedModals.has(modal) && 
-        modal.style.display !== 'none' &&
-        modal.querySelector && 
-        modal.querySelector(currentSiteConfig.inputSelector)) {
-      
-      enlargeModal(modal);
-      enlargedModals.add(modal);
-      
-      if (settings.debugMode) {
-        console.log('Existing modal found and enlarged (contains target inputs):', modal);
-      }
-    }
-  });
-}
+            // Skip our own overlay elements
+            if (node.id === 'scan-overlay-extension-overlay' ||
+                node.classList?.contains('soe-overlay')) {
+              return;
+            }
 
-function enlargeModal(modal) {
-  if (!currentSiteConfig || !currentSiteConfig.enableModalResize) {
-    return;
-  }
-  
-  try {
-    // Set CSS custom properties for the modal dimensions
-    modal.style.setProperty('--soe-modal-width', currentSiteConfig.modalWidth || '800px');
-    modal.style.setProperty('--soe-modal-height', currentSiteConfig.modalHeight || '600px');
-    modal.style.setProperty('--soe-modal-min-width', currentSiteConfig.modalMinWidth || '600px');
-    modal.style.setProperty('--soe-modal-min-height', currentSiteConfig.modalMinHeight || '400px');
-    
-    // Add the enlargement class
-    modal.classList.add('soe-enlarged-modal');
-    
-    // Also enhance the backdrop if present
-    const backdrop = modal.parentElement;
-    if (backdrop && (backdrop.classList.contains('loader_block_ui') || backdrop.id === '_modal_block_ui')) {
-      backdrop.classList.add('soe-enlarged-modal-backdrop');
-    }
-    
-    // Set up cleanup when modal is removed
-    const cleanupObserver = new MutationObserver((mutations) => {
-      mutations.forEach((mutation) => {
-        mutation.removedNodes.forEach((removedNode) => {
-          if (removedNode === modal || (removedNode.contains && removedNode.contains(modal))) {
-            enlargedModals.delete(modal);
-            cleanupObserver.disconnect();
-            
-            if (settings.debugMode) {
-              console.log('Enlarged modal removed from tracking:', modal);
+            // Check for common error snackbar patterns
+            const errorElement = checkForErrorSnackbar(node);
+            if (errorElement) {
+              interceptErrorSnackbar(errorElement);
             }
           }
         });
-      });
+      }
+
+      // Also check for attribute changes that might show errors
+      if (mutation.type === 'attributes' &&
+          (mutation.attributeName === 'class' || mutation.attributeName === 'style')) {
+        const target = mutation.target;
+
+        // Skip our overlay elements
+        if (target.id === 'scan-overlay-extension-overlay' ||
+            target.classList?.contains('soe-overlay') ||
+            target.closest('#scan-overlay-extension-overlay')) {
+          return;
+        }
+
+        if (target.nodeType === Node.ELEMENT_NODE) {
+          const errorElement = checkForErrorSnackbar(target);
+          if (errorElement) {
+            interceptErrorSnackbar(errorElement);
+          }
+        }
+      }
     });
-    
-    cleanupObserver.observe(document.body, { childList: true, subtree: true });
-    
-  } catch (error) {
-    console.error('Error enlarging modal:', error);
+  });
+
+  errorSnackbarObserver.observe(document.body, {
+    childList: true,
+    subtree: true,
+    attributes: true,
+    attributeFilter: ['class', 'style']
+  });
+
+  if (settings.debugMode) {
+    console.log('Error snackbar interception initialized');
   }
 }
 
-function cleanupModalResize() {
-  if (modalObserver) {
-    modalObserver.disconnect();
-    modalObserver = null;
-  }
-  
-  // Remove enlargement from all tracked modals
-  enlargedModals.forEach(modal => {
-    if (modal && modal.classList) {
-      modal.classList.remove('soe-enlarged-modal');
-      modal.style.removeProperty('--soe-modal-width');
-      modal.style.removeProperty('--soe-modal-height');
-      modal.style.removeProperty('--soe-modal-min-width');
-      modal.style.removeProperty('--soe-modal-min-height');
+function checkForErrorSnackbar(element) {
+  // Check for common error snackbar patterns
+  const errorSelectors = [
+    '.snackbar',
+    '.snackbar-error',
+    '.error-snackbar',
+    '.toast-error',
+    '.alert-error',
+    '.notification-error',
+    '.tf-validate-error-message',
+    '[class*="error"]',
+    '[class*="snackbar"]',
+    '[class*="toast"]',
+    '[class*="alert"]'
+  ];
+
+  // Check if element matches error patterns
+  for (const selector of errorSelectors) {
+    if (element.matches && element.matches(selector)) {
+      return element;
     }
-  });
-  
-  enlargedModals.clear();
-  
-  if (settings.debugMode) {
-    console.log('Modal resize feature cleaned up');
   }
+
+  // Check if element contains error text
+  const textContent = element.textContent || '';
+  if (textContent.toLowerCase().includes('error') ||
+      textContent.toLowerCase().includes('no record found') ||
+      textContent.toLowerCase().includes('invalid') ||
+      textContent.toLowerCase().includes('failed')) {
+    return element;
+  }
+
+  return null;
+}
+
+function interceptErrorSnackbar(errorElement) {
+  // Prevent recursive triggering
+  if (isInterceptingError) {
+    if (settings.debugMode) {
+      console.log('Already intercepting an error, skipping');
+    }
+    return;
+  }
+
+  isInterceptingError = true;
+
+  try {
+    // Extract error message
+    const errorMessage = errorElement.textContent || errorElement.innerText || 'Error occurred';
+
+    if (settings.debugMode) {
+      console.log('Intercepting error snackbar:', errorMessage);
+    }
+
+    // Hide the original error element
+    errorElement.style.display = 'none !important';
+    errorElement.style.visibility = 'hidden !important';
+    errorElement.remove(); // Remove from DOM to prevent any interference
+
+    // Show our overlay with the error message
+    window.postMessage({
+      type: 'SHOW_ERROR_OVERLAY',
+      error: errorMessage,
+      progress: scanState.scanHistory.length
+    }, '*');
+
+    // Log the error interception
+    if (settings.debugMode) {
+      console.log('Error snackbar intercepted and overlay shown:', errorMessage);
+    }
+
+    // Also log to background for history
+    chrome.runtime.sendMessage({
+      type: 'LOG_SCAN',
+      itemId: scanState.itemId || 'error_intercepted',
+      statusId: scanState.statusId || '',
+      result: 'error_intercepted',
+      error: errorMessage
+    });
+
+  } catch (error) {
+    if (settings.debugMode) {
+      console.error('Error intercepting snackbar:', error);
+    }
+  } finally {
+    // Clear the flag after a short delay to allow any triggered mutations to complete
+    setTimeout(() => {
+      isInterceptingError = false;
+      if (settings.debugMode) {
+        console.log('Error interception flag cleared');
+      }
+    }, 100);
+  }
+}
+
+function cleanupErrorSnackbarInterception() {
+  if (errorSnackbarObserver) {
+    errorSnackbarObserver.disconnect();
+    errorSnackbarObserver = null;
+  }
+  // Clear the interception flag
+  isInterceptingError = false;
 }
 
 // === Track DOM observation state ===
@@ -947,13 +1083,13 @@ let isCheckingFields = false;
 // === Initialize extension features ===
 function initializeExtensionFeatures() {
   if (!currentSiteConfig) return;
-  
+
   // Initialize monitoring mechanisms (non-invasive)
   interceptApiSubmission();
-  
-  // Initialize modal resize feature (now safe with DOM removal detection)
-  initializeModalResize();
-  
+
+  // Initialize error snackbar interception
+  initializeErrorSnackbarInterception();
+
   // Clean up existing observer
   if (domObserver) {
     domObserver.disconnect();
@@ -991,6 +1127,8 @@ function initializeExtensionFeatures() {
               shouldCheck = true;
               break;
             }
+
+            // No need to mark inputs for enlargement - using simple CSS approach
           }
         }
         if (shouldCheck) break;
@@ -1083,10 +1221,10 @@ function cleanupExtensionFeatures() {
   
   // Reset document listeners
   documentListenersAttached = false;
-  
-  // Clean up modal resize feature
-  cleanupModalResize();
-  
+
+  // Clean up error snackbar interception
+  cleanupErrorSnackbarInterception();
+
   if (settings.debugMode) {
     console.log('Scan overlay extension features cleaned up');
   }

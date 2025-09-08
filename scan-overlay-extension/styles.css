@@ -899,128 +899,64 @@ input:checked + .slider:before {
   opacity: 0 !important;
 }
 
-/* === Modal Resize Enhancement === */
-/* Applied when enableModalResize is active */
-.soe-enlarged-modal {
-  width: var(--soe-modal-width) !important;
-  height: var(--soe-modal-height) !important;
-  min-width: var(--soe-modal-min-width) !important;
-  min-height: var(--soe-modal-min-height) !important;
-  max-width: 95vw !important;
-  max-height: 95vh !important;
-  /* Remove position:fixed and transform to avoid breaking jQuery event delegation */
-  /* Keep the original positioning but just make it larger */
-}
-
-/* Ensure our enlargement doesn't interfere with modal hiding */
-.soe-enlarged-modal[style*="display: none"],
-.soe-enlarged-modal[style*="visibility: hidden"] {
+/* Suppress error snackbars that will be intercepted */
+.snackbar,
+.snackbar-error,
+.error-snackbar,
+.toast-error,
+.alert-error,
+.notification-error,
+.tf-validate-error-message,
+[class*="error"][class*="snackbar"],
+[class*="error"][class*="toast"],
+[class*="error"][class*="alert"] {
   display: none !important;
   visibility: hidden !important;
-  z-index: 10000 !important;
-  font-size: 1.2em !important;
-  box-shadow: 0 10px 50px rgba(0, 0, 0, 0.3) !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
 }
 
-/* Enlarge modal content areas */
-.soe-enlarged-modal .modal-head,
-.soe-enlarged-modal .modal-header,
-.soe-enlarged-modal .page-body,
-.soe-enlarged-modal .modal-body,
-.soe-enlarged-modal .page-foot,
-.soe-enlarged-modal .modal-footer {
+/* === Simple Modal Size Enhancement === */
+/* Just make the modal a bit bigger, keep all functionality intact */
+
+#_modal_block_ui .modal-box {
+  width: 600px !important;
+  max-width: 90vw !important;
+  min-height: 400px !important;
+}
+
+#_modal_block_ui .modal-box-content {
   padding: 20px !important;
-  font-size: inherit !important;
+  font-size: 1.1em !important;
 }
 
-/* Enlarge modal title */
-.soe-enlarged-modal h1,
-.soe-enlarged-modal h2,
-.soe-enlarged-modal h3,
-.soe-enlarged-modal h4,
-.soe-enlarged-modal h5,
-.soe-enlarged-modal .panel-box-title {
-  font-size: 1.8em !important;
-  font-weight: bold !important;
-  margin-bottom: 15px !important;
+#_modal_block_ui .modal-box-title {
+  padding: 15px 20px !important;
 }
 
-/* Enlarge modal labels */
-.soe-enlarged-modal label {
-  font-size: 1.3em !important;
-  font-weight: 600 !important;
-  margin-bottom: 8px !important;
-  display: block !important;
+#_modal_block_ui .modal-box-title h2 {
+  font-size: 1.2em !important;
+  margin: 0 !important;
 }
 
-/* Enlarge modal inputs */
-.soe-enlarged-modal input[type="text"],
-.soe-enlarged-modal input[type="number"],
-.soe-enlarged-modal input[type="password"],
-.soe-enlarged-modal input[type="email"],
-.soe-enlarged-modal textarea,
-.soe-enlarged-modal select {
-  font-size: 1.4em !important;
-  padding: 15px !important;
-  width: 100% !important;
-  border: 2px solid #ccc !important;
-  border-radius: 6px !important;
-  margin-bottom: 15px !important;
-  min-height: 50px !important;
-  box-sizing: border-box !important;
+#_modal_block_ui .page-foot {
+  padding: 15px 20px !important;
 }
 
-/* Enlarge modal buttons */
-.soe-enlarged-modal button,
-.soe-enlarged-modal .btn {
-  font-size: 1.3em !important;
-  padding: 15px 25px !important;
-  margin: 10px !important;
-  min-height: 50px !important;
-  min-width: 120px !important;
-  border-radius: 6px !important;
-  cursor: pointer !important;
+#_modal_block_ui .modal-box-controls {
+  text-align: right !important;
 }
 
-/* Enlarge close button */
-.soe-enlarged-modal .close-icon-btn,
-.soe-enlarged-modal .close,
-.soe-enlarged-modal [data-dismiss],
-.soe-enlarged-modal .modal-close {
-  font-size: 2em !important;
-  width: 50px !important;
-  height: 50px !important;
-  padding: 0 !important;
-  border: none !important;
-  background: transparent !important;
-  position: absolute !important;
-  top: 15px !important;
-  right: 15px !important;
+#_modal_block_ui .modal-box-button {
+  padding: 8px 16px !important;
+  font-size: 1em !important;
+  margin-left: 8px !important;
 }
 
-/* Enlarge form groups */
-.soe-enlarged-modal .form-group,
-.soe-enlarged-modal .input-group {
-  margin-bottom: 25px !important;
-}
-
-/* Improve modal backdrop for visibility */
-.soe-enlarged-modal-backdrop {
-  background: rgba(0, 0, 0, 0.8) !important;
-  backdrop-filter: blur(3px) !important;
-}
-
-/* Responsive adjustments for enlarged modals */
+/* Responsive adjustments */
 @media (max-width: 768px) {
-  .soe-enlarged-modal {
+  #_modal_block_ui .modal-box {
     width: 95vw !important;
-    height: auto !important;
-    max-height: 90vh !important;
-    font-size: 1.1em !important;
-  }
-  
-  .soe-enlarged-modal input,
-  .soe-enlarged-modal button {
-    font-size: 1.2em !important;
+    max-width: 95vw !important;
   }
 }
