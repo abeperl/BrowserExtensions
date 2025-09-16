@@ -10,4 +10,6 @@ public interface IActionService
     Task<PageAction> UpdateActionAsync(PageAction action);
     Task<bool> DeleteActionAsync(int id);
     Task<ActionResult> ExecuteActionAsync(int actionId, object? data = null);
+    Task<IEnumerable<string>> GetAvailableActionTypesAsync();
+    Task<ActionResult> ValidateActionAsync(PageAction action, object? sampleData = null);
 }

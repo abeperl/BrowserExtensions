@@ -1,13 +1,14 @@
 using DataFlow.Mobile.Models;
+using PageModelModel = DataFlow.Mobile.Models.PageModel;
 
-namespace DataFlow.Mobile.Services;
+namespace DataFlow.Mobile.Services.Interfaces;
 
-public interface IPageService
+public interface IPageModelService
 {
-    Task<IEnumerable<Page>> GetAllPagesAsync();
-    Task<Page?> GetPageByIdAsync(int id);
-    Task<Page> CreatePageAsync(Page page);
-    Task<Page> UpdatePageAsync(Page page);
-    Task<bool> DeletePageAsync(int id);
-    Task<IEnumerable<object>> FetchPageDataAsync(int pageId);
+    Task<IEnumerable<PageModel>> GetAllPageModelsAsync();
+    Task<PageModel?> GetPageModelByIdAsync(int id);
+    Task<PageModel> CreatePageModelAsync(PageModel page);
+    Task<PageModel> UpdatePageModelAsync(PageModel page);
+    Task<bool> DeletePageModelAsync(int id);
+    Task<IEnumerable<object>> FetchPageModelDataAsync(int pageId);
 }

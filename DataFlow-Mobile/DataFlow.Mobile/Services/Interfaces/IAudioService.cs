@@ -1,6 +1,6 @@
 namespace DataFlow.Mobile.Services;
 
-public interface IAudioService
+public interface IAudioService : IDisposable
 {
     Task PlaySoundAsync(string soundName);
     Task<bool> LoadSoundAsync(string soundName, string filePath);
@@ -9,4 +9,6 @@ public interface IAudioService
     Task<double> GetVolumeAsync();
     Task<bool> IsMutedAsync();
     Task SetMutedAsync(bool muted);
+    Task PreloadBuiltInSoundsAsync();
+    Task ClearCacheAsync();
 }

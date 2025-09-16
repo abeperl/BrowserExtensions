@@ -141,6 +141,7 @@ public static class MauiProgram
 		services.AddTransient<ApiConfigurationViewModel>();
 		services.AddTransient<AdvancedTemplateDesignerViewModel>();
 		services.AddTransient<ActionConfigurationViewModel>();
+		services.AddTransient<AudioSettingsViewModel>();
 
 		// Pages
 		services.AddTransient<HomePage>();
@@ -152,5 +153,6 @@ public static class MauiProgram
 		services.AddTransient<ApiConfigurationPage>();
 		services.AddTransient<AdvancedTemplateDesignerPage>();
 		services.AddTransient<ActionConfigurationPage>();
+		services.AddTransient<AudioSettingsPage>();
 	}
 }

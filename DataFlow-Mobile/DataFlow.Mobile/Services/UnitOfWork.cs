@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore.Storage;
 using DataFlow.Mobile.Models;
 using DataFlow.Mobile.Services.Interfaces;
+using PageModel = DataFlow.Mobile.Models.Page;
 
 namespace DataFlow.Mobile.Services;
 
@@ -9,7 +10,7 @@ public class UnitOfWork : IUnitOfWork
     private readonly DataFlowDbContext _context;
     private IDbContextTransaction? _transaction;
 
-    private IGenericRepository<Page>? _pages;
+    private IGenericRepository<PageModel>? _pages;
     private IGenericRepository<Template>? _templates;
     private IGenericRepository<PageAction>? _actions;
     private IGenericRepository<AuthenticationConfig>? _authenticationConfigs;
@@ -21,8 +22,8 @@ public class UnitOfWork : IUnitOfWork
         _context = context;
     }
 
-    public IGenericRepository<Page> Pages =>
-        _pages ??= new GenericRepository<Page>(_context);
+    public IGenericRepository<PageModel> Pages =>
+        _pages ??= new GenericRepository<PageModel>(_context);
 
     public IGenericRepository<Template> Templates =>
         _templates ??= new GenericRepository<Template>(_context);

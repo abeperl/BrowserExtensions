@@ -65,13 +65,3 @@ public interface ITemplateColumnService
     Task<TemplateColumnSummary> GetColumnSummaryAsync(int templateId);
 }
 
-public class TemplateColumnSummary
-{
-    public int TotalColumns { get; set; }
-    public int VisibleColumns { get; set; }
-    public int HiddenColumns { get; set; }
-    public List<string> AvailableDataTypes { get; set; } = [];
-    public List<string> MostUsedDataTypes { get; set; } = [];
-    public bool HasCustomFormatting { get; set; }
-    public bool HasConditionalFormatting { get; set; }
-}

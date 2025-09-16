@@ -1,0 +1,280 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentView
+    x:Class="DataFlow.Mobile.Views.Controls.DynamicActionView"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:models="clr-namespace:DataFlow.Mobile.Models"
+    xmlns:viewmodels="clr-namespace:DataFlow.Mobile.ViewModels">
+
+    <ContentView.Resources>
+        <ResourceDictionary>
+            <Style x:Key="ActionButtonStyle" TargetType="Button">
+                <Setter Property="FontSize" Value="14" />
+                <Setter Property="CornerRadius" Value="20" />
+                <Setter Property="Padding" Value="20,10" />
+                <Setter Property="Margin" Value="5" />
+                <Setter Property="TextColor" Value="White" />
+            </Style>
+
+            <Style x:Key="ActionInputStyle" TargetType="Entry">
+                <Setter Property="FontSize" Value="14" />
+                <Setter Property="BackgroundColor" Value="White" />
+                <Setter Property="Margin" Value="5" />
+                <Setter Property="Padding" Value="10" />
+            </Style>
+
+            <Style x:Key="ActionPickerStyle" TargetType="Picker">
+                <Setter Property="FontSize" Value="14" />
+                <Setter Property="BackgroundColor" Value="White" />
+                <Setter Property="Margin" Value="5" />
+            </Style>
+        </ResourceDictionary>
+    </ContentView.Resources>
+
+    <!-- Main Actions Container -->
+    <StackLayout x:Name="ActionsContainer" Spacing="10">
+
+        <!-- Actions will be dynamically generated based on PageActions -->
+        <CollectionView
+            ItemsSource="{Binding Actions}"
+            SelectionMode="None"
+            BackgroundColor="Transparent">
+
+            <CollectionView.ItemsLayout>
+                <LinearItemsLayout Orientation="Vertical" ItemSpacing="8" />
+            </CollectionView.ItemsLayout>
+
+            <CollectionView.ItemTemplate>
+                <DataTemplate x:DataType="models:PageAction">
+                    <Grid>
+
+                        <!-- Button Action -->
+                        <Button
+                            Text="{Binding DisplayText}"
+                            BackgroundColor="{Binding ButtonColor}"
+                            Style="{StaticResource ActionButtonStyle}"
+                            Command="{Binding Source={RelativeSource AncestorType={x:Type ContentView}}, Path=BindingContext.ExecuteActionCommand}"
+                            CommandParameter="{Binding .}"
+                            IsVisible="{Binding ActionType, Converter={StaticResource StringEqualsConverter}, ConverterParameter='Button'}"
+                            IsEnabled="{Binding IsEnabled}" />
+
+                        <!-- Input Action -->
+                        <StackLayout
+                            IsVisible="{Binding ActionType, Converter={StaticResource StringEqualsConverter}, ConverterParameter='Input'}"
+                            Spacing="5">
+
+                            <Label
+                                Text="{Binding DisplayText}"
+                                FontSize="14"
+                                FontAttributes="Bold"
+                                TextColor="{StaticResource Gray700}" />
+
+                            <Grid ColumnDefinitions="*,Auto">
+                                <Entry
+                                    Grid.Column="0"
+                                    Text="{Binding InputValue}"
+                                    Placeholder="{Binding Placeholder}"
+                                    Style="{StaticResource ActionInputStyle}"
+                                    IsEnabled="{Binding IsEnabled}" />
+
+                                <Button
+                                    Grid.Column="1"
+                                    Text="Submit"
+                                    BackgroundColor="{Binding ButtonColor}"
+                                    Style="{StaticResource ActionButtonStyle}"
+                                    Command="{Binding Source={RelativeSource AncestorType={x:Type ContentView}}, Path=BindingContext.ExecuteActionCommand}"
+                                    CommandParameter="{Binding .}"
+                                    IsEnabled="{Binding IsEnabled}"
+                                    Margin="5,0" />
+                            </Grid>
+                        </StackLayout>
+
+                        <!-- Dropdown Action -->
+                        <StackLayout
+                            IsVisible="{Binding ActionType, Converter={StaticResource StringEqualsConverter}, ConverterParameter='Dropdown'}"
+                            Spacing="5">
+
+                            <Label
+                                Text="{Binding DisplayText}"
+                                FontSize="14"
+                                FontAttributes="Bold"
+                                TextColor="{StaticResource Gray700}" />
+
+                            <Grid ColumnDefinitions="*,Auto">
+                                <Picker
+                                    Grid.Column="0"
+                                    ItemsSource="{Binding DropdownOptions}"
+                                    SelectedItem="{Binding SelectedValue}"
+                                    Style="{StaticResource ActionPickerStyle}"
+                                    IsEnabled="{Binding IsEnabled}" />
+
+                                <Button
+                                    Grid.Column="1"
+                                    Text="Apply"
+                                    BackgroundColor="{Binding ButtonColor}"
+                                    Style="{StaticResource ActionButtonStyle}"
+                                    Command="{Binding Source={RelativeSource AncestorType={x:Type ContentView}}, Path=BindingContext.ExecuteActionCommand}"
+                                    CommandParameter="{Binding .}"
+                                    IsEnabled="{Binding IsEnabled}"
+                                    Margin="5,0" />
+                            </Grid>
+                        </StackLayout>
+
+                        <!-- Toggle Action -->
+                        <StackLayout
+                            IsVisible="{Binding ActionType, Converter={StaticResource StringEqualsConverter}, ConverterParameter='Toggle'}"
+                            Orientation="Horizontal"
+                            Spacing="10">
+
+                            <Label
+                                Text="{Binding DisplayText}"
+                                FontSize="14"
+                                FontAttributes="Bold"
+                                TextColor="{StaticResource Gray700}"
+                                VerticalOptions="Center" />
+
+                            <Switch
+                                IsToggled="{Binding ToggleValue}"
+                                OnColor="{Binding ButtonColor}"
+                                IsEnabled="{Binding IsEnabled}"
+                                VerticalOptions="Center">
+                                <!-- TODO: Implement event to command behavior -->
+                                <!-- Temporarily removed behaviors until toolkit is properly configured -->
+                            </Switch>
+                        </StackLayout>
+
+                        <!-- Multi-Select Action -->
+                        <StackLayout
+                            IsVisible="{Binding ActionType, Converter={StaticResource StringEqualsConverter}, ConverterParameter='MultiSelect'}"
+                            Spacing="10">
+
+                            <Label
+                                Text="{Binding DisplayText}"
+                                FontSize="14"
+                                FontAttributes="Bold"
+                                TextColor="{StaticResource Gray700}" />
+
+                            <CollectionView
+                                ItemsSource="{Binding MultiSelectOptions}"
+                                SelectionMode="Multiple"
+                                SelectedItems="{Binding SelectedItems}"
+                                BackgroundColor="Transparent"
+                                HeightRequest="120"
+                                IsEnabled="{Binding IsEnabled}">
+
+                                <CollectionView.ItemTemplate>
+                                    <DataTemplate x:DataType="viewmodels:SelectableItem">
+                                        <Grid Padding="10,5">
+                                            <Grid ColumnDefinitions="Auto,*">
+                                                <CheckBox
+                                                    Grid.Column="0"
+                                                    IsChecked="{Binding IsSelected}"
+                                                    Color="{StaticResource Primary}"
+                                                    VerticalOptions="Center" />
+                                                <Label
+                                                    Grid.Column="1"
+                                                    Text="{Binding Text}"
+                                                    VerticalOptions="Center"
+                                                    Margin="10,0,0,0" />
+                                            </Grid>
+                                        </Grid>
+                                    </DataTemplate>
+                                </CollectionView.ItemTemplate>
+                            </CollectionView>
+
+                            <Button
+                                Text="Apply Selection"
+                                BackgroundColor="{Binding ButtonColor}"
+                                Style="{StaticResource ActionButtonStyle}"
+                                Command="{Binding Source={RelativeSource AncestorType={x:Type ContentView}}, Path=BindingContext.ExecuteActionCommand}"
+                                CommandParameter="{Binding .}"
+                                IsEnabled="{Binding IsEnabled}" />
+                        </StackLayout>
+
+                        <!-- Navigation Action -->
+                        <Button
+                            Text="{Binding DisplayText}"
+                            BackgroundColor="{Binding ButtonColor}"
+                            Style="{StaticResource ActionButtonStyle}"
+                            Command="{Binding Source={RelativeSource AncestorType={x:Type ContentView}}, Path=BindingContext.ExecuteActionCommand}"
+                            CommandParameter="{Binding .}"
+                            IsVisible="{Binding ActionType, Converter={StaticResource StringEqualsConverter}, ConverterParameter='Navigation'}"
+                            IsEnabled="{Binding IsEnabled}">
+                            <Button.ImageSource>
+                                <FontImageSource
+                                    FontFamily="MaterialIcons"
+                                    Glyph="→"
+                                    Color="White"
+                                    Size="16" />
+                            </Button.ImageSource>
+                        </Button>
+
+                        <!-- API Call Action -->
+                        <Button
+                            Text="{Binding DisplayText}"
+                            BackgroundColor="{Binding ButtonColor}"
+                            Style="{StaticResource ActionButtonStyle}"
+                            Command="{Binding Source={RelativeSource AncestorType={x:Type ContentView}}, Path=BindingContext.ExecuteActionCommand}"
+                            CommandParameter="{Binding .}"
+                            IsVisible="{Binding ActionType, Converter={StaticResource StringEqualsConverter}, ConverterParameter='API_Call'}"
+                            IsEnabled="{Binding IsEnabled}">
+                            <Button.ImageSource>
+                                <FontImageSource
+                                    FontFamily="MaterialIcons"
+                                    Glyph="🔗"
+                                    Color="White"
+                                    Size="16" />
+                            </Button.ImageSource>
+                        </Button>
+
+                    </Grid>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
+
+        <!-- Action Execution Status -->
+        <StackLayout
+            IsVisible="{Binding IsExecutingAction}"
+            Spacing="10"
+            Padding="15"
+            BackgroundColor="{StaticResource Gray100}">
+
+            <ActivityIndicator
+                IsRunning="{Binding IsExecutingAction}"
+                Color="{StaticResource Primary}"
+                HorizontalOptions="Center" />
+
+            <Label
+                Text="{Binding ExecutionStatus}"
+                FontSize="14"
+                TextColor="{StaticResource Gray700}"
+                HorizontalOptions="Center"
+                HorizontalTextAlignment="Center" />
+        </StackLayout>
+
+        <!-- Action Result Display -->
+        <Frame
+            BackgroundColor="{Binding ActionResult.IsSuccess, Converter={StaticResource BoolToResultColorConverter}}"
+            Padding="15"
+            CornerRadius="8"
+            Margin="5"
+            IsVisible="{Binding ActionResult, Converter={StaticResource NotNullToBoolConverter}}">
+
+            <StackLayout Spacing="5">
+                <Label
+                    Text="{Binding ActionResult.IsSuccess, Converter={StaticResource BoolToResultTextConverter}}"
+                    FontSize="16"
+                    FontAttributes="Bold"
+                    TextColor="White" />
+
+                <Label
+                    Text="{Binding ActionResult.Message}"
+                    FontSize="14"
+                    TextColor="White"
+                    LineBreakMode="WordWrap"
+                    IsVisible="{Binding ActionResult.Message, Converter={StaticResource StringToBoolConverter}}" />
+            </StackLayout>
+        </Frame>
+
+    </StackLayout>
+</ContentView>

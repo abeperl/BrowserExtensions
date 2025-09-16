@@ -1,5 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.ComponentModel;
+using System.Collections.ObjectModel;
 
 namespace DataFlow.Mobile.Models;
 
@@ -57,6 +59,49 @@ public class PageAction
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+
+    // Additional properties for UI binding
+    [NotMapped]
+    public string DisplayText => !string.IsNullOrEmpty(Label) ? Label : Name;
+
+    [NotMapped]
+    public string ButtonColor => !string.IsNullOrEmpty(Color) ? Color : "#007ACC";
+
+    [NotMapped]
+    public bool IsEnabled => IsActive;
+
+    [NotMapped]
+    public string? Placeholder { get; set; }
+
+    [NotMapped]
+    public string? InputValue { get; set; }
+
+    [NotMapped]
+    public string? SelectedValue { get; set; }
+
+    [NotMapped]
+    public bool ToggleValue { get; set; }
+
+    [NotMapped]
+    public ObservableCollection<string> DropdownOptions { get; set; } = new();
+
+    [NotMapped]
+    public ObservableCollection<SelectableItem> MultiSelectOptions { get; set; } = new();
+
+    [NotMapped]
+    public ObservableCollection<object> SelectedItems { get; set; } = new();
+
+    [NotMapped]
+    public string? NavigationTarget { get; set; }
+
+    [NotMapped]
+    public string? Conditions { get; set; }
+
+    [NotMapped]
+    public string? SuccessSound { get; set; }
+
+    [NotMapped]
+    public string? ErrorSound { get; set; }
 
     // Foreign key
     public int PageId { get; set; }

@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DataFlow.Mobile.Models;
+using DataFlow.Mobile.Services;
 using DataFlow.Mobile.Services.Interfaces;
 using System.Collections.ObjectModel;
 using System.Text.Json;
@@ -487,7 +488,7 @@ public partial class ApiConfigurationViewModel : ObservableObject
     }
 }
 
-public class HttpHeader : ObservableObject
+public partial class HttpHeader : ObservableObject
 {
     [ObservableProperty]
     private string _name = string.Empty;
@@ -499,7 +500,7 @@ public class HttpHeader : ObservableObject
     private bool _isEnabled = true;
 }
 
-public class QueryParameter : ObservableObject
+public partial class QueryParameter : ObservableObject
 {
     [ObservableProperty]
     private string _name = string.Empty;

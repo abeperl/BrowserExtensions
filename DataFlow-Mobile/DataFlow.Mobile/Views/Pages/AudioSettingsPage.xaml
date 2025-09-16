@@ -1,0 +1,263 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="DataFlow.Mobile.Views.Pages.AudioSettingsPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:viewmodels="clr-namespace:DataFlow.Mobile.ViewModels"
+    x:DataType="viewmodels:AudioSettingsViewModel"
+    Title="Audio Settings">
+
+    <ContentPage.ToolbarItems>
+        <ToolbarItem
+            Text="Reset"
+            IconImageSource="reset.png"
+            Command="{Binding ResetToDefaultsCommand}" />
+    </ContentPage.ToolbarItems>
+
+    <ScrollView>
+        <StackLayout Spacing="0">
+
+            <!-- Header -->
+            <Grid BackgroundColor="{StaticResource Primary}" Padding="20,15">
+                <StackLayout>
+                    <Label
+                        Text="Audio Settings"
+                        FontSize="24"
+                        FontAttributes="Bold"
+                        TextColor="White" />
+                    <Label
+                        Text="Configure sound effects and audio feedback"
+                        FontSize="14"
+                        TextColor="LightGray" />
+                </StackLayout>
+            </Grid>
+
+            <!-- Master Audio Control -->
+            <StackLayout Padding="20" BackgroundColor="White">
+                <Label Text="Master Audio Control" FontSize="18" FontAttributes="Bold" TextColor="{StaticResource Primary}" Margin="0,0,0,15" />
+
+                <!-- Mute Toggle -->
+                <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,15">
+                    <StackLayout Grid.Column="0">
+                        <Label Text="Enable Audio" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource Gray700}" />
+                        <Label Text="Turn on/off all sound effects" FontSize="12" TextColor="{StaticResource Gray500}" />
+                    </StackLayout>
+                    <Switch
+                        Grid.Column="1"
+                        IsToggled="{Binding IsAudioEnabled}"
+                        OnColor="{StaticResource Primary}"
+                        VerticalOptions="Center" />
+                </Grid>
+
+                <!-- Volume Control -->
+                <StackLayout IsVisible="{Binding IsAudioEnabled}" Spacing="10">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <Label
+                            Grid.Column="0"
+                            Text="Volume"
+                            FontSize="16"
+                            FontAttributes="Bold"
+                            TextColor="{StaticResource Gray700}"
+                            VerticalOptions="Center" />
+                        <Label
+                            Grid.Column="1"
+                            Text="{Binding VolumePercentage, StringFormat='{0}%'}"
+                            FontSize="14"
+                            TextColor="{StaticResource Gray600}"
+                            VerticalOptions="Center" />
+                    </Grid>
+
+                    <Slider
+                        Value="{Binding Volume}"
+                        Minimum="0"
+                        Maximum="1"
+                        ThumbColor="{StaticResource Primary}"
+                        MinimumTrackColor="{StaticResource Primary}"
+                        MaximumTrackColor="{StaticResource Gray300}" />
+
+                    <Button
+                        Text="🔊 Test Volume"
+                        FontSize="14"
+                        BackgroundColor="{StaticResource Secondary}"
+                        TextColor="White"
+                        CornerRadius="20"
+                        Padding="20,10"
+                        Command="{Binding TestVolumeCommand}"
+                        HorizontalOptions="Center" />
+                </StackLayout>
+            </StackLayout>
+
+            <!-- Action Sounds -->
+            <StackLayout Padding="20" BackgroundColor="{StaticResource Gray50}">
+                <Label Text="Action Sounds" FontSize="18" FontAttributes="Bold" TextColor="{StaticResource Primary}" Margin="0,0,0,15" />
+
+                <CollectionView
+                    ItemsSource="{Binding ActionSounds}"
+                    SelectionMode="None"
+                    BackgroundColor="Transparent">
+
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate x:DataType="viewmodels:SoundSetting">
+                            <Grid Margin="0,5">
+                                <Frame BackgroundColor="White" Padding="15" CornerRadius="8" HasShadow="True">
+                                    <Grid RowDefinitions="Auto,Auto" ColumnDefinitions="*,Auto,Auto" RowSpacing="8">
+
+                                        <!-- Sound Name and Description -->
+                                        <StackLayout Grid.Row="0" Grid.Column="0" Spacing="3">
+                                            <Label
+                                                Text="{Binding DisplayName}"
+                                                FontSize="16"
+                                                FontAttributes="Bold"
+                                                TextColor="{StaticResource Gray700}" />
+                                            <Label
+                                                Text="{Binding Description}"
+                                                FontSize="12"
+                                                TextColor="{StaticResource Gray500}" />
+                                        </StackLayout>
+
+                                        <!-- Enable/Disable Toggle -->
+                                        <Switch
+                                            Grid.Row="0"
+                                            Grid.Column="1"
+                                            IsToggled="{Binding IsEnabled}"
+                                            OnColor="{StaticResource Primary}"
+                                            VerticalOptions="Center"
+                                            Margin="10,0" />
+
+                                        <!-- Test Button -->
+                                        <Button
+                                            Grid.Row="0"
+                                            Grid.Column="2"
+                                            Text="▶"
+                                            FontSize="16"
+                                            BackgroundColor="{StaticResource Tertiary}"
+                                            TextColor="White"
+                                            CornerRadius="15"
+                                            Padding="10"
+                                            Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:AudioSettingsViewModel}}, Path=TestSoundCommand}"
+                                            CommandParameter="{Binding .}"
+                                            IsEnabled="{Binding IsEnabled}" />
+
+                                        <!-- Sound Selection -->
+                                        <StackLayout Grid.Row="1" Grid.ColumnSpan="3" IsVisible="{Binding IsEnabled}">
+                                            <Label Text="Sound:" FontSize="12" TextColor="{StaticResource Gray600}" />
+                                            <Picker
+                                                ItemsSource="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:AudioSettingsViewModel}}, Path=AvailableSounds}"
+                                                SelectedItem="{Binding SelectedSound}"
+                                                BackgroundColor="{StaticResource Gray100}" />
+                                        </StackLayout>
+
+                                    </Grid>
+                                </Frame>
+                            </Grid>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+            </StackLayout>
+
+            <!-- Built-in Sounds -->
+            <StackLayout Padding="20" BackgroundColor="White">
+                <Label Text="Built-in Sounds" FontSize="18" FontAttributes="Bold" TextColor="{StaticResource Primary}" Margin="0,0,0,15" />
+
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="10" RowSpacing="10">
+                    <Button
+                        Grid.Row="0"
+                        Grid.Column="0"
+                        Text="🔄 Reload Sounds"
+                        FontSize="14"
+                        BackgroundColor="{StaticResource Secondary}"
+                        TextColor="White"
+                        CornerRadius="20"
+                        Command="{Binding ReloadSoundsCommand}" />
+
+                    <Button
+                        Grid.Row="0"
+                        Grid.Column="1"
+                        Text="🗑️ Clear Cache"
+                        FontSize="14"
+                        BackgroundColor="{StaticResource Gray600}"
+                        TextColor="White"
+                        CornerRadius="20"
+                        Command="{Binding ClearCacheCommand}" />
+                </Grid>
+
+                <!-- Available Sounds List -->
+                <StackLayout Margin="0,15,0,0">
+                    <Label Text="Available Sounds:" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource Gray700}" />
+
+                    <CollectionView
+                        ItemsSource="{Binding AvailableSounds}"
+                        SelectionMode="None"
+                        BackgroundColor="Transparent"
+                        HeightRequest="200">
+
+                        <CollectionView.ItemsLayout>
+                            <LinearItemsLayout Orientation="Vertical" ItemSpacing="2" />
+                        </CollectionView.ItemsLayout>
+
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate x:DataType="x:String">
+                                <Grid ColumnDefinitions="*,Auto" Padding="10,8" BackgroundColor="{StaticResource Gray100}" Margin="0,1">
+                                    <Label
+                                        Grid.Column="0"
+                                        Text="{Binding .}"
+                                        FontSize="14"
+                                        TextColor="{StaticResource Gray700}"
+                                        VerticalOptions="Center" />
+                                    <Button
+                                        Grid.Column="1"
+                                        Text="▶"
+                                        FontSize="12"
+                                        BackgroundColor="{StaticResource Primary}"
+                                        TextColor="White"
+                                        CornerRadius="12"
+                                        Padding="8"
+                                        Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:AudioSettingsViewModel}}, Path=TestBuiltInSoundCommand}"
+                                        CommandParameter="{Binding .}" />
+                                </Grid>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+                </StackLayout>
+            </StackLayout>
+
+            <!-- Status Information -->
+            <StackLayout Padding="20" BackgroundColor="{StaticResource Gray50}">
+                <Label Text="Status Information" FontSize="18" FontAttributes="Bold" TextColor="{StaticResource Primary}" Margin="0,0,0,15" />
+
+                <Frame BackgroundColor="White" Padding="15" CornerRadius="8">
+                    <StackLayout Spacing="8">
+                        <Grid ColumnDefinitions="*,*">
+                            <StackLayout Grid.Column="0">
+                                <Label Text="Audio Status:" FontSize="12" TextColor="{StaticResource Gray600}" />
+                                <Label Text="{Binding AudioStatus}" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource Primary}" />
+                            </StackLayout>
+                            <StackLayout Grid.Column="1">
+                                <Label Text="Loaded Sounds:" FontSize="12" TextColor="{StaticResource Gray600}" />
+                                <Label Text="{Binding LoadedSoundsCount}" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource Primary}" />
+                            </StackLayout>
+                        </Grid>
+
+                        <StackLayout>
+                            <Label Text="Last Played:" FontSize="12" TextColor="{StaticResource Gray600}" />
+                            <Label Text="{Binding LastPlayedSound}" FontSize="14" TextColor="{StaticResource Gray700}" />
+                        </StackLayout>
+                    </StackLayout>
+                </Frame>
+            </StackLayout>
+
+        </StackLayout>
+    </ScrollView>
+
+    <!-- Loading Overlay -->
+    <Grid
+        BackgroundColor="#80000000"
+        IsVisible="{Binding IsLoading}">
+        <ActivityIndicator
+            IsRunning="{Binding IsLoading}"
+            Color="{StaticResource Primary}"
+            VerticalOptions="Center"
+            HorizontalOptions="Center" />
+    </Grid>
+
+</ContentPage>

@@ -173,8 +173,15 @@
 
         </Grid>
 
-        <!-- Placeholder for Global Actions - Will be implemented in Phase 7 -->
-        <!-- Actions framework will be available in Phase 7 -->
+        <!-- Page Actions -->
+        <controls:DynamicActionView
+            Grid.Row="1"
+            PageId="{Binding PageId}"
+            CurrentData="{Binding SelectedDataItem}"
+            Actions="{Binding PageActions}"
+            IsVisible="{Binding HasActions}"
+            VerticalOptions="End"
+            Margin="15,0,15,15" />
 
     </Grid>
 </ContentPage>

@@ -1,10 +1,11 @@
 using DataFlow.Mobile.Models;
+using PageModel = DataFlow.Mobile.Models.Page;
 
 namespace DataFlow.Mobile.Services.Interfaces;
 
 public interface IUnitOfWork : IDisposable
 {
-    IGenericRepository<Page> Pages { get; }
+    IGenericRepository<PageModel> Pages { get; }
     IGenericRepository<Template> Templates { get; }
     IGenericRepository<PageAction> Actions { get; }
     IGenericRepository<AuthenticationConfig> AuthenticationConfigs { get; }

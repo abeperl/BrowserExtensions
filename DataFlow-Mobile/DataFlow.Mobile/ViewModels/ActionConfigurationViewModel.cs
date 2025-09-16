@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DataFlow.Mobile.Models;
+using DataFlow.Mobile.Services;
 using DataFlow.Mobile.Services.Interfaces;
 using System.Collections.ObjectModel;
 using System.Text.Json;
@@ -18,13 +19,13 @@ public partial class ActionConfigurationViewModel : ObservableObject
     private Models.Page _currentPage = new();
 
     [ObservableProperty]
-    private ObservableCollection<Models.Action> _pageActions = new();
+    private ObservableCollection<ActionModel> _pageActions = new();
 
     [ObservableProperty]
     private ObservableCollection<ActionTrigger> _actionTriggers = new();
 
     [ObservableProperty]
-    private Models.Action _selectedAction = new();
+    private ActionModel _selectedAction = new();
 
     [ObservableProperty]
     private ActionTrigger _selectedTrigger = new();
@@ -120,7 +121,7 @@ public partial class ActionConfigurationViewModel : ObservableObject
     [RelayCommand]
     public async Task AddActionAsync()
     {
-        var newAction = new Models.Action
+        var newAction = new ActionModel
         {
             Id = PageActions.Count + 1,
             Name = "New Action",
@@ -137,7 +138,7 @@ public partial class ActionConfigurationViewModel : ObservableObject
     }
 
     [RelayCommand]
-    public async Task RemoveActionAsync(Models.Action action)
+    public async Task RemoveActionAsync(ActionModel action)
     {
         if (action != null)
         {
@@ -155,11 +156,11 @@ public partial class ActionConfigurationViewModel : ObservableObject
     }
 
     [RelayCommand]
-    public async Task DuplicateActionAsync(Models.Action action)
+    public async Task DuplicateActionAsync(ActionModel action)
     {
         if (action != null)
         {
-            var duplicated = new Models.Action
+            var duplicated = new ActionModel
             {
                 Id = PageActions.Count + 1,
                 Name = $"{action.Name} Copy",
@@ -369,7 +370,7 @@ public partial class ActionConfigurationViewModel : ObservableObject
 
         try
         {
-            var importedActions = JsonSerializer.Deserialize<List<Models.Action>>(actionsJson);
+            var importedActions = JsonSerializer.Deserialize<List<ActionModel>>(actionsJson);
 
             foreach (var action in importedActions)
             {
@@ -626,7 +627,7 @@ function processData(data, params) {
         }
     }
 
-    partial void OnSelectedActionChanged(Models.Action value)
+    partial void OnSelectedActionChanged(ActionModel value)
     {
         if (value != null)
         {
@@ -636,7 +637,7 @@ function processData(data, params) {
 }
 
 // Supporting models for action configuration
-public class ActionTrigger : ObservableObject
+public partial class ActionTrigger : ObservableObject
 {
     [ObservableProperty]
     private int _id;
@@ -660,7 +661,7 @@ public class ActionTrigger : ObservableObject
     private int _actionId;
 }
 
-public class ActionParameter : ObservableObject
+public partial class ActionParameter : ObservableObject
 {
     [ObservableProperty]
     private int _id;
@@ -684,7 +685,7 @@ public class ActionParameter : ObservableObject
     private int _actionId;
 }
 
-public class ActionCondition : ObservableObject
+public partial class ActionCondition : ObservableObject
 {
     [ObservableProperty]
     private int _id;
