@@ -1,0 +1,387 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="DataFlow.Mobile.Views.Pages.ApiConfigurationPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:viewmodels="clr-namespace:DataFlow.Mobile.ViewModels"
+    x:DataType="viewmodels:ApiConfigurationViewModel"
+    Title="API Configuration">
+
+    <ContentPage.ToolbarItems>
+        <ToolbarItem
+            Text="Save"
+            IconImageSource="save.png"
+            Command="{Binding SaveConfigurationCommand}" />
+        <ToolbarItem
+            Text="Test"
+            IconImageSource="test.png"
+            Command="{Binding TestApiCommand}" />
+    </ContentPage.ToolbarItems>
+
+    <ScrollView>
+        <StackLayout Spacing="0">
+
+            <!-- Header -->
+            <Grid BackgroundColor="{StaticResource Primary}" Padding="20,15">
+                <StackLayout>
+                    <Label
+                        Text="{Binding CurrentPage.Name}"
+                        FontSize="20"
+                        FontAttributes="Bold"
+                        TextColor="White" />
+                    <Label
+                        Text="Configure API endpoint and request settings"
+                        FontSize="14"
+                        TextColor="LightGray" />
+                </StackLayout>
+            </Grid>
+
+            <!-- Basic Configuration -->
+            <StackLayout Padding="20" BackgroundColor="White">
+                <Label Text="Basic Configuration" FontSize="18" FontAttributes="Bold" TextColor="{StaticResource Primary}" Margin="0,0,0,15" />
+
+                <!-- API Endpoint -->
+                <Grid RowDefinitions="Auto,Auto" RowSpacing="8" Margin="0,0,0,15">
+                    <Label Grid.Row="0" Text="API Endpoint URL *" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource Gray600}" />
+                    <Entry
+                        Grid.Row="1"
+                        Text="{Binding CurrentPage.ApiEndpoint}"
+                        Placeholder="https://api.example.com/data"
+                        Keyboard="Url"
+                        BackgroundColor="{StaticResource Gray50}" />
+                </Grid>
+
+                <!-- HTTP Method -->
+                <Grid RowDefinitions="Auto,Auto" RowSpacing="8" Margin="0,0,0,15">
+                    <Label Grid.Row="0" Text="HTTP Method" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource Gray600}" />
+                    <Picker
+                        Grid.Row="1"
+                        ItemsSource="{Binding HttpMethods}"
+                        SelectedItem="{Binding CurrentPage.ApiMethod}"
+                        BackgroundColor="{StaticResource Gray50}" />
+                </Grid>
+
+                <!-- Content Type -->
+                <Grid RowDefinitions="Auto,Auto" RowSpacing="8" Margin="0,0,0,15">
+                    <Label Grid.Row="0" Text="Content Type" FontSize="14" FontAttributes="Bold" TextColor="{StaticResource Gray600}" />
+                    <Picker
+                        Grid.Row="1"
+                        ItemsSource="{Binding ContentTypes}"
+                        SelectedItem="{Binding SelectedContentType}"
+                        BackgroundColor="{StaticResource Gray50}" />
+                </Grid>
+            </StackLayout>
+
+            <!-- Quick Actions -->
+            <StackLayout Padding="20,0,20,20" BackgroundColor="White">
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+                    <Button
+                        Grid.Column="0"
+                        Text="📥 Import cURL"
+                        FontSize="14"
+                        BackgroundColor="{StaticResource Tertiary}"
+                        TextColor="White"
+                        CornerRadius="20"
+                        Command="{Binding ImportFromCurlCommand}" />
+
+                    <Button
+                        Grid.Column="1"
+                        Text="📤 Export cURL"
+                        FontSize="14"
+                        BackgroundColor="{StaticResource Secondary}"
+                        TextColor="White"
+                        CornerRadius="20"
+                        Command="{Binding ExportToCurlCommand}" />
+                </Grid>
+            </StackLayout>
+
+            <!-- Request Headers -->
+            <StackLayout Padding="20" BackgroundColor="{StaticResource Gray50}">
+                <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,15">
+                    <Label
+                        Grid.Column="0"
+                        Text="Request Headers"
+                        FontSize="18"
+                        FontAttributes="Bold"
+                        TextColor="{StaticResource Primary}"
+                        VerticalOptions="Center" />
+                    <Button
+                        Grid.Column="1"
+                        Text="+ Add"
+                        FontSize="14"
+                        BackgroundColor="{StaticResource Primary}"
+                        TextColor="White"
+                        CornerRadius="15"
+                        Padding="15,8"
+                        Command="{Binding AddHeaderCommand}" />
+                </Grid>
+
+                <CollectionView
+                    ItemsSource="{Binding RequestHeaders}"
+                    SelectionMode="None"
+                    BackgroundColor="Transparent">
+
+                    <CollectionView.EmptyView>
+                        <StackLayout
+                            VerticalOptions="Center"
+                            HorizontalOptions="Center"
+                            Spacing="10"
+                            Padding="20">
+                            <Label
+                                Text="📄"
+                                FontSize="32"
+                                HorizontalOptions="Center" />
+                            <Label
+                                Text="No headers configured"
+                                FontSize="14"
+                                TextColor="{StaticResource Gray600}"
+                                HorizontalOptions="Center" />
+                        </StackLayout>
+                    </CollectionView.EmptyView>
+
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate x:DataType="viewmodels:HttpHeader">
+                            <Grid>
+                                <Frame
+                                    BackgroundColor="White"
+                                    HasShadow="True"
+                                    CornerRadius="8"
+                                    Margin="0,5"
+                                    Padding="15">
+
+                                    <Grid RowDefinitions="Auto,Auto" ColumnDefinitions="Auto,*,Auto" RowSpacing="10">
+
+                                        <!-- Enable/Disable Toggle -->
+                                        <Switch
+                                            Grid.Row="0"
+                                            Grid.Column="0"
+                                            IsToggled="{Binding IsEnabled}"
+                                            OnColor="{StaticResource Primary}"
+                                            VerticalOptions="Center" />
+
+                                        <!-- Header Name -->
+                                        <StackLayout Grid.Row="0" Grid.Column="1" Spacing="5">
+                                            <Label Text="Header Name" FontSize="12" TextColor="{StaticResource Gray600}" />
+                                            <Entry
+                                                Text="{Binding Name}"
+                                                Placeholder="Header-Name"
+                                                BackgroundColor="{StaticResource Gray100}"
+                                                IsEnabled="{Binding IsEnabled}" />
+                                        </StackLayout>
+
+                                        <!-- Remove Button -->
+                                        <Button
+                                            Grid.Row="0"
+                                            Grid.Column="2"
+                                            Text="🗑️"
+                                            FontSize="16"
+                                            BackgroundColor="Red"
+                                            TextColor="White"
+                                            CornerRadius="15"
+                                            Padding="10"
+                                            Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:ApiConfigurationViewModel}}, Path=RemoveHeaderCommand}"
+                                            CommandParameter="{Binding .}" />
+
+                                        <!-- Header Value -->
+                                        <StackLayout Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" Spacing="5">
+                                            <Label Text="Header Value" FontSize="12" TextColor="{StaticResource Gray600}" />
+                                            <Entry
+                                                Text="{Binding Value}"
+                                                Placeholder="Header value"
+                                                BackgroundColor="{StaticResource Gray100}"
+                                                IsEnabled="{Binding IsEnabled}" />
+                                        </StackLayout>
+
+                                    </Grid>
+                                </Frame>
+                            </Grid>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+            </StackLayout>
+
+            <!-- Query Parameters -->
+            <StackLayout Padding="20" BackgroundColor="White">
+                <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,15">
+                    <Label
+                        Grid.Column="0"
+                        Text="Query Parameters"
+                        FontSize="18"
+                        FontAttributes="Bold"
+                        TextColor="{StaticResource Primary}"
+                        VerticalOptions="Center" />
+                    <Button
+                        Grid.Column="1"
+                        Text="+ Add"
+                        FontSize="14"
+                        BackgroundColor="{StaticResource Primary}"
+                        TextColor="White"
+                        CornerRadius="15"
+                        Padding="15,8"
+                        Command="{Binding AddParameterCommand}" />
+                </Grid>
+
+                <CollectionView
+                    ItemsSource="{Binding QueryParameters}"
+                    SelectionMode="None"
+                    BackgroundColor="Transparent">
+
+                    <CollectionView.EmptyView>
+                        <StackLayout
+                            VerticalOptions="Center"
+                            HorizontalOptions="Center"
+                            Spacing="10"
+                            Padding="20">
+                            <Label
+                                Text="🔗"
+                                FontSize="32"
+                                HorizontalOptions="Center" />
+                            <Label
+                                Text="No parameters configured"
+                                FontSize="14"
+                                TextColor="{StaticResource Gray600}"
+                                HorizontalOptions="Center" />
+                        </StackLayout>
+                    </CollectionView.EmptyView>
+
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate x:DataType="viewmodels:QueryParameter">
+                            <Grid>
+                                <Frame
+                                    BackgroundColor="{StaticResource Gray50}"
+                                    HasShadow="True"
+                                    CornerRadius="8"
+                                    Margin="0,5"
+                                    Padding="15">
+
+                                    <Grid RowDefinitions="Auto,Auto" ColumnDefinitions="Auto,*,Auto" RowSpacing="10">
+
+                                        <!-- Enable/Disable Toggle -->
+                                        <Switch
+                                            Grid.Row="0"
+                                            Grid.Column="0"
+                                            IsToggled="{Binding IsEnabled}"
+                                            OnColor="{StaticResource Primary}"
+                                            VerticalOptions="Center" />
+
+                                        <!-- Parameter Name -->
+                                        <StackLayout Grid.Row="0" Grid.Column="1" Spacing="5">
+                                            <Label Text="Parameter Name" FontSize="12" TextColor="{StaticResource Gray600}" />
+                                            <Entry
+                                                Text="{Binding Name}"
+                                                Placeholder="param_name"
+                                                BackgroundColor="White"
+                                                IsEnabled="{Binding IsEnabled}" />
+                                        </StackLayout>
+
+                                        <!-- Remove Button -->
+                                        <Button
+                                            Grid.Row="0"
+                                            Grid.Column="2"
+                                            Text="🗑️"
+                                            FontSize="16"
+                                            BackgroundColor="Red"
+                                            TextColor="White"
+                                            CornerRadius="15"
+                                            Padding="10"
+                                            Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:ApiConfigurationViewModel}}, Path=RemoveParameterCommand}"
+                                            CommandParameter="{Binding .}" />
+
+                                        <!-- Parameter Value -->
+                                        <StackLayout Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" Spacing="5">
+                                            <Label Text="Parameter Value" FontSize="12" TextColor="{StaticResource Gray600}" />
+                                            <Entry
+                                                Text="{Binding Value}"
+                                                Placeholder="Parameter value"
+                                                BackgroundColor="White"
+                                                IsEnabled="{Binding IsEnabled}" />
+                                        </StackLayout>
+
+                                    </Grid>
+                                </Frame>
+                            </Grid>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+            </StackLayout>
+
+            <!-- Test Section -->
+            <StackLayout Padding="20" BackgroundColor="{StaticResource Gray50}">
+                <Label Text="API Testing" FontSize="18" FontAttributes="Bold" TextColor="{StaticResource Primary}" Margin="0,0,0,15" />
+
+                <Button
+                    Text="🧪 Test API Connection"
+                    FontSize="16"
+                    BackgroundColor="{StaticResource Secondary}"
+                    TextColor="White"
+                    CornerRadius="25"
+                    Padding="20,12"
+                    Command="{Binding TestApiCommand}"
+                    IsEnabled="{Binding IsTesting, Converter={StaticResource InvertedBoolConverter}}"
+                    Margin="0,0,0,15" />
+
+                <ActivityIndicator
+                    IsVisible="{Binding IsTesting}"
+                    IsRunning="{Binding IsTesting}"
+                    Color="{StaticResource Primary}"
+                    Margin="0,0,0,10" />
+
+                <!-- Test Result -->
+                <Frame
+                    BackgroundColor="{Binding TestSuccessful, Converter={StaticResource BoolToTestResultColorConverter}}"
+                    Padding="15"
+                    CornerRadius="8"
+                    Margin="0,0,0,15"
+                    IsVisible="{Binding TestResult, Converter={StaticResource StringToBoolConverter}}">
+
+                    <StackLayout Spacing="5">
+                        <Label
+                            Text="{Binding TestResult}"
+                            TextColor="White"
+                            FontSize="14"
+                            FontAttributes="Bold" />
+
+                        <Label
+                            Text="{Binding ResponseTime, StringFormat='Response time: {0}ms'}"
+                            TextColor="White"
+                            FontSize="12"
+                            IsVisible="{Binding TestSuccessful}" />
+                    </StackLayout>
+                </Frame>
+
+                <!-- API Response -->
+                <StackLayout IsVisible="{Binding ApiResponse, Converter={StaticResource StringToBoolConverter}}">
+                    <Label Text="API Response" FontSize="16" FontAttributes="Bold" TextColor="{StaticResource Gray700}" Margin="0,0,0,10" />
+
+                    <Frame
+                        BackgroundColor="White"
+                        HasShadow="True"
+                        CornerRadius="8"
+                        Padding="15">
+                        <ScrollView HeightRequest="200">
+                            <Label
+                                Text="{Binding ApiResponse}"
+                                FontFamily="Courier"
+                                FontSize="12"
+                                TextColor="{StaticResource Gray800}"
+                                LineBreakMode="WordWrap" />
+                        </ScrollView>
+                    </Frame>
+                </StackLayout>
+            </StackLayout>
+
+        </StackLayout>
+    </ScrollView>
+
+    <!-- Loading Overlay -->
+    <Grid
+        BackgroundColor="#80000000"
+        IsVisible="{Binding IsLoading}">
+        <ActivityIndicator
+            IsRunning="{Binding IsLoading}"
+            Color="{StaticResource Primary}"
+            VerticalOptions="Center"
+            HorizontalOptions="Center" />
+    </Grid>
+
+</ContentPage>

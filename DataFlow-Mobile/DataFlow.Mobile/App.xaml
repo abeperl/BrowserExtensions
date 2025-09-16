@@ -2,6 +2,7 @@
 <Application xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:local="clr-namespace:DataFlow.Mobile"
+             xmlns:converters="clr-namespace:DataFlow.Mobile.Converters"
              x:Class="DataFlow.Mobile.App">
     <Application.Resources>
         <ResourceDictionary>
@@ -9,6 +10,32 @@
                 <ResourceDictionary Source="Resources/Styles/Colors.xaml" />
                 <ResourceDictionary Source="Resources/Styles/Styles.xaml" />
             </ResourceDictionary.MergedDictionaries>
+
+            <!-- Value Converters -->
+            <converters:StringToBoolConverter x:Key="StringToBoolConverter" />
+            <converters:InvertedBoolConverter x:Key="InvertedBoolConverter" />
+            <converters:DateTimeToBoolConverter x:Key="DateTimeToBoolConverter" />
+            <converters:IntToBoolConverter x:Key="IntToBoolConverter" />
+            <converters:BoolToStatusConverter x:Key="BoolToStatusConverter" />
+            <converters:BoolToColorConverter x:Key="BoolToColorConverter" />
+            <converters:JsonPropertyConverter x:Key="JsonPropertyConverter" />
+            <converters:ActionItemParameterConverter x:Key="ActionItemParameterConverter" />
+            <converters:JsonElementToStringConverter x:Key="JsonElementToStringConverter" />
+            <converters:NullToBoolConverter x:Key="NullToBoolConverter" />
+            <converters:NotNullToBoolConverter x:Key="NotNullToBoolConverter" />
+            <converters:TemplateColumnConverter x:Key="TemplateColumnConverter" />
+            <converters:TemplateColumnColorConverter x:Key="TemplateColumnColorConverter" />
+            <converters:TemplateColumnBackgroundConverter x:Key="TemplateColumnBackgroundConverter" />
+            <converters:TemplateColumnFontWeightConverter x:Key="TemplateColumnFontWeightConverter" />
+            <converters:StringEqualsConverter x:Key="StringEqualsConverter" />
+            <converters:BoolToLineBreakModeConverter x:Key="BoolToLineBreakModeConverter" />
+            <converters:StepProgressConverter x:Key="StepProgressConverter" />
+            <converters:StepTitleConverter x:Key="StepTitleConverter" />
+            <converters:StepDescriptionConverter x:Key="StepDescriptionConverter" />
+            <converters:IntEqualsConverter x:Key="IntEqualsConverter" />
+            <converters:IntGreaterThanConverter x:Key="IntGreaterThanConverter" />
+            <converters:NextButtonTextConverter x:Key="NextButtonTextConverter" />
+            <converters:BoolToTestResultColorConverter x:Key="BoolToTestResultColorConverter" />
         </ResourceDictionary>
     </Application.Resources>
 </Application>

@@ -1,0 +1,37 @@
+.table-item-link {
+    color: #0066cc !important;
+    text-decoration: none !important;
+    cursor: pointer !important;
+    display: inline-block !important;
+    transition: color 0.2s ease, text-decoration 0.2s ease !important;
+}
+
+.table-item-link:hover {
+    color: #004499 !important;
+    text-decoration: underline !important;
+}
+
+.table-item-link:active {
+    color: #002266 !important;
+}
+
+.table-item-link:focus {
+    outline: 2px solid #0066cc !important;
+    outline-offset: 2px !important;
+}
+
+table td .table-item-link,
+table th .table-item-link {
+    width: 100% !important;
+    text-align: inherit !important;
+}
+
+table td:has(.table-item-link),
+table th:has(.table-item-link) {
+    padding: 4px 8px !important;
+}
+
+table td:has(.table-item-link):hover,
+table th:has(.table-item-link):hover {
+    background-color: rgba(0, 102, 204, 0.1) !important;
+}

@@ -3,12 +3,28 @@
     x:Class="DataFlow.Mobile.AppShell"
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-    xmlns:local="clr-namespace:DataFlow.Mobile"
-    Title="DataFlow.Mobile">
+    xmlns:views="clr-namespace:DataFlow.Mobile.Views.Pages"
+    Title="DataFlow Mobile">
 
-    <ShellContent
-        Title="Home"
-        ContentTemplate="{DataTemplate local:MainPage}"
-        Route="MainPage" />
+    <!-- Tab Bar Navigation -->
+    <TabBar>
+        <ShellContent
+            Title="Home"
+            Icon="home.png"
+            ContentTemplate="{DataTemplate views:HomePage}"
+            Route="home" />
+
+        <ShellContent
+            Title="Settings"
+            Icon="settings.png"
+            ContentTemplate="{DataTemplate views:SettingsPage}"
+            Route="settings" />
+
+        <ShellContent
+            Title="About"
+            Icon="info.png"
+            ContentTemplate="{DataTemplate views:AboutPage}"
+            Route="about" />
+    </TabBar>
 
 </Shell>

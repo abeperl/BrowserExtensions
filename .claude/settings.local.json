@@ -7,7 +7,13 @@
       "Read(//c//**)",
       "Bash(find:*)",
       "Bash(powershell:*)",
-      "Read(//c/Users/User/.claude/**)"
+      "Read(//c/Users/User/.claude/**)",
+      "Bash(dotnet --version)",
+      "Bash(dotnet:*)",
+      "Bash(dir \"C:\\Users\\User\\source\\repos\\BrowserExtensions\\DataFlow-Mobile\")",
+      "Bash(dir:*)",
+      "Bash(tree:*)",
+      "Bash(del \"C:\\Users\\User\\source\\repos\\BrowserExtensions\\DataFlow-Mobile\\DataFlow.Mobile\\Models\\PageModel.cs\")"
     ],
     "deny": []
   }

@@ -7,6 +7,8 @@ using Polly.CircuitBreaker;
 using Polly.Extensions.Http;
 using DataFlow.Mobile.Services;
 using DataFlow.Mobile.Services.Interfaces;
+using DataFlow.Mobile.ViewModels;
+using DataFlow.Mobile.Views.Pages;
 
 namespace DataFlow.Mobile;
 
@@ -119,5 +121,36 @@ public static class MauiProgram
 
 		// Backup/Restore service
 		services.AddScoped<IBackupRestoreService, BackupRestoreService>();
+
+		// Navigation service
+		services.AddSingleton<INavigationService, NavigationService>();
+
+		// Template processing services
+		services.AddScoped<ITemplateProcessor, TemplateProcessor>();
+		services.AddScoped<ITemplateColumnService, TemplateColumnService>();
+		services.AddScoped<IColorSchemeService, ColorSchemeService>();
+		services.AddScoped<ILayoutTemplateService, LayoutTemplateService>();
+
+		// ViewModels
+		services.AddTransient<HomePageViewModel>();
+		services.AddTransient<PageDetailViewModel>();
+		services.AddTransient<SettingsPageViewModel>();
+		services.AddTransient<AboutPageViewModel>();
+		services.AddTransient<TemplateEditorViewModel>();
+		services.AddTransient<PageWizardViewModel>();
+		services.AddTransient<ApiConfigurationViewModel>();
+		services.AddTransient<AdvancedTemplateDesignerViewModel>();
+		services.AddTransient<ActionConfigurationViewModel>();
+
+		// Pages
+		services.AddTransient<HomePage>();
+		services.AddTransient<PageDetailView>();
+		services.AddTransient<SettingsPage>();
+		services.AddTransient<AboutPage>();
+		services.AddTransient<TemplateEditorPage>();
+		services.AddTransient<PageWizardPage>();
+		services.AddTransient<ApiConfigurationPage>();
+		services.AddTransient<AdvancedTemplateDesignerPage>();
+		services.AddTransient<ActionConfigurationPage>();
 	}
 }

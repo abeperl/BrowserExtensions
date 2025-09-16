@@ -1,0 +1,278 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="DataFlow.Mobile.Views.Pages.SettingsPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:viewmodels="clr-namespace:DataFlow.Mobile.ViewModels"
+    xmlns:models="clr-namespace:DataFlow.Mobile.Models"
+    x:DataType="viewmodels:SettingsPageViewModel"
+    Title="Settings">
+
+    <ContentPage.ToolbarItems>
+        <ToolbarItem
+            Text="Import"
+            IconImageSource="import.png"
+            Command="{Binding ImportSettingsCommand}" />
+        <ToolbarItem
+            Text="Export"
+            IconImageSource="export.png"
+            Command="{Binding ExportSettingsCommand}" />
+    </ContentPage.ToolbarItems>
+
+    <ScrollView>
+        <StackLayout Spacing="0">
+
+            <!-- Header Section -->
+            <Grid BackgroundColor="{StaticResource Primary}" Padding="20">
+                <StackLayout>
+                    <Label
+                        Text="DataFlow Mobile Settings"
+                        FontSize="24"
+                        FontAttributes="Bold"
+                        TextColor="White" />
+                    <Label
+                        Text="Configure your API pages and data visualization"
+                        FontSize="14"
+                        TextColor="LightGray" />
+                </StackLayout>
+            </Grid>
+
+            <!-- Quick Actions Section -->
+            <StackLayout Padding="20" BackgroundColor="{StaticResource Gray100}">
+                <Label
+                    Text="Quick Actions"
+                    FontSize="16"
+                    FontAttributes="Bold"
+                    TextColor="{StaticResource Gray700}"
+                    Margin="0,0,0,10" />
+
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+                    <Button
+                        Grid.Column="0"
+                        Text="➕ New Page"
+                        FontSize="14"
+                        BackgroundColor="{StaticResource Primary}"
+                        TextColor="White"
+                        CornerRadius="25"
+                        Padding="15,10"
+                        Command="{Binding CreateNewPageCommand}" />
+
+                    <Button
+                        Grid.Column="1"
+                        Text="📁 Import/Export"
+                        FontSize="14"
+                        BackgroundColor="{StaticResource Secondary}"
+                        TextColor="White"
+                        CornerRadius="25"
+                        Padding="15,10"
+                        Command="{Binding ExportSettingsCommand}" />
+                </Grid>
+            </StackLayout>
+
+            <!-- Search Section -->
+            <StackLayout Padding="20,10">
+                <SearchBar
+                    Placeholder="Search pages..."
+                    Text="{Binding SearchText}"
+                    SearchCommand="{Binding SearchPagesCommand}"
+                    BackgroundColor="White"
+                    Margin="0,0,0,10" />
+            </StackLayout>
+
+            <!-- Pages Management Section -->
+            <StackLayout Padding="20,0">
+                <Label
+                    Text="Configured Pages"
+                    FontSize="16"
+                    FontAttributes="Bold"
+                    TextColor="{StaticResource Gray700}"
+                    Margin="0,0,0,10" />
+
+                <!-- Pages List -->
+                <CollectionView
+                    ItemsSource="{Binding Pages}"
+                    SelectionMode="None"
+                    BackgroundColor="Transparent">
+
+                    <CollectionView.EmptyView>
+                        <Grid>
+                            <StackLayout
+                                VerticalOptions="Center"
+                                HorizontalOptions="Center"
+                                Spacing="20"
+                                Padding="40">
+
+                                <Label
+                                    Text="⚙️"
+                                    FontSize="48"
+                                    HorizontalOptions="Center" />
+
+                                <Label
+                                    Text="No pages configured"
+                                    FontSize="18"
+                                    FontAttributes="Bold"
+                                    HorizontalOptions="Center"
+                                    TextColor="{StaticResource Gray600}" />
+
+                                <Label
+                                    Text="Create your first page to get started with DataFlow Mobile"
+                                    FontSize="14"
+                                    HorizontalOptions="Center"
+                                    TextColor="{StaticResource Gray500}"
+                                    HorizontalTextAlignment="Center" />
+
+                                <Button
+                                    Text="Create First Page"
+                                    Command="{Binding CreateNewPageCommand}"
+                                    BackgroundColor="{StaticResource Primary}"
+                                    TextColor="White"
+                                    CornerRadius="25"
+                                    Padding="20,10" />
+
+                            </StackLayout>
+                        </Grid>
+                    </CollectionView.EmptyView>
+
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate x:DataType="models:Page">
+                            <Grid>
+                                <Frame
+                                    BackgroundColor="White"
+                                    HasShadow="True"
+                                    CornerRadius="12"
+                                    Margin="0,5"
+                                    Padding="15">
+
+                                    <Grid RowDefinitions="Auto,Auto,Auto">
+
+                                        <!-- Page Header -->
+                                        <Grid Grid.Row="0" ColumnDefinitions="*,Auto">
+                                            <StackLayout Grid.Column="0">
+                                                <Label
+                                                    Text="{Binding Name}"
+                                                    FontSize="16"
+                                                    FontAttributes="Bold"
+                                                    TextColor="{StaticResource Primary}" />
+                                                <Label
+                                                    Text="{Binding Description}"
+                                                    FontSize="12"
+                                                    TextColor="{StaticResource Gray600}"
+                                                    IsVisible="{Binding Description, Converter={StaticResource StringToBoolConverter}}" />
+                                            </StackLayout>
+                                            <Label
+                                                Grid.Column="1"
+                                                Text="{Binding IsActive, Converter={StaticResource BoolToStatusConverter}}"
+                                                FontSize="12"
+                                                TextColor="{Binding IsActive, Converter={StaticResource BoolToColorConverter}}"
+                                                VerticalOptions="Center"
+                                                HorizontalOptions="End" />
+                                        </Grid>
+
+                                        <!-- Page Details -->
+                                        <StackLayout Grid.Row="1" Margin="0,10,0,0">
+                                            <Label
+                                                Text="{Binding ApiEndpoint}"
+                                                FontSize="12"
+                                                TextColor="{StaticResource Gray500}"
+                                                LineBreakMode="TailTruncation" />
+                                            <Label
+                                                Text="{Binding UpdatedAt, StringFormat='Last updated: {0:MMM dd, yyyy HH:mm}'}"
+                                                FontSize="11"
+                                                TextColor="{StaticResource Gray400}" />
+                                        </StackLayout>
+
+                                        <!-- Action Buttons -->
+                                        <StackLayout
+                                            Grid.Row="2"
+                                            Orientation="Horizontal"
+                                            Spacing="10"
+                                            HorizontalOptions="End"
+                                            Margin="0,15,0,0">
+
+                                            <Button
+                                                Text="✏️ Edit"
+                                                FontSize="12"
+                                                BackgroundColor="{StaticResource Secondary}"
+                                                TextColor="White"
+                                                CornerRadius="15"
+                                                Padding="12,6"
+                                                Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:SettingsPageViewModel}}, Path=EditPageCommand}"
+                                                CommandParameter="{Binding .}" />
+
+                                            <Button
+                                                Text="📋 Copy"
+                                                FontSize="12"
+                                                BackgroundColor="{StaticResource Tertiary}"
+                                                TextColor="White"
+                                                CornerRadius="15"
+                                                Padding="12,6"
+                                                Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:SettingsPageViewModel}}, Path=DuplicatePageCommand}"
+                                                CommandParameter="{Binding .}" />
+
+                                            <Button
+                                                Text="🗑️ Delete"
+                                                FontSize="12"
+                                                BackgroundColor="Red"
+                                                TextColor="White"
+                                                CornerRadius="15"
+                                                Padding="12,6"
+                                                Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:SettingsPageViewModel}}, Path=DeletePageCommand}"
+                                                CommandParameter="{Binding .}" />
+
+                                        </StackLayout>
+
+                                    </Grid>
+                                </Frame>
+                            </Grid>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+
+                <!-- Loading Indicator -->
+                <ActivityIndicator
+                    IsVisible="{Binding IsLoading}"
+                    IsRunning="{Binding IsLoading}"
+                    Color="{StaticResource Primary}"
+                    VerticalOptions="Center"
+                    HorizontalOptions="Center"
+                    Margin="0,20" />
+
+            </StackLayout>
+
+            <!-- Footer Section -->
+            <StackLayout Padding="20" BackgroundColor="{StaticResource Gray100}" Margin="0,20,0,0">
+                <Label
+                    Text="Advanced Configuration"
+                    FontSize="16"
+                    FontAttributes="Bold"
+                    TextColor="{StaticResource Gray700}"
+                    Margin="0,0,0,10" />
+
+                <Label
+                    Text="• Template Designer: Available in Phase 5"
+                    FontSize="12"
+                    TextColor="{StaticResource Gray600}"
+                    Margin="0,2" />
+
+                <Label
+                    Text="• Action Builder: Available in Phase 7"
+                    FontSize="12"
+                    TextColor="{StaticResource Gray600}"
+                    Margin="0,2" />
+
+                <Label
+                    Text="• Audio Settings: Available in Phase 8"
+                    FontSize="12"
+                    TextColor="{StaticResource Gray600}"
+                    Margin="0,2" />
+
+                <Label
+                    Text="• Full Import/Export: Available in Phase 9"
+                    FontSize="12"
+                    TextColor="{StaticResource Gray600}"
+                    Margin="0,2" />
+            </StackLayout>
+
+        </StackLayout>
+    </ScrollView>
+</ContentPage>

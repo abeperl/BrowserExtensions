@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="DataFlow.Mobile.Views.Pages.HomePage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:viewmodels="clr-namespace:DataFlow.Mobile.ViewModels"
+    xmlns:models="clr-namespace:DataFlow.Mobile.Models"
+    x:DataType="viewmodels:HomePageViewModel"
+    Title="DataFlow Mobile">
+
+    <ContentPage.ToolbarItems>
+        <ToolbarItem
+            Text="Settings"
+            IconImageSource="settings.png"
+            Command="{Binding NavigateToSettingsCommand}" />
+    </ContentPage.ToolbarItems>
+
+    <Grid RowDefinitions="Auto,*">
+
+        <!-- Search Bar -->
+        <SearchBar
+            Grid.Row="0"
+            Placeholder="Search pages..."
+            Text="{Binding SearchText}"
+            SearchCommand="{Binding SearchPagesCommand}"
+            BackgroundColor="{StaticResource Primary}"
+            TextColor="White"
+            PlaceholderColor="LightGray"
+            Margin="10,5" />
+
+        <!-- Pages List -->
+        <RefreshView
+            Grid.Row="1"
+            IsRefreshing="{Binding IsRefreshing}"
+            Command="{Binding RefreshPagesCommand}">
+
+            <CollectionView
+                ItemsSource="{Binding Pages}"
+                SelectionMode="None"
+                BackgroundColor="Transparent">
+
+                <CollectionView.EmptyView>
+                    <Grid>
+                        <StackLayout
+                            VerticalOptions="Center"
+                            HorizontalOptions="Center"
+                            Spacing="20">
+
+                            <Label
+                                Text="📊"
+                                FontSize="48"
+                                HorizontalOptions="Center" />
+
+                            <Label
+                                Text="No pages configured yet"
+                                FontSize="18"
+                                FontAttributes="Bold"
+                                HorizontalOptions="Center"
+                                TextColor="{StaticResource Gray600}" />
+
+                            <Label
+                                Text="Go to Settings to create your first page"
+                                FontSize="14"
+                                HorizontalOptions="Center"
+                                TextColor="{StaticResource Gray500}" />
+
+                            <Button
+                                Text="Open Settings"
+                                Command="{Binding NavigateToSettingsCommand}"
+                                BackgroundColor="{StaticResource Primary}"
+                                TextColor="White"
+                                CornerRadius="25"
+                                Padding="20,10" />
+
+                        </StackLayout>
+                    </Grid>
+                </CollectionView.EmptyView>
+
+                <CollectionView.ItemTemplate>
+                    <DataTemplate x:DataType="models:Page">
+                        <Grid>
+                            <Frame
+                                BackgroundColor="White"
+                                HasShadow="True"
+                                CornerRadius="12"
+                                Margin="15,10,15,5"
+                                Padding="0">
+
+                                <Frame.GestureRecognizers>
+                                    <TapGestureRecognizer
+                                        Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:HomePageViewModel}}, Path=OpenPageCommand}"
+                                        CommandParameter="{Binding .}" />
+                                </Frame.GestureRecognizers>
+
+                                <Grid RowDefinitions="Auto,Auto,Auto" Padding="20">
+
+                                    <!-- Page Header -->
+                                    <Grid Grid.Row="0" ColumnDefinitions="*,Auto">
+                                        <Label
+                                            Grid.Column="0"
+                                            Text="{Binding Name}"
+                                            FontSize="18"
+                                            FontAttributes="Bold"
+                                            TextColor="{StaticResource Primary}"
+                                            VerticalOptions="Center" />
+
+                                        <Label
+                                            Grid.Column="1"
+                                            Text="▶"
+                                            FontSize="16"
+                                            TextColor="{StaticResource Gray400}"
+                                            VerticalOptions="Center" />
+                                    </Grid>
+
+                                    <!-- Page Description -->
+                                    <Label
+                                        Grid.Row="1"
+                                        Text="{Binding Description}"
+                                        FontSize="14"
+                                        TextColor="{StaticResource Gray600}"
+                                        IsVisible="{Binding Description, Converter={StaticResource StringToBoolConverter}}"
+                                        Margin="0,5,0,0" />
+
+                                    <!-- Page Details -->
+                                    <Grid Grid.Row="2" ColumnDefinitions="*,*" Margin="0,10,0,0">
+                                        <Label
+                                            Grid.Column="0"
+                                            Text="{Binding ApiEndpoint}"
+                                            FontSize="12"
+                                            TextColor="{StaticResource Gray500}"
+                                            LineBreakMode="TailTruncation" />
+
+                                        <Label
+                                            Grid.Column="1"
+                                            Text="{Binding UpdatedAt, StringFormat='{0:MMM dd, yyyy}'}"
+                                            FontSize="12"
+                                            TextColor="{StaticResource Gray500}"
+                                            HorizontalOptions="End" />
+                                    </Grid>
+
+                                </Grid>
+                            </Frame>
+                        </Grid>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
+        </RefreshView>
+
+        <!-- Loading Indicator -->
+        <ActivityIndicator
+            Grid.Row="1"
+            IsVisible="{Binding IsLoading}"
+            IsRunning="{Binding IsLoading}"
+            Color="{StaticResource Primary}"
+            VerticalOptions="Center"
+            HorizontalOptions="Center" />
+
+    </Grid>
+</ContentPage>

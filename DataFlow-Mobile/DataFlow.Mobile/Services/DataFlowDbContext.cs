@@ -15,6 +15,9 @@ public class DataFlowDbContext : DbContext
     public DbSet<AuthenticationConfig> AuthenticationConfigs { get; set; }
     public DbSet<AppSettings> Settings { get; set; }
     public DbSet<AudioConfigModel> AudioConfigs { get; set; }
+    public DbSet<TemplateColumn> TemplateColumns { get; set; }
+    public DbSet<ColorScheme> ColorSchemes { get; set; }
+    public DbSet<LayoutTemplate> LayoutTemplates { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -48,6 +51,22 @@ public class DataFlowDbContext : DbContext
             entity.HasKey(e => e.Id);
             entity.Property(e => e.Name).IsRequired().HasMaxLength(200);
             entity.HasIndex(e => e.Name).IsUnique();
+
+            // Configure relationships
+            entity.HasOne(e => e.ColorScheme)
+                  .WithMany(cs => cs.Templates)
+                  .HasForeignKey(e => e.ColorSchemeId)
+                  .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasOne(e => e.LayoutTemplate)
+                  .WithMany(lt => lt.Templates)
+                  .HasForeignKey(e => e.LayoutTemplateId)
+                  .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasMany(e => e.Columns)
+                  .WithOne(tc => tc.Template)
+                  .HasForeignKey(tc => tc.TemplateId)
+                  .OnDelete(DeleteBehavior.Cascade);
         });
 
         // Configure PageAction entity
@@ -91,6 +110,41 @@ public class DataFlowDbContext : DbContext
             entity.Property(e => e.EventType).IsRequired().HasMaxLength(50);
             entity.Property(e => e.AudioFileName).IsRequired().HasMaxLength(200);
             entity.Property(e => e.Volume).HasPrecision(3, 2);
+            entity.HasIndex(e => e.Name).IsUnique();
+        });
+
+        // Configure TemplateColumn entity
+        modelBuilder.Entity<TemplateColumn>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.PropertyName).IsRequired().HasMaxLength(100);
+            entity.Property(e => e.DisplayName).IsRequired().HasMaxLength(100);
+            entity.Property(e => e.DataType).IsRequired().HasMaxLength(50);
+
+            entity.HasOne(e => e.Template)
+                  .WithMany(t => t.Columns)
+                  .HasForeignKey(e => e.TemplateId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(e => new { e.TemplateId, e.PropertyName }).IsUnique();
+        });
+
+        // Configure ColorScheme entity
+        modelBuilder.Entity<ColorScheme>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Name).IsRequired().HasMaxLength(100);
+            entity.Property(e => e.PrimaryColor).IsRequired().HasMaxLength(50);
+            entity.Property(e => e.BackgroundColor).IsRequired().HasMaxLength(50);
+            entity.HasIndex(e => e.Name).IsUnique();
+        });
+
+        // Configure LayoutTemplate entity
+        modelBuilder.Entity<LayoutTemplate>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Name).IsRequired().HasMaxLength(100);
+            entity.Property(e => e.LayoutType).IsRequired().HasMaxLength(50);
             entity.HasIndex(e => e.Name).IsUnique();
         });
 

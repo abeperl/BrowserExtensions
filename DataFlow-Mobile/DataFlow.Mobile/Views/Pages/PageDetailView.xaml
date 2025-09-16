@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="DataFlow.Mobile.Views.Pages.PageDetailView"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:viewmodels="clr-namespace:DataFlow.Mobile.ViewModels"
+    xmlns:models="clr-namespace:DataFlow.Mobile.Models"
+    xmlns:controls="clr-namespace:DataFlow.Mobile.Views.Controls"
+    x:DataType="viewmodels:PageDetailViewModel"
+    Title="{Binding CurrentPage.Name}">
+
+    <ContentPage.ToolbarItems>
+        <ToolbarItem
+            Text="Refresh"
+            IconImageSource="refresh.png"
+            Command="{Binding RefreshDataCommand}" />
+    </ContentPage.ToolbarItems>
+
+    <Grid RowDefinitions="Auto,*">
+
+        <!-- Page Header with Last Refresh Info -->
+        <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Padding="15,10" BackgroundColor="{StaticResource Gray100}">
+            <StackLayout Grid.Column="0" VerticalOptions="Center">
+                <Label
+                    Text="{Binding CurrentPage.Name}"
+                    FontSize="18"
+                    FontAttributes="Bold"
+                    TextColor="{StaticResource Primary}" />
+                <Label
+                    Text="{Binding CurrentPage.Description}"
+                    FontSize="14"
+                    TextColor="{StaticResource Gray600}"
+                    IsVisible="{Binding CurrentPage.Description, Converter={StaticResource StringToBoolConverter}}" />
+            </StackLayout>
+            <Label
+                Grid.Column="1"
+                Text="{Binding LastRefresh, StringFormat='Last updated: {0:HH:mm}'}"
+                FontSize="12"
+                TextColor="{StaticResource Gray500}"
+                VerticalOptions="Center"
+                IsVisible="{Binding LastRefresh, Converter={StaticResource DateTimeToBoolConverter}}" />
+        </Grid>
+
+        <!-- Main Content -->
+        <Grid Grid.Row="1">
+
+            <!-- Error State -->
+            <StackLayout
+                IsVisible="{Binding HasError}"
+                VerticalOptions="Center"
+                HorizontalOptions="Center"
+                Spacing="20"
+                Padding="40">
+
+                <Label
+                    Text="⚠️"
+                    FontSize="48"
+                    HorizontalOptions="Center" />
+
+                <Label
+                    Text="Unable to load data"
+                    FontSize="18"
+                    FontAttributes="Bold"
+                    HorizontalOptions="Center"
+                    TextColor="{StaticResource Gray600}" />
+
+                <Label
+                    Text="{Binding ErrorMessage}"
+                    FontSize="14"
+                    HorizontalOptions="Center"
+                    TextColor="{StaticResource Gray500}"
+                    HorizontalTextAlignment="Center" />
+
+                <Button
+                    Text="Try Again"
+                    Command="{Binding LoadPageDataCommand}"
+                    BackgroundColor="{StaticResource Primary}"
+                    TextColor="White"
+                    CornerRadius="25"
+                    Padding="20,10" />
+
+            </StackLayout>
+
+            <!-- Dynamic Template Data Display -->
+            <RefreshView
+                IsVisible="{Binding HasError, Converter={StaticResource InvertedBoolConverter}}"
+                IsRefreshing="{Binding IsRefreshing}"
+                Command="{Binding RefreshDataCommand}">
+
+                <!-- Dynamic Template View -->
+                <controls:DynamicTemplateView
+                    ProcessedData="{Binding ProcessedData}"
+                    Template="{Binding CurrentPage.Template}"
+                    LayoutType="{Binding LayoutType}"
+                    IsVisible="{Binding ProcessedData, Converter={StaticResource NotNullToBoolConverter}}" />
+
+                <!-- Fallback Simple Display -->
+                <CollectionView
+                    ItemsSource="{Binding DataItems}"
+                    SelectionMode="None"
+                    BackgroundColor="Transparent"
+                    IsVisible="{Binding ProcessedData, Converter={StaticResource NullToBoolConverter}}">
+
+                    <CollectionView.EmptyView>
+                        <Grid IsVisible="{Binding IsLoading, Converter={StaticResource InvertedBoolConverter}}">
+                            <StackLayout
+                                VerticalOptions="Center"
+                                HorizontalOptions="Center"
+                                Spacing="20">
+
+                                <Label
+                                    Text="📋"
+                                    FontSize="48"
+                                    HorizontalOptions="Center" />
+
+                                <Label
+                                    Text="No data available"
+                                    FontSize="18"
+                                    FontAttributes="Bold"
+                                    HorizontalOptions="Center"
+                                    TextColor="{StaticResource Gray600}" />
+
+                                <Label
+                                    Text="The API returned no data"
+                                    FontSize="14"
+                                    HorizontalOptions="Center"
+                                    TextColor="{StaticResource Gray500}" />
+
+                                <Button
+                                    Text="Refresh"
+                                    Command="{Binding RefreshDataCommand}"
+                                    BackgroundColor="{StaticResource Primary}"
+                                    TextColor="White"
+                                    CornerRadius="25"
+                                    Padding="20,10" />
+
+                            </StackLayout>
+                        </Grid>
+                    </CollectionView.EmptyView>
+
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate>
+                            <Grid>
+                                <Frame
+                                    BackgroundColor="White"
+                                    HasShadow="True"
+                                    CornerRadius="12"
+                                    Margin="15,10,15,5"
+                                    Padding="15">
+
+                                    <StackLayout Spacing="10">
+                                        <!-- Simple JSON Display for templates without columns -->
+                                        <Label
+                                            Text="{Binding ., Converter={StaticResource JsonElementToStringConverter}}"
+                                            FontSize="14"
+                                            TextColor="{StaticResource Gray900}"
+                                            LineBreakMode="WordWrap" />
+                                    </StackLayout>
+                                </Frame>
+                            </Grid>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+            </RefreshView>
+
+            <!-- Loading Indicator -->
+            <ActivityIndicator
+                IsVisible="{Binding IsLoading}"
+                IsRunning="{Binding IsLoading}"
+                Color="{StaticResource Primary}"
+                VerticalOptions="Center"
+                HorizontalOptions="Center" />
+
+        </Grid>
+
+        <!-- Placeholder for Global Actions - Will be implemented in Phase 7 -->
+        <!-- Actions framework will be available in Phase 7 -->
+
+    </Grid>
+</ContentPage>

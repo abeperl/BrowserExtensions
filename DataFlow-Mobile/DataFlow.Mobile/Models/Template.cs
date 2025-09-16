@@ -19,13 +19,17 @@ public class Template
 
     public string? VisibleColumns { get; set; }
 
-    [MaxLength(50)]
-    public string? ColorScheme { get; set; }
+    public int? ColorSchemeId { get; set; }
+
+    [ForeignKey(nameof(ColorSchemeId))]
+    public ColorScheme? ColorScheme { get; set; }
 
     public string? FontSettings { get; set; }
 
-    [MaxLength(20)]
-    public string? LayoutType { get; set; } = "List";
+    public int? LayoutTemplateId { get; set; }
+
+    [ForeignKey(nameof(LayoutTemplateId))]
+    public LayoutTemplate? LayoutTemplate { get; set; }
 
     public string? CustomStyling { get; set; }
 
@@ -67,4 +71,12 @@ public class Template
 
     // Navigation properties
     public ICollection<Page> Pages { get; set; } = [];
+    public ICollection<TemplateColumn> Columns { get; set; } = [];
+
+    // Computed properties for easier access
+    public ICollection<TemplateColumn> VisibleColumns =>
+        Columns.Where(c => c.IsVisible).OrderBy(c => c.SortOrder).ToList();
+
+    public string BackgroundColor => ColorScheme?.BackgroundColor ?? "#FFFFFF";
+    public string TextColor => ColorScheme?.TextColor ?? "#000000";
 }

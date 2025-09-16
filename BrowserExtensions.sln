@@ -1,0 +1,29 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.5.2.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "DataFlow-Mobile", "DataFlow-Mobile", "{9D0C9662-57AD-2F02-E20D-7E7ACBE487C8}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DataFlow.Mobile", "DataFlow-Mobile\DataFlow.Mobile\DataFlow.Mobile.csproj", "{E17C427E-81DD-FF51-EA67-66E6C8069723}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{E17C427E-81DD-FF51-EA67-66E6C8069723}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E17C427E-81DD-FF51-EA67-66E6C8069723}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E17C427E-81DD-FF51-EA67-66E6C8069723}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E17C427E-81DD-FF51-EA67-66E6C8069723}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{E17C427E-81DD-FF51-EA67-66E6C8069723} = {9D0C9662-57AD-2F02-E20D-7E7ACBE487C8}
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {C9D64992-C45F-4622-905D-C0E650CC8EBC}
+	EndGlobalSection
+EndGlobal

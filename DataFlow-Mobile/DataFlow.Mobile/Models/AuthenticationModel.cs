@@ -63,5 +63,5 @@ public class AuthenticationModel
     [Required]
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
-    public ICollection<PageModel> Pages { get; set; } = [];
+    public ICollection<Page> Pages { get; set; } = [];
 }

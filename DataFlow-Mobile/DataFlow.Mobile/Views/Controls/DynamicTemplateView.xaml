@@ -1,0 +1,181 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentView
+    x:Class="DataFlow.Mobile.Views.Controls.DynamicTemplateView"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:models="clr-namespace:DataFlow.Mobile.Models"
+    xmlns:converters="clr-namespace:DataFlow.Mobile.Converters"
+    xmlns:services="clr-namespace:DataFlow.Mobile.Services.Interfaces">
+
+    <ContentView.Resources>
+        <ResourceDictionary>
+            <converters:TemplateColumnConverter x:Key="TemplateColumnConverter" />
+            <converters:TemplateColumnColorConverter x:Key="TemplateColumnColorConverter" />
+            <converters:TemplateColumnBackgroundConverter x:Key="TemplateColumnBackgroundConverter" />
+            <converters:TemplateColumnFontWeightConverter x:Key="TemplateColumnFontWeightConverter" />
+        </ResourceDictionary>
+    </ContentView.Resources>
+
+    <!-- Dynamic content based on layout template -->
+    <Grid x:Name="MainContainer">
+
+        <!-- List Layout -->
+        <CollectionView
+            x:Name="ListView"
+            ItemsSource="{Binding ProcessedData.Items}"
+            SelectionMode="None"
+            BackgroundColor="Transparent"
+            IsVisible="{Binding LayoutType, Converter={StaticResource StringEqualsConverter}, ConverterParameter='List'}">
+
+            <CollectionView.ItemTemplate>
+                <DataTemplate x:DataType="services:ProcessedDataItem">
+                    <Grid>
+                        <Frame
+                            BackgroundColor="{Binding Source={RelativeSource AncestorType={x:Type ContentView}}, Path=BindingContext.Template.BackgroundColor}"
+                            HasShadow="{Binding Source={RelativeSource AncestorType={x:Type ContentView}}, Path=BindingContext.Template.LayoutTemplate.ShowShadows}"
+                            CornerRadius="{Binding Source={RelativeSource AncestorType={x:Type ContentView}}, Path=BindingContext.Template.LayoutTemplate.BorderRadius}"
+                            Margin="{Binding Source={RelativeSource AncestorType={x:Type ContentView}}, Path=BindingContext.Template.LayoutTemplate.ItemSpacing}"
+                            Padding="{Binding Source={RelativeSource AncestorType={x:Type ContentView}}, Path=BindingContext.Template.LayoutTemplate.ItemPadding}">
+
+                            <!-- Dynamic columns display -->
+                            <StackLayout
+                                x:Name="ColumnsContainer"
+                                Spacing="8"
+                                BindableLayout.ItemsSource="{Binding Source={RelativeSource AncestorType={x:Type ContentView}}, Path=BindingContext.ProcessedData.VisibleColumns}">
+
+                                <BindableLayout.ItemTemplate>
+                                    <DataTemplate x:DataType="models:TemplateColumn">
+                                        <Grid ColumnDefinitions="*,2*" Margin="0,4" IsVisible="{Binding IsVisible}">
+
+                                            <!-- Column Header/Label -->
+                                            <Label
+                                                Grid.Column="0"
+                                                Text="{Binding DisplayName}"
+                                                FontSize="12"
+                                                FontAttributes="Bold"
+                                                TextColor="{Binding Source={RelativeSource AncestorType={x:Type ContentView}}, Path=BindingContext.Template.ColorScheme.TextSecondaryColor}"
+                                                VerticalOptions="Center"
+                                                LineBreakMode="TailTruncation" />
+
+                                            <!-- Column Value -->
+                                            <Label
+                                                Grid.Column="1"
+                                                Text="{Binding Source={RelativeSource AncestorType={x:Type Grid}, AncestorLevel=2}, Path=BindingContext, Converter={StaticResource TemplateColumnConverter}, ConverterParameter={Binding .}}"
+                                                TextColor="{Binding Source={RelativeSource AncestorType={x:Type Grid}, AncestorLevel=2}, Path=BindingContext, Converter={StaticResource TemplateColumnColorConverter}, ConverterParameter={Binding .}}"
+                                                BackgroundColor="{Binding Source={RelativeSource AncestorType={x:Type Grid}, AncestorLevel=2}, Path=BindingContext, Converter={StaticResource TemplateColumnBackgroundConverter}, ConverterParameter={Binding .}}"
+                                                FontAttributes="{Binding Source={RelativeSource AncestorType={x:Type Grid}, AncestorLevel=2}, Path=BindingContext, Converter={StaticResource TemplateColumnFontWeightConverter}, ConverterParameter={Binding .}}"
+                                                FontSize="{Binding FontSize}"
+                                                HorizontalTextAlignment="{Binding TextAlignment}"
+                                                VerticalOptions="Center"
+                                                LineBreakMode="{Binding WordWrap, Converter={StaticResource BoolToLineBreakModeConverter}}"
+                                                MaxLines="{Binding MaxLines}" />
+
+                                        </Grid>
+                                    </DataTemplate>
+                                </BindableLayout.ItemTemplate>
+                            </StackLayout>
+
+                        </Frame>
+                    </Grid>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
+
+        <!-- Grid Layout -->
+        <CollectionView
+            x:Name="GridView"
+            ItemsSource="{Binding ProcessedData.Items}"
+            SelectionMode="None"
+            BackgroundColor="Transparent"
+            IsVisible="{Binding LayoutType, Converter={StaticResource StringEqualsConverter}, ConverterParameter='Grid'}"
+            ItemsLayout="{x:Static ListItemsLayout.VerticalGrid}">
+
+            <CollectionView.ItemTemplate>
+                <DataTemplate x:DataType="services:ProcessedDataItem">
+                    <Grid>
+                        <Frame
+                            BackgroundColor="{Binding Source={RelativeSource AncestorType={x:Type ContentView}}, Path=BindingContext.Template.BackgroundColor}"
+                            HasShadow="{Binding Source={RelativeSource AncestorType={x:Type ContentView}}, Path=BindingContext.Template.LayoutTemplate.ShowShadows}"
+                            CornerRadius="{Binding Source={RelativeSource AncestorType={x:Type ContentView}}, Path=BindingContext.Template.LayoutTemplate.BorderRadius}"
+                            Margin="{Binding Source={RelativeSource AncestorType={x:Type ContentView}}, Path=BindingContext.Template.LayoutTemplate.ItemSpacing}"
+                            Padding="{Binding Source={RelativeSource AncestorType={x:Type ContentView}}, Path=BindingContext.Template.LayoutTemplate.ItemPadding}"
+                            HeightRequest="200"
+                            WidthRequest="180">
+
+                            <!-- Compact columns display for grid items -->
+                            <StackLayout
+                                Spacing="6"
+                                BindableLayout.ItemsSource="{Binding Source={RelativeSource AncestorType={x:Type ContentView}}, Path=BindingContext.ProcessedData.VisibleColumns}">
+
+                                <BindableLayout.ItemTemplate>
+                                    <DataTemplate x:DataType="models:TemplateColumn">
+                                        <StackLayout IsVisible="{Binding IsVisible}">
+
+                                            <!-- Column Value (Compact) -->
+                                            <Label
+                                                Text="{Binding Source={RelativeSource AncestorType={x:Type Grid}, AncestorLevel=2}, Path=BindingContext, Converter={StaticResource TemplateColumnConverter}, ConverterParameter={Binding .}}"
+                                                TextColor="{Binding Source={RelativeSource AncestorType={x:Type Grid}, AncestorLevel=2}, Path=BindingContext, Converter={StaticResource TemplateColumnColorConverter}, ConverterParameter={Binding .}}"
+                                                FontAttributes="{Binding Source={RelativeSource AncestorType={x:Type Grid}, AncestorLevel=2}, Path=BindingContext, Converter={StaticResource TemplateColumnFontWeightConverter}, ConverterParameter={Binding .}}"
+                                                FontSize="13"
+                                                HorizontalTextAlignment="Center"
+                                                LineBreakMode="TailTruncation"
+                                                MaxLines="2" />
+
+                                        </StackLayout>
+                                    </DataTemplate>
+                                </BindableLayout.ItemTemplate>
+                            </StackLayout>
+
+                        </Frame>
+                    </Grid>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
+
+        <!-- Compact Layout -->
+        <CollectionView
+            x:Name="CompactView"
+            ItemsSource="{Binding ProcessedData.Items}"
+            SelectionMode="None"
+            BackgroundColor="Transparent"
+            IsVisible="{Binding LayoutType, Converter={StaticResource StringEqualsConverter}, ConverterParameter='Compact'}">
+
+            <CollectionView.ItemTemplate>
+                <DataTemplate x:DataType="services:ProcessedDataItem">
+                    <Grid Padding="15,8" BackgroundColor="{Binding Source={RelativeSource AncestorType={x:Type ContentView}}, Path=BindingContext.Template.BackgroundColor}">
+
+                        <!-- Horizontal layout for compact display -->
+                        <StackLayout
+                            Orientation="Horizontal"
+                            Spacing="15"
+                            BindableLayout.ItemsSource="{Binding Source={RelativeSource AncestorType={x:Type ContentView}}, Path=BindingContext.ProcessedData.VisibleColumns}">
+
+                            <BindableLayout.ItemTemplate>
+                                <DataTemplate x:DataType="models:TemplateColumn">
+                                    <Label
+                                        Text="{Binding Source={RelativeSource AncestorType={x:Type Grid}}, Path=BindingContext, Converter={StaticResource TemplateColumnConverter}, ConverterParameter={Binding .}}"
+                                        TextColor="{Binding Source={RelativeSource AncestorType={x:Type Grid}}, Path=BindingContext, Converter={StaticResource TemplateColumnColorConverter}, ConverterParameter={Binding .}}"
+                                        FontAttributes="{Binding Source={RelativeSource AncestorType={x:Type Grid}}, Path=BindingContext, Converter={StaticResource TemplateColumnFontWeightConverter}, ConverterParameter={Binding .}}"
+                                        FontSize="14"
+                                        VerticalOptions="Center"
+                                        LineBreakMode="TailTruncation"
+                                        HorizontalOptions="Start"
+                                        IsVisible="{Binding IsVisible}" />
+                                </DataTemplate>
+                            </BindableLayout.ItemTemplate>
+                        </StackLayout>
+
+                        <!-- Separator line -->
+                        <BoxView
+                            Color="{Binding Source={RelativeSource AncestorType={x:Type ContentView}}, Path=BindingContext.Template.ColorScheme.BorderColor}"
+                            HeightRequest="1"
+                            HorizontalOptions="FillAndExpand"
+                            VerticalOptions="End" />
+
+                    </Grid>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
+
+    </Grid>
+</ContentView>

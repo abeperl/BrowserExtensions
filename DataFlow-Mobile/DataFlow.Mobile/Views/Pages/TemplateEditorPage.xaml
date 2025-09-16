@@ -1,0 +1,340 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="DataFlow.Mobile.Views.Pages.TemplateEditorPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:viewmodels="clr-namespace:DataFlow.Mobile.ViewModels"
+    xmlns:models="clr-namespace:DataFlow.Mobile.Models"
+    xmlns:controls="clr-namespace:DataFlow.Mobile.Views.Controls"
+    x:DataType="viewmodels:TemplateEditorViewModel"
+    Title="Template Editor">
+
+    <ContentPage.ToolbarItems>
+        <ToolbarItem
+            Text="Save"
+            IconImageSource="save.png"
+            Command="{Binding SaveTemplateCommand}" />
+        <ToolbarItem
+            Text="Preview"
+            IconImageSource="preview.png"
+            Command="{Binding TogglePreviewModeCommand}" />
+    </ContentPage.ToolbarItems>
+
+    <Grid RowDefinitions="Auto,*">
+
+        <!-- Header with Template Info -->
+        <Grid Grid.Row="0" BackgroundColor="{StaticResource Primary}" Padding="20,15">
+            <Grid ColumnDefinitions="*,Auto">
+                <StackLayout Grid.Column="0">
+                    <Label
+                        Text="{Binding CurrentTemplate.Name}"
+                        FontSize="20"
+                        FontAttributes="Bold"
+                        TextColor="White" />
+                    <Label
+                        Text="{Binding CurrentTemplate.Description}"
+                        FontSize="14"
+                        TextColor="LightGray"
+                        IsVisible="{Binding CurrentTemplate.Description, Converter={StaticResource StringToBoolConverter}}" />
+                </StackLayout>
+                <StackLayout Grid.Column="1" Spacing="5">
+                    <Label
+                        Text="{Binding ColumnSummary.VisibleColumns, StringFormat='{0} visible'}"
+                        FontSize="12"
+                        TextColor="White"
+                        HorizontalOptions="End" />
+                    <Label
+                        Text="{Binding ColumnSummary.TotalColumns, StringFormat='{0} total'}"
+                        FontSize="12"
+                        TextColor="LightGray"
+                        HorizontalOptions="End" />
+                </StackLayout>
+            </Grid>
+        </Grid>
+
+        <!-- Main Content -->
+        <Grid Grid.Row="1">
+
+            <!-- Editor Mode -->
+            <ScrollView IsVisible="{Binding IsPreviewMode, Converter={StaticResource InvertedBoolConverter}}">
+                <StackLayout Spacing="0">
+
+                    <!-- Quick Actions -->
+                    <StackLayout Padding="20,15" BackgroundColor="{StaticResource Gray100}">
+                        <Label
+                            Text="Quick Actions"
+                            FontSize="16"
+                            FontAttributes="Bold"
+                            TextColor="{StaticResource Gray700}"
+                            Margin="0,0,0,10" />
+
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+                            <Button
+                                Grid.Column="0"
+                                Text="➕ Add Column"
+                                FontSize="14"
+                                BackgroundColor="{StaticResource Primary}"
+                                TextColor="White"
+                                CornerRadius="25"
+                                Command="{Binding AddColumnCommand}" />
+
+                            <Button
+                                Grid.Column="1"
+                                Text="🔄 Auto-Generate"
+                                FontSize="14"
+                                BackgroundColor="{StaticResource Secondary}"
+                                TextColor="White"
+                                CornerRadius="25"
+                                Command="{Binding AutoGenerateColumnsCommand}" />
+                        </Grid>
+                    </StackLayout>
+
+                    <!-- Template Settings -->
+                    <StackLayout Padding="20">
+                        <Label
+                            Text="Template Settings"
+                            FontSize="16"
+                            FontAttributes="Bold"
+                            TextColor="{StaticResource Gray700}"
+                            Margin="0,0,0,15" />
+
+                        <!-- Color Scheme Selection -->
+                        <Grid RowDefinitions="Auto,Auto" RowSpacing="8" Margin="0,0,0,15">
+                            <Label
+                                Grid.Row="0"
+                                Text="Color Scheme"
+                                FontSize="14"
+                                FontAttributes="Bold"
+                                TextColor="{StaticResource Gray600}" />
+                            <Picker
+                                Grid.Row="1"
+                                ItemsSource="{Binding AvailableColorSchemes}"
+                                ItemDisplayBinding="{Binding Name}"
+                                SelectedItem="{Binding CurrentTemplate.ColorScheme}"
+                                BackgroundColor="White" />
+                        </Grid>
+
+                        <!-- Layout Template Selection -->
+                        <Grid RowDefinitions="Auto,Auto" RowSpacing="8" Margin="0,0,0,15">
+                            <Label
+                                Grid.Row="0"
+                                Text="Layout Template"
+                                FontSize="14"
+                                FontAttributes="Bold"
+                                TextColor="{StaticResource Gray600}" />
+                            <Picker
+                                Grid.Row="1"
+                                ItemsSource="{Binding AvailableLayoutTemplates}"
+                                ItemDisplayBinding="{Binding Name}"
+                                SelectedItem="{Binding CurrentTemplate.LayoutTemplate}"
+                                BackgroundColor="White" />
+                        </Grid>
+                    </StackLayout>
+
+                    <!-- Columns Management -->
+                    <StackLayout Padding="20,0,20,20">
+                        <Label
+                            Text="Columns"
+                            FontSize="16"
+                            FontAttributes="Bold"
+                            TextColor="{StaticResource Gray700}"
+                            Margin="0,0,0,15" />
+
+                        <CollectionView
+                            ItemsSource="{Binding Columns}"
+                            SelectionMode="None"
+                            BackgroundColor="Transparent">
+
+                            <CollectionView.EmptyView>
+                                <StackLayout
+                                    VerticalOptions="Center"
+                                    HorizontalOptions="Center"
+                                    Spacing="15"
+                                    Padding="40">
+
+                                    <Label
+                                        Text="📋"
+                                        FontSize="48"
+                                        HorizontalOptions="Center" />
+
+                                    <Label
+                                        Text="No columns configured"
+                                        FontSize="16"
+                                        FontAttributes="Bold"
+                                        HorizontalOptions="Center"
+                                        TextColor="{StaticResource Gray600}" />
+
+                                    <Button
+                                        Text="Add First Column"
+                                        Command="{Binding AddColumnCommand}"
+                                        BackgroundColor="{StaticResource Primary}"
+                                        TextColor="White"
+                                        CornerRadius="25" />
+
+                                </StackLayout>
+                            </CollectionView.EmptyView>
+
+                            <CollectionView.ItemTemplate>
+                                <DataTemplate x:DataType="models:TemplateColumn">
+                                    <Grid>
+                                        <Frame
+                                            BackgroundColor="White"
+                                            HasShadow="True"
+                                            CornerRadius="12"
+                                            Margin="0,5"
+                                            Padding="15">
+
+                                            <Grid RowDefinitions="Auto,Auto,Auto">
+
+                                                <!-- Column Header -->
+                                                <Grid Grid.Row="0" ColumnDefinitions="*,Auto,Auto">
+                                                    <StackLayout Grid.Column="0">
+                                                        <Label
+                                                            Text="{Binding DisplayName}"
+                                                            FontSize="16"
+                                                            FontAttributes="Bold"
+                                                            TextColor="{StaticResource Primary}" />
+                                                        <Label
+                                                            Text="{Binding PropertyName}"
+                                                            FontSize="12"
+                                                            TextColor="{StaticResource Gray500}" />
+                                                    </StackLayout>
+
+                                                    <!-- Visibility Toggle -->
+                                                    <Switch
+                                                        Grid.Column="1"
+                                                        IsToggled="{Binding IsVisible}"
+                                                        OnColor="{StaticResource Primary}"
+                                                        VerticalOptions="Center"
+                                                        Margin="10,0"
+                                                        Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:TemplateEditorViewModel}}, Path=ToggleColumnVisibilityCommand}"
+                                                        CommandParameter="{Binding .}" />
+
+                                                    <!-- More Actions -->
+                                                    <Button
+                                                        Grid.Column="2"
+                                                        Text="⋮"
+                                                        FontSize="18"
+                                                        BackgroundColor="Transparent"
+                                                        TextColor="{StaticResource Gray600}"
+                                                        Padding="10"
+                                                        VerticalOptions="Center" />
+                                                </Grid>
+
+                                                <!-- Column Properties -->
+                                                <Grid Grid.Row="1" ColumnDefinitions="*,*,*" ColumnSpacing="10" Margin="0,10,0,0">
+                                                    <StackLayout Grid.Column="0">
+                                                        <Label Text="Data Type" FontSize="12" TextColor="{StaticResource Gray600}" />
+                                                        <Label Text="{Binding DataType}" FontSize="14" TextColor="{StaticResource Gray800}" />
+                                                    </StackLayout>
+                                                    <StackLayout Grid.Column="1">
+                                                        <Label Text="Width" FontSize="12" TextColor="{StaticResource Gray600}" />
+                                                        <Label Text="{Binding Width}" FontSize="14" TextColor="{StaticResource Gray800}" />
+                                                    </StackLayout>
+                                                    <StackLayout Grid.Column="2">
+                                                        <Label Text="Alignment" FontSize="12" TextColor="{StaticResource Gray600}" />
+                                                        <Label Text="{Binding TextAlignment}" FontSize="14" TextColor="{StaticResource Gray800}" />
+                                                    </StackLayout>
+                                                </Grid>
+
+                                                <!-- Column Actions -->
+                                                <StackLayout
+                                                    Grid.Row="2"
+                                                    Orientation="Horizontal"
+                                                    Spacing="10"
+                                                    HorizontalOptions="End"
+                                                    Margin="0,15,0,0">
+
+                                                    <Button
+                                                        Text="↑"
+                                                        FontSize="16"
+                                                        BackgroundColor="{StaticResource Tertiary}"
+                                                        TextColor="White"
+                                                        CornerRadius="15"
+                                                        Padding="10,5"
+                                                        Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:TemplateEditorViewModel}}, Path=MoveColumnUpCommand}"
+                                                        CommandParameter="{Binding .}" />
+
+                                                    <Button
+                                                        Text="↓"
+                                                        FontSize="16"
+                                                        BackgroundColor="{StaticResource Tertiary}"
+                                                        TextColor="White"
+                                                        CornerRadius="15"
+                                                        Padding="10,5"
+                                                        Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:TemplateEditorViewModel}}, Path=MoveColumnDownCommand}"
+                                                        CommandParameter="{Binding .}" />
+
+                                                    <Button
+                                                        Text="✏️"
+                                                        FontSize="14"
+                                                        BackgroundColor="{StaticResource Secondary}"
+                                                        TextColor="White"
+                                                        CornerRadius="15"
+                                                        Padding="10,5" />
+
+                                                    <Button
+                                                        Text="🗑️"
+                                                        FontSize="14"
+                                                        BackgroundColor="Red"
+                                                        TextColor="White"
+                                                        CornerRadius="15"
+                                                        Padding="10,5"
+                                                        Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:TemplateEditorViewModel}}, Path=DeleteColumnCommand}"
+                                                        CommandParameter="{Binding .}" />
+
+                                                </StackLayout>
+
+                                            </Grid>
+                                        </Frame>
+                                    </Grid>
+                                </DataTemplate>
+                            </CollectionView.ItemTemplate>
+                        </CollectionView>
+                    </StackLayout>
+
+                </StackLayout>
+            </ScrollView>
+
+            <!-- Preview Mode -->
+            <ScrollView IsVisible="{Binding IsPreviewMode}">
+                <StackLayout Spacing="0">
+
+                    <!-- Preview Header -->
+                    <StackLayout Padding="20,15" BackgroundColor="{StaticResource Gray100}">
+                        <Label
+                            Text="Template Preview"
+                            FontSize="18"
+                            FontAttributes="Bold"
+                            TextColor="{StaticResource Gray700}"
+                            HorizontalOptions="Center" />
+                        <Label
+                            Text="Preview shows how your template will look with sample data"
+                            FontSize="12"
+                            TextColor="{StaticResource Gray500}"
+                            HorizontalOptions="Center"
+                            HorizontalTextAlignment="Center" />
+                    </StackLayout>
+
+                    <!-- Preview Content -->
+                    <controls:DynamicTemplateView
+                        ProcessedData="{Binding PreviewData}"
+                        Template="{Binding CurrentTemplate}"
+                        LayoutType="{Binding CurrentTemplate.LayoutTemplate.LayoutType}"
+                        Margin="0,10" />
+
+                </StackLayout>
+            </ScrollView>
+
+            <!-- Loading Indicator -->
+            <ActivityIndicator
+                IsVisible="{Binding IsLoading}"
+                IsRunning="{Binding IsLoading}"
+                Color="{StaticResource Primary}"
+                VerticalOptions="Center"
+                HorizontalOptions="Center" />
+
+        </Grid>
+
+    </Grid>
+</ContentPage>

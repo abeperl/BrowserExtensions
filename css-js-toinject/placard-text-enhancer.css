@@ -1,0 +1,52 @@
+/* Placard Text Enhancement - Double size and bold for specific elements */
+
+/* Override top info section text with higher specificity */
+.box-label-wrp .top-info-section .text {
+    font-size: 60px !important; /* Double the original 30px */
+    font-weight: bold !important;
+}
+
+/* Override ship info section text */
+.box-label-wrp .ship-info-section .text {
+    font-size: 60px !important; /* Double the original 30px */
+    font-weight: bold !important;
+}
+
+/* Override small text elements */
+.box-label-wrp .ship-info-section .text.sm-text {
+    font-size: 50px !important; /* Double the original 25px */
+    font-weight: bold !important;
+}
+
+/* Override order reference text */
+.box-label-wrp .order-ref .order-ref-text {
+    font-size: 56px !important; /* Double the original 28px */
+    font-weight: bold !important;
+}
+
+/* Override carton count */
+.box-label-wrp .carton-count {
+    font-size: 80px !important; /* Double the original 40px */
+    font-weight: bold !important;
+}
+
+/* Alternative approach using attribute selectors for inline styles */
+div[style*="font-size: 30px"] {
+    font-size: 60px !important;
+    font-weight: bold !important;
+}
+
+div[style*="font-size: 25px"] {
+    font-size: 50px !important;
+    font-weight: bold !important;
+}
+
+div[style*="font-size: 40px"] {
+    font-size: 80px !important;
+    font-weight: bold !important;
+}
+
+div[style*="font-size:28px"] {
+    font-size: 56px !important;
+    font-weight: bold !important;
+}
