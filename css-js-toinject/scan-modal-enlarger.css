@@ -1,0 +1,192 @@
+/* scan-modal-enlarger.css
+ * Enlarges the scan product modal overlay and input boxes
+ * For: https://mj.3plnext.com/#outbound/ProcessPersonalizedOrderItems
+ */
+
+/* Make the modal much bigger */
+#scan-product-modal.modal-small {
+  width: 90vw !important;
+  max-width: 1200px !important;
+  min-height: 60vh !important;
+}
+
+/* Enlarge the modal container */
+#_modal_block_ui .panel-box.modal-box {
+  transform: scale(1) !important;
+}
+
+/* Make modal header bigger */
+#scan-product-modal .modal-head {
+  padding: 30px 40px !important;
+  min-height: 80px !important;
+}
+
+#scan-product-modal .modal-head h4 {
+  font-size: 32px !important;
+  font-weight: 600 !important;
+  margin: 0 !important;
+}
+
+#scan-product-modal .modal-head .close-icon-btn {
+  width: 50px !important;
+  height: 50px !important;
+  font-size: 32px !important;
+  line-height: 1 !important;
+}
+
+/* Make modal body bigger with more padding */
+#scan-product-modal .page-body {
+  padding: 40px 50px !important;
+  min-height: 400px !important;
+}
+
+/* Enlarge form groups */
+#scan-product-modal .form-group {
+  margin-bottom: 40px !important;
+}
+
+/* Make labels much bigger */
+#scan-product-modal .form-group label {
+  font-size: 24px !important;
+  font-weight: 600 !important;
+  margin-bottom: 15px !important;
+  display: block !important;
+  color: #333 !important;
+}
+
+/* Make input boxes MUCH bigger */
+#scan-product-modal .form-control,
+#scan-product-modal #product-scan,
+#scan-product-modal #status-scan {
+  height: 80px !important;
+  font-size: 28px !important;
+  padding: 20px 25px !important;
+  border: 3px solid #ccc !important;
+  border-radius: 8px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  font-weight: 500 !important;
+}
+
+/* Input focus state */
+#scan-product-modal .form-control:focus,
+#scan-product-modal #product-scan:focus,
+#scan-product-modal #status-scan:focus {
+  border-color: #007bff !important;
+  outline: none !important;
+  box-shadow: 0 0 0 4px rgba(0, 123, 255, 0.25) !important;
+}
+
+/* Make footer bigger */
+#scan-product-modal .page-foot {
+  padding: 30px 40px !important;
+  min-height: 100px !important;
+}
+
+/* Make buttons much bigger */
+#scan-product-modal .modal-box-controls {
+  display: flex !important;
+  gap: 20px !important;
+  justify-content: center !important;
+}
+
+#scan-product-modal .modal-box-button {
+  height: 70px !important;
+  min-width: 180px !important;
+  font-size: 24px !important;
+  padding: 20px 40px !important;
+  border-radius: 8px !important;
+  font-weight: 600 !important;
+  cursor: pointer !important;
+  transition: all 0.2s !important;
+}
+
+#scan-product-modal .modal-box-button:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+}
+
+#scan-product-modal .modal-box-button:active {
+  transform: translateY(0) !important;
+}
+
+/* Center modal backdrop using flexbox */
+#_modal_block_ui.loader_block_ui {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  background: rgba(0, 0, 0, 0.6) !important;
+  backdrop-filter: blur(4px) !important;
+  z-index: 9999 !important;
+}
+
+/* Center modal - reset any existing positioning */
+#_modal_block_ui .panel-box,
+#scan-product-modal {
+  position: relative !important;
+  top: auto !important;
+  left: auto !important;
+  right: auto !important;
+  bottom: auto !important;
+  transform: none !important;
+  margin: auto !important;
+}
+
+/* Add visual feedback for inputs */
+#scan-product-modal #product-scan {
+  background-color: #f0f8ff !important;
+}
+
+#scan-product-modal #status-scan {
+  background-color: #fff5f0 !important;
+}
+
+/* Responsive adjustments for smaller screens */
+@media (max-width: 1024px) {
+  #scan-product-modal.modal-small {
+    width: 95vw !important;
+  }
+
+  #scan-product-modal .form-control,
+  #scan-product-modal #product-scan,
+  #scan-product-modal #status-scan {
+    height: 70px !important;
+    font-size: 24px !important;
+  }
+
+  #scan-product-modal .form-group label {
+    font-size: 20px !important;
+  }
+
+  #scan-product-modal .modal-box-button {
+    height: 60px !important;
+    min-width: 150px !important;
+    font-size: 20px !important;
+  }
+}
+
+/* Extra emphasis on active/focused input */
+#scan-product-modal .form-control:focus::placeholder {
+  opacity: 0.5 !important;
+}
+
+/* Add subtle animation when modal appears */
+#scan-product-modal {
+  animation: modalGrowIn 0.3s ease-out !important;
+}
+
+@keyframes modalGrowIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
