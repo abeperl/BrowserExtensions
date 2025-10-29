@@ -20,7 +20,8 @@ public class LayoutTemplateService : ILayoutTemplateService
         try
         {
             var repository = _unitOfWork.GetRepository<LayoutTemplate>();
-            return await repository.GetAllAsync(orderBy: q => q.OrderBy(lt => lt.IsBuiltIn ? 0 : 1).ThenBy(lt => lt.Name));
+            var allTemplates = await repository.GetAllAsync();
+            return allTemplates.OrderBy(lt => lt.IsBuiltIn ? 0 : 1).ThenBy(lt => lt.Name).ToList();
         }
         catch (Exception ex)
         {
@@ -48,7 +49,8 @@ public class LayoutTemplateService : ILayoutTemplateService
         try
         {
             var repository = _unitOfWork.GetRepository<LayoutTemplate>();
-            return await repository.GetAsync(lt => lt.IsBuiltIn, orderBy: q => q.OrderBy(lt => lt.Name));
+            var builtInTemplates = await repository.FindAsync(lt => lt.IsBuiltIn);
+            return builtInTemplates.OrderBy(lt => lt.Name).ToList();
         }
         catch (Exception ex)
         {
@@ -62,9 +64,9 @@ public class LayoutTemplateService : ILayoutTemplateService
         try
         {
             var repository = _unitOfWork.GetRepository<LayoutTemplate>();
-            return await repository.GetAsync(
-                lt => lt.LayoutType.ToLower() == layoutType.ToLower(),
-                orderBy: q => q.OrderBy(lt => lt.IsBuiltIn ? 0 : 1).ThenBy(lt => lt.Name));
+            var templates = await repository.FindAsync(
+                lt => lt.LayoutType.ToLower() == layoutType.ToLower());
+            return templates.OrderBy(lt => lt.IsBuiltIn ? 0 : 1).ThenBy(lt => lt.Name).ToList();
         }
         catch (Exception ex)
         {

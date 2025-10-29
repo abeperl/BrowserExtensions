@@ -134,7 +134,7 @@
                     </CollectionView.EmptyView>
 
                     <CollectionView.ItemTemplate>
-                        <DataTemplate x:DataType="models:Page">
+                        <DataTemplate x:DataType="models:DataPage">
                             <Grid>
                                 <Frame
                                     BackgroundColor="White"

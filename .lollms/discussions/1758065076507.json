@@ -1,0 +1,23 @@
+{
+  "id": "1758065076507",
+  "title": "New Discussion",
+  "messages": [
+    {
+      "role": "system",
+      "content": "🤖 **Agent Mode Activated.** Using model: `ollama/mistral`. Please provide your goal.",
+      "id": "1758065083599jn27cln24ns"
+    },
+    {
+      "role": "system",
+      "content": "🎯 **Objective:** tell me a programming joke\n\n🧠 Thinking... Generating a plan.",
+      "id": "1758065511130lxgmlbmve4"
+    },
+    {
+      "role": "system",
+      "content": "❌ **Critical Error during planning:** request to http://localhost:9642/v1/chat/completions failed, reason: ",
+      "id": "1758065512295h0xmhpr3v9a"
+    }
+  ],
+  "timestamp": 1758065512295,
+  "groupId": null
+}

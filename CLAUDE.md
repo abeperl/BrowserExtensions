@@ -109,9 +109,17 @@ BrowserExtensions/
 │   ├── templates/             # Sample Word templates
 │   ├── build-packages.ps1     # Build script for distribution
 │   └── *.md                   # Documentation files
-└── scan-overlay-extension/    # Complete browser extension
-    ├── audio/                 # Sound effects
-    └── *.js, *.html, *.css   # Extension files
+├── scan-overlay-extension/    # Complete browser extension
+│   ├── audio/                 # Sound effects
+│   └── *.js, *.html, *.css   # Extension files
+└── css-js-toinject/           # Injectable scripts for website enhancement
+    ├── router.js              # Main routing logic
+    ├── auto-print-buttons.js  # Auto print buttons feature
+    ├── overlay-manager.js     # Overlay system
+    ├── status-dropdown.js     # Status dropdown controls
+    ├── table-item-linker.js   # SKU/Qty clickable items
+    ├── item-line-id.js        # Item line ID column
+    └── *.md                   # Feature documentation
 ```
 
 ## Key Technologies
@@ -149,3 +157,47 @@ BrowserExtensions/
 - Test overlay rendering on various websites
 - Verify audio feedback functionality
 - Check accessibility features with screen readers
+
+### CSS-JS-ToInject Scripts
+
+Injectable scripts for enhancing the 3PL website:
+
+#### Auto Print Buttons Feature (`#outbound/packing`)
+- Monitors "Create Shipment" button clicks
+- Automatically combines "Print Carton Label" + "Packing Slip" buttons
+- Prints **Carton Label first** (async API), waits for completion
+- Then prints **Packing Slip second** (prevents window overlap)
+- Auto-clicks ONLY when "Create Shipment" button was pressed
+- See `AUTO-PRINT-BUTTONS-README.md` and `SEQUENTIAL-PRINTING-EXPLANATION.md` for details
+
+**Testing:**
+```javascript
+// Disable auto-click
+window.autoPrintButtons.setAutoClick(false);
+
+// Manual trigger
+window.autoPrintButtons.printAll();
+
+// View configuration
+window.autoPrintButtons.config
+```
+
+#### Status Dropdown (`#outbound/ProcessPersonalizedOrderItems`)
+- Adds status dropdown to page tools
+- Auto-fills status-scan input field
+- Enlarges scan modal for better visibility
+
+#### Item Line ID Column (`#outbound/ProcessPersonalizedOrderItems`)
+- Adds Item Line ID column to order items table
+- Auto-populates from API responses
+- Watches for table changes via MutationObserver
+
+#### Packing Slip Column (`#outbound/shipment`)
+- Adds "Packing Slip" link column to shipment table
+- Links to `#outbound/packingSlipdetail?id=<shipmentId>`
+- Updates dynamically as table loads
+
+#### Placard Text Enhancement (`#Outbound/shipmentdetails`)
+- Doubles text sizes on shipping placards
+- Makes all text bold for better readability
+- Works in iframes and main document

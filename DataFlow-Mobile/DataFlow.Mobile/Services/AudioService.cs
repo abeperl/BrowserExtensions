@@ -126,8 +126,11 @@ public class AudioService : IAudioService
     {
         try
         {
-            _volume = await _settingsService.GetSettingAsync<double>("AudioVolume", 0.8);
-            _isMuted = await _settingsService.GetSettingAsync<bool>("AudioMuted", false);
+            var volumeSetting = await _settingsService.GetSettingAsync<double?>("AudioVolume");
+            _volume = volumeSetting ?? 0.8;
+
+            var mutedSetting = await _settingsService.GetSettingAsync<bool?>("AudioMuted");
+            _isMuted = mutedSetting ?? false;
             _logger.LogInformation("AudioService initialized - Volume: {Volume}, Muted: {IsMuted}", _volume, _isMuted);
         }
         catch (Exception ex)

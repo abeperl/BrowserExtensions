@@ -142,12 +142,11 @@ public partial class AdvancedTemplateDesignerViewModel : ObservableObject
         var newColumn = new TemplateColumn
         {
             Id = DesignerColumns.Count + 1,
-            Name = "New Column",
             DisplayName = "New Column",
             DataType = "Text",
             IsVisible = true,
-            Order = DesignerColumns.Count,
-            Width = 100,
+            SortOrder = DesignerColumns.Count,
+            Width = "100",
             TextAlignment = "Left",
             TemplateId = CurrentTemplate.Id
         };
@@ -175,14 +174,13 @@ public partial class AdvancedTemplateDesignerViewModel : ObservableObject
             var duplicated = new TemplateColumn
             {
                 Id = DesignerColumns.Count + 1,
-                Name = $"{column.Name}_Copy",
                 DisplayName = $"{column.DisplayName} Copy",
                 DataType = column.DataType,
-                Format = column.Format,
+                FormatString = column.FormatString,
                 IsVisible = column.IsVisible,
-                IsSortable = column.IsSortable,
-                IsFilterable = column.IsFilterable,
-                Order = DesignerColumns.Count,
+                AllowSorting = column.AllowSorting,
+                AllowFiltering = column.AllowFiltering,
+                SortOrder = DesignerColumns.Count,
                 Width = column.Width,
                 TextAlignment = column.TextAlignment,
                 TextColor = column.TextColor,
@@ -440,7 +438,7 @@ public partial class AdvancedTemplateDesignerViewModel : ObservableObject
     {
         for (int i = 0; i < DesignerColumns.Count; i++)
         {
-            DesignerColumns[i].Order = i;
+            DesignerColumns[i].SortOrder = i;
         }
         await UpdateTemplateColumnsAsync();
     }

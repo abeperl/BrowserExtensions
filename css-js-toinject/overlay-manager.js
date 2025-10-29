@@ -137,96 +137,105 @@ const OverlayManager = (() => {
   };
 })();
 
-// Add overlay styles
-if (!document.getElementById('cji-overlay-styles')) {
-  const style = document.createElement('style');
-  style.id = 'cji-overlay-styles';
-  style.textContent = `
-    .cji-overlay-container {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100vw;
-      height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: rgba(0, 0, 0, 0.5);
-      z-index: 999999;
-      animation: cji-fade-in 0.2s ease-in;
-    }
+// Add overlay styles when DOM is ready
+function injectOverlayStyles() {
+  if (!document.getElementById('cji-overlay-styles')) {
+    const style = document.createElement('style');
+    style.id = 'cji-overlay-styles';
+    style.textContent = `
+      .cji-overlay-container {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 999999;
+        animation: cji-fade-in 0.2s ease-in;
+      }
 
-    .cji-overlay {
-      background: white;
-      border-radius: 12px;
-      padding: 40px;
-      min-width: 320px;
-      max-width: 500px;
-      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
-      animation: cji-scale-in 0.3s ease-out;
-    }
+      .cji-overlay {
+        background: white;
+        border-radius: 12px;
+        padding: 40px;
+        min-width: 320px;
+        max-width: 500px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+        animation: cji-scale-in 0.3s ease-out;
+      }
 
-    .cji-overlay-content {
-      text-align: center;
-    }
+      .cji-overlay-content {
+        text-align: center;
+      }
 
-    .cji-overlay-icon {
-      font-size: 64px;
-      margin-bottom: 16px;
-    }
+      .cji-overlay-icon {
+        font-size: 64px;
+        margin-bottom: 16px;
+      }
 
-    .cji-overlay-title {
-      font-size: 24px;
-      font-weight: bold;
-      margin-bottom: 12px;
-    }
+      .cji-overlay-title {
+        font-size: 24px;
+        font-weight: bold;
+        margin-bottom: 12px;
+      }
 
-    .cji-overlay-message {
-      font-size: 16px;
-      color: #666;
-    }
+      .cji-overlay-message {
+        font-size: 16px;
+        color: #666;
+      }
 
-    .cji-overlay-success {
-      border-top: 4px solid #28a745;
-    }
+      .cji-overlay-success {
+        border-top: 4px solid #28a745;
+      }
 
-    .cji-overlay-success .cji-overlay-icon {
-      color: #28a745;
-    }
+      .cji-overlay-success .cji-overlay-icon {
+        color: #28a745;
+      }
 
-    .cji-overlay-error {
-      border-top: 4px solid #dc3545;
-    }
+      .cji-overlay-error {
+        border-top: 4px solid #dc3545;
+      }
 
-    .cji-overlay-error .cji-overlay-icon {
-      color: #dc3545;
-    }
+      .cji-overlay-error .cji-overlay-icon {
+        color: #dc3545;
+      }
 
-    .cji-overlay-warning {
-      border-top: 4px solid #ffc107;
-    }
+      .cji-overlay-warning {
+        border-top: 4px solid #ffc107;
+      }
 
-    .cji-overlay-warning .cji-overlay-icon {
-      color: #ffc107;
-    }
+      .cji-overlay-warning .cji-overlay-icon {
+        color: #ffc107;
+      }
 
-    .cji-overlay-info {
-      border-top: 4px solid #17a2b8;
-    }
+      .cji-overlay-info {
+        border-top: 4px solid #17a2b8;
+      }
 
-    .cji-overlay-info .cji-overlay-icon {
-      color: #17a2b8;
-    }
+      .cji-overlay-info .cji-overlay-icon {
+        color: #17a2b8;
+      }
 
-    @keyframes cji-fade-in {
-      from { opacity: 0; }
-      to { opacity: 1; }
-    }
+      @keyframes cji-fade-in {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
 
-    @keyframes cji-scale-in {
-      from { transform: scale(0.8); opacity: 0; }
-      to { transform: scale(1); opacity: 1; }
-    }
-  `;
-  document.head.appendChild(style);
+      @keyframes cji-scale-in {
+        from { transform: scale(0.8); opacity: 0; }
+        to { transform: scale(1); opacity: 1; }
+      }
+    `;
+    (document.head || document.documentElement).appendChild(style);
+  }
+}
+
+// Inject styles when DOM is ready
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', injectOverlayStyles);
+} else {
+  injectOverlayStyles();
 }

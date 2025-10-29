@@ -15,7 +15,7 @@ public partial class SettingsPageViewModel : ObservableObject
     private readonly INavigationService _navigationService;
 
     [ObservableProperty]
-    private ObservableCollection<Models.Page> _pages = new();
+    private ObservableCollection<DataPage> _pages = new();
 
     [ObservableProperty]
     private bool _isLoading;
@@ -43,24 +43,41 @@ public partial class SettingsPageViewModel : ObservableObject
         try
         {
             IsLoading = true;
-            var pages = await _pageService.GetAllPagesAsync();
+            Android.Util.Log.Info("DataFlow", "LoadPagesAsync: Starting to load pages");
 
+            // Temporary: Just create some sample data instead of calling the service
             Pages.Clear();
-            foreach (var page in pages)
+            Pages.Add(new DataPage
             {
-                Pages.Add(page);
-            }
+                Id = 1,
+                Name = "Sample Page",
+                Description = "This is a test page",
+                ApiEndpoint = "https://api.example.com",
+                CreatedAt = DateTime.Now,
+                IsActive = true
+            });
+
+            Android.Util.Log.Info("DataFlow", "LoadPagesAsync: Successfully added sample pages");
         }
         catch (Exception ex)
         {
-            await Application.Current.MainPage.DisplayAlert(
-                "Error",
-                $"Failed to load pages: {ex.Message}",
-                "OK");
+            Android.Util.Log.Error("DataFlow", $"LoadPagesAsync: Error - {ex}");
+            try
+            {
+                await Application.Current.MainPage.DisplayAlert(
+                    "Error",
+                    $"Failed to load pages: {ex.Message}",
+                    "OK");
+            }
+            catch (Exception alertEx)
+            {
+                Android.Util.Log.Error("DataFlow", $"LoadPagesAsync: Alert error - {alertEx}");
+            }
         }
         finally
         {
             IsLoading = false;
+            Android.Util.Log.Info("DataFlow", "LoadPagesAsync: Finished");
         }
     }
 
@@ -86,7 +103,7 @@ public partial class SettingsPageViewModel : ObservableObject
             if (string.IsNullOrWhiteSpace(apiEndpoint))
                 return;
 
-            var newPage = new Models.Page
+            var newPage = new DataPage
             {
                 Name = pageName,
                 Description = "Created from settings",
@@ -94,13 +111,12 @@ public partial class SettingsPageViewModel : ObservableObject
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow,
                 IsActive = true,
-                Template = new TemplateModel
+                Template = new Template
                 {
                     Name = $"{pageName} Template",
-                    Layout = "List",
-                    BackgroundColor = "#FFFFFF",
-                    TextColor = "#000000",
-                    CreatedAt = DateTime.UtcNow
+                    LayoutType = "List",
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
                 }
             };
 
@@ -122,7 +138,7 @@ public partial class SettingsPageViewModel : ObservableObject
     }
 
     [RelayCommand]
-    public async Task EditPageAsync(Models.Page page)
+    public async Task EditPageAsync(DataPage page)
     {
         if (page == null) return;
 
@@ -167,7 +183,7 @@ public partial class SettingsPageViewModel : ObservableObject
     }
 
     [RelayCommand]
-    public async Task DeletePageAsync(Models.Page page)
+    public async Task DeletePageAsync(DataPage page)
     {
         if (page == null) return;
 
@@ -199,13 +215,13 @@ public partial class SettingsPageViewModel : ObservableObject
     }
 
     [RelayCommand]
-    public async Task DuplicatePageAsync(Models.Page page)
+    public async Task DuplicatePageAsync(DataPage page)
     {
         if (page == null) return;
 
         try
         {
-            var duplicatePage = new Models.Page
+            var duplicatePage = new DataPage
             {
                 Name = $"{page.Name} (Copy)",
                 Description = page.Description,

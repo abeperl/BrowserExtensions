@@ -26,10 +26,8 @@ public class TemplateColumnService : ITemplateColumnService
         try
         {
             var repository = _unitOfWork.GetRepository<TemplateColumn>();
-            return await repository.GetAsync(
-                tc => tc.TemplateId == templateId,
-                orderBy: q => q.OrderBy(tc => tc.SortOrder).ThenBy(tc => tc.PropertyName)
-            );
+            var columns = await repository.FindAsync(tc => tc.TemplateId == templateId);
+            return columns.OrderBy(tc => tc.SortOrder).ThenBy(tc => tc.PropertyName).ToList();
         }
         catch (Exception ex)
         {
@@ -43,10 +41,8 @@ public class TemplateColumnService : ITemplateColumnService
         try
         {
             var repository = _unitOfWork.GetRepository<TemplateColumn>();
-            return await repository.GetAsync(
-                tc => tc.TemplateId == templateId && tc.IsVisible,
-                orderBy: q => q.OrderBy(tc => tc.SortOrder)
-            );
+            var visibleColumns = await repository.FindAsync(tc => tc.TemplateId == templateId && tc.IsVisible);
+            return visibleColumns.OrderBy(tc => tc.SortOrder).ToList();
         }
         catch (Exception ex)
         {
@@ -73,18 +69,18 @@ public class TemplateColumnService : ITemplateColumnService
     {
         try
         {
+            var repository = _unitOfWork.GetRepository<TemplateColumn>();
+
             // Auto-assign sort order if not specified
             if (column.SortOrder == 0)
             {
-                var repository = _unitOfWork.GetRepository<TemplateColumn>();
                 var existingColumns = await repository.GetAsync(tc => tc.TemplateId == column.TemplateId);
-                column.SortOrder = existingColumns.Count > 0 ? existingColumns.Max(tc => tc.SortOrder) + 1 : 1;
+                column.SortOrder = existingColumns.Count() > 0 ? existingColumns.Max(tc => tc.SortOrder) + 1 : 1;
             }
 
             column.CreatedAt = DateTime.UtcNow;
             column.UpdatedAt = DateTime.UtcNow;
 
-            var repository = _unitOfWork.GetRepository<TemplateColumn>();
             await repository.AddAsync(column);
             await _unitOfWork.SaveChangesAsync();
 
@@ -228,7 +224,7 @@ public class TemplateColumnService : ITemplateColumnService
 
             // Get the next sort order
             var existingColumns = await repository.GetAsync(tc => tc.TemplateId == originalColumn.TemplateId);
-            var nextSortOrder = existingColumns.Count > 0 ? existingColumns.Max(tc => tc.SortOrder) + 1 : 1;
+            var nextSortOrder = existingColumns.Count() > 0 ? existingColumns.Max(tc => tc.SortOrder) + 1 : 1;
 
             var duplicatedColumn = new TemplateColumn
             {
@@ -310,7 +306,7 @@ public class TemplateColumnService : ITemplateColumnService
 
             var summary = new TemplateColumnSummary
             {
-                TotalColumns = columns.Count,
+                TotalColumns = columns.Count(),
                 VisibleColumns = columns.Count(c => c.IsVisible),
                 HiddenColumns = columns.Count(c => !c.IsVisible),
                 AvailableDataTypes = ["String", "Number", "Date", "Boolean", "Currency", "Percentage"],
@@ -337,10 +333,10 @@ public class TemplateColumnService : ITemplateColumnService
         try
         {
             var repository = _unitOfWork.GetRepository<TemplateColumn>();
-            var remainingColumns = await repository.GetAsync(
+            var remainingColumns = (await repository.GetAsync<int>(
                 tc => tc.TemplateId == templateId,
                 orderBy: q => q.OrderBy(tc => tc.SortOrder)
-            );
+            )).ToList();
 
             for (int i = 0; i < remainingColumns.Count; i++)
             {

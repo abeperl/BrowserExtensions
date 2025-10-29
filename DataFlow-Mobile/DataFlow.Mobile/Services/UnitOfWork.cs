@@ -1,7 +1,6 @@
 using Microsoft.EntityFrameworkCore.Storage;
 using DataFlow.Mobile.Models;
 using DataFlow.Mobile.Services.Interfaces;
-using PageModel = DataFlow.Mobile.Models.Page;
 
 namespace DataFlow.Mobile.Services;
 
@@ -10,7 +9,7 @@ public class UnitOfWork : IUnitOfWork
     private readonly DataFlowDbContext _context;
     private IDbContextTransaction? _transaction;
 
-    private IGenericRepository<PageModel>? _pages;
+    private IGenericRepository<DataPage>? _pages;
     private IGenericRepository<Template>? _templates;
     private IGenericRepository<PageAction>? _actions;
     private IGenericRepository<AuthenticationConfig>? _authenticationConfigs;
@@ -22,8 +21,8 @@ public class UnitOfWork : IUnitOfWork
         _context = context;
     }
 
-    public IGenericRepository<PageModel> Pages =>
-        _pages ??= new GenericRepository<PageModel>(_context);
+    public IGenericRepository<DataPage> Pages =>
+        _pages ??= new GenericRepository<DataPage>(_context);
 
     public IGenericRepository<Template> Templates =>
         _templates ??= new GenericRepository<Template>(_context);
@@ -39,6 +38,11 @@ public class UnitOfWork : IUnitOfWork
 
     public IGenericRepository<AudioConfigModel> AudioConfigs =>
         _audioConfigs ??= new GenericRepository<AudioConfigModel>(_context);
+
+    public IGenericRepository<T> GetRepository<T>() where T : class
+    {
+        return new GenericRepository<T>(_context);
+    }
 
     public async Task<int> SaveChangesAsync()
     {

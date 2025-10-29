@@ -27,4 +27,6 @@ public interface IAuthenticationService
     Task<AuthenticationConfig?> GetAuthConfigAsync(int pageId);
     Task<bool> SaveAuthConfigAsync(AuthenticationConfig config);
     Task<bool> TestAuthenticationAsync(AuthenticationConfig config);
+    Task<AuthenticationConfig> CreateAuthenticationAsync(AuthenticationConfig config);
+    Task<AuthenticationConfig> UpdateAuthenticationAsync(AuthenticationConfig config);
 }

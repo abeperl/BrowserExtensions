@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using DataFlow.Mobile.Models;
 using Microsoft.Extensions.Logging;
-using PageModel = DataFlow.Mobile.Models.Page;
+using DataFlow.Mobile.Services.Interfaces;
 
 namespace DataFlow.Mobile.Services;
 
@@ -16,114 +16,109 @@ public class PageService : IPageService
         _logger = logger;
     }
 
-    public async Task<IEnumerable<PageModel>> GetAllPageModelsAsync()
+    public async Task<IEnumerable<DataPage>> GetAllPagesAsync(CancellationToken cancellationToken = default)
     {
         try
         {
-            return await _context.PageModels
+            return await _context.Pages
+                .AsNoTracking()
                 .Include(p => p.Template)
                 .Include(p => p.Actions)
                 .Where(p => p.IsActive)
                 .OrderBy(p => p.Name)
-                .ToListAsync();
+                .ToListAsync(cancellationToken);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error getting all pages");
-            return [];
+            return Enumerable.Empty<DataPage>();
         }
     }
 
-    public async Task<PageModel?> GetPageModelByIdAsync(int id)
+    public async Task<DataPage?> GetPageByIdAsync(int id, CancellationToken cancellationToken = default)
     {
         try
         {
-            return await _context.PageModels
+            return await _context.Pages
                 .Include(p => p.Template)
                 .Include(p => p.Actions)
-                .FirstOrDefaultAsync(p => p.Id == id && p.IsActive);
+                .FirstOrDefaultAsync(p => p.Id == id && p.IsActive, cancellationToken);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error getting page by ID: {PageModelId}", id);
+            _logger.LogError(ex, "Error getting page by ID: {PageId}", id);
             return null;
         }
     }
 
-    public async Task<PageModel> CreatePageModelAsync(PageModel page)
+    public async Task<DataPage> CreatePageAsync(DataPage page, CancellationToken cancellationToken = default)
     {
         try
         {
             page.CreatedAt = DateTime.UtcNow;
             page.UpdatedAt = DateTime.UtcNow;
-
-            _context.PageModels.Add(page);
-            await _context.SaveChangesAsync();
-
-            _logger.LogInformation("Created new page: {PageModelName} (ID: {PageModelId})", page.Name, page.Id);
+            _context.Pages.Add(page);
+            await _context.SaveChangesAsync(cancellationToken);
+            _logger.LogInformation("Created new page: {PageName} (ID: {PageId})", page.Name, page.Id);
             return page;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error creating page: {PageModelName}", page.Name);
+            _logger.LogError(ex, "Error creating page: {PageName}", page.Name);
             throw;
         }
     }
 
-    public async Task<PageModel> UpdatePageModelAsync(PageModel page)
+    public async Task<DataPage> UpdatePageAsync(DataPage page, CancellationToken cancellationToken = default)
     {
         try
         {
             page.UpdatedAt = DateTime.UtcNow;
             _context.Entry(page).State = EntityState.Modified;
-            await _context.SaveChangesAsync();
-
-            _logger.LogInformation("Updated page: {PageModelName} (ID: {PageModelId})", page.Name, page.Id);
+            await _context.SaveChangesAsync(cancellationToken);
+            _logger.LogInformation("Updated page: {PageName} (ID: {PageId})", page.Name, page.Id);
             return page;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error updating page: {PageModelId}", page.Id);
+            _logger.LogError(ex, "Error updating page: {PageId}", page.Id);
             throw;
         }
     }
 
-    public async Task<bool> DeletePageModelAsync(int id)
+    public async Task<bool> DeletePageAsync(int id, CancellationToken cancellationToken = default)
     {
         try
         {
-            var page = await _context.PageModels.FindAsync(id);
+            var page = await _context.Pages.FindAsync(new object?[] { id }, cancellationToken);
             if (page == null)
                 return false;
 
             page.IsActive = false;
             page.UpdatedAt = DateTime.UtcNow;
-            await _context.SaveChangesAsync();
-
-            _logger.LogInformation("Deleted page: {PageModelId}", id);
+            await _context.SaveChangesAsync(cancellationToken);
+            _logger.LogInformation("Deleted page: {PageId}", id);
             return true;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error deleting page: {PageModelId}", id);
+            _logger.LogError(ex, "Error deleting page: {PageId}", id);
             return false;
         }
     }
 
-    public async Task<IEnumerable<object>> FetchPageModelDataAsync(int pageId)
+    public async Task<IEnumerable<object>> FetchPageDataAsync(int pageId, CancellationToken cancellationToken = default)
     {
         try
         {
-            // This will be implemented with the ApiService
-            // For now, return empty list
-            await Task.Delay(1); // Placeholder
-            _logger.LogInformation("Fetching data for page: {PageModelId}", pageId);
-            return [];
+            await Task.CompletedTask; // to be implemented with ApiService
+            _logger.LogInformation("Fetching data for page: {PageId}", pageId);
+            return Enumerable.Empty<object>();
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error fetching data for page: {PageModelId}", pageId);
-            return [];
+            _logger.LogError(ex, "Error fetching data for page: {PageId}", pageId);
+            return Enumerable.Empty<object>();
         }
     }
 }

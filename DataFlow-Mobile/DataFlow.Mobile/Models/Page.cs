@@ -4,7 +4,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 namespace DataFlow.Mobile.Models;
 
 [Table("Pages")]
-public class Page
+public class DataPage
 {
     [Key]
     public int Id { get; set; }
@@ -19,6 +19,10 @@ public class Page
     [Required]
     [MaxLength(2000)]
     public string ApiEndpoint { get; set; } = string.Empty;
+
+    // Alias for backward compatibility
+    [NotMapped]
+    public string ApiUrl => ApiEndpoint;
 
     [Required]
     [MaxLength(20)]
@@ -61,4 +65,7 @@ public class Page
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
     public ICollection<PageAction> Actions { get; set; } = [];
+
+    // Navigation property for authentication configuration
+    public AuthenticationConfig? AuthConfig { get; set; }
 }

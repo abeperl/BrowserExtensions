@@ -152,6 +152,367 @@
                     subtree: true
                 });
 
+                // ========== STATUS DROPDOWN FEATURE ==========
+                if (typeof addStatusDropdown === 'function' &&
+                    typeof setupStatusAutoFill === 'function') {
+
+                    console.log('📋 Status dropdown feature enabled');
+
+                    // Add dropdown to page tools
+                    const pageToolsObserver = new MutationObserver((mutations, obs) => {
+                        const pageTools = document.querySelector('.page-tools');
+                        if (pageTools) {
+                            console.log('✅ .page-tools found, adding dropdown');
+                            addStatusDropdown();
+                            obs.disconnect();
+                        }
+                    });
+
+                    pageToolsObserver.observe(document.body, {
+                        childList: true,
+                        subtree: true
+                    });
+
+                    // Try immediately
+                    setTimeout(() => {
+                        const pageTools = document.querySelector('.page-tools');
+                        if (pageTools) {
+                            addStatusDropdown();
+                            pageToolsObserver.disconnect();
+                        }
+                    }, 500);
+
+                    // Setup auto-fill for status-scan input
+                    const statusInputObserver = new MutationObserver((mutations, obs) => {
+                        const statusInput = document.getElementById('status-scan');
+                        if (statusInput) {
+                            console.log('✅ status-scan input found, setting up auto-fill');
+                            setupStatusAutoFill();
+                            obs.disconnect();
+                        }
+                    });
+
+                    statusInputObserver.observe(document.body, {
+                        childList: true,
+                        subtree: true
+                    });
+
+                    // Try immediately
+                    setTimeout(() => {
+                        const statusInput = document.getElementById('status-scan');
+                        if (statusInput) {
+                            setupStatusAutoFill();
+                            statusInputObserver.disconnect();
+                        }
+                    }, 500);
+                } else {
+                    console.warn('⚠️ Status dropdown functions not loaded');
+                }
+
+                // ========== SNACKBAR INTERCEPTOR ==========
+                if (typeof OverlayManager !== 'undefined') {
+                    console.log('🎯 Snackbar interceptor feature enabled');
+
+                    // Intercept snackbar.show calls and replace with OverlayManager
+                    function interceptSnackbar() {
+                        if (typeof window.snackbar !== 'undefined' && window.snackbar.show) {
+                            console.log('✅ snackbar.show found, installing interceptor');
+
+                            // Store original in case we need fallback
+                            // const originalSnackbarShow = window.snackbar.show;
+
+                            window.snackbar.show = function(message, type) {
+                                console.log('📢 snackbar.show intercepted:', message, type);
+
+                                // Map snackbar types to OverlayManager types
+                                // cs-danger -> error, cs-success -> success, cs-warning -> warning, default -> info
+                                let overlayType = 'info';
+                                if (type === 'cs-danger' || type === 'danger') {
+                                    overlayType = 'error';
+                                } else if (type === 'cs-success' || type === 'success') {
+                                    overlayType = 'success';
+                                } else if (type === 'cs-warning' || type === 'warning') {
+                                    overlayType = 'warning';
+                                }
+
+                                // Show using OverlayManager instead
+                                OverlayManager[overlayType]({
+                                    message: message,
+                                    duration: 3000
+                                });
+
+                                console.log(`✅ Replaced snackbar with ${overlayType} overlay:`, message);
+
+                                // Don't call original snackbar
+                                // If you want to call original as fallback, uncomment:
+                                // return originalSnackbarShow.call(this, message, type);
+                            };
+
+                            console.log('✅ snackbar.show interceptor installed');
+                            return true;
+                        }
+                        return false;
+                    }
+
+                    // Try to intercept immediately
+                    if (!interceptSnackbar()) {
+                        // snackbar not ready yet, wait for it
+                        console.log('⏳ Waiting for snackbar to be available...');
+
+                        const checkSnackbarInterval = setInterval(() => {
+                            if (interceptSnackbar()) {
+                                clearInterval(checkSnackbarInterval);
+                            }
+                        }, 100);
+
+                        // Give up after 10 seconds
+                        setTimeout(() => {
+                            clearInterval(checkSnackbarInterval);
+                            if (typeof window.snackbar === 'undefined' || !window.snackbar.show) {
+                                console.warn('⚠️ snackbar not found after 10 seconds');
+                            }
+                        }, 10000);
+                    }
+                } else {
+                    console.warn('⚠️ OverlayManager not loaded - snackbar interception disabled');
+                }
+
+                // ========== API RESPONSE OVERLAY FEATURE ==========
+                if (typeof OverlayManager !== 'undefined') {
+                    console.log('🎯 API response overlay feature enabled');
+                    console.log('✅ OverlayManager available:', typeof OverlayManager);
+
+                    // Intercept tf.service.post (primary method used by the app)
+                    function interceptTfService() {
+                        if (typeof window.tf !== 'undefined' && window.tf.service && window.tf.service.post) {
+                            console.log('✅ tf.service.post found, installing interceptor');
+
+                            const originalPost = window.tf.service.post;
+
+                            window.tf.service.post = function(endpoint, data, callback, errorCallback) {
+                                console.log('📡 tf.service.post intercepted:', endpoint);
+
+                                // Check if this is the PersonalizedAndCustomizedOrders endpoint
+                                if (endpoint.includes('PersonalizedAndCustomizedOrders')) {
+                                    console.log('🎯🎯🎯 PersonalizedAndCustomizedOrders API MATCHED!');
+                                    console.log('Request data:', data);
+
+                                    // Wrap the callback to intercept response
+                                    const wrappedCallback = function(response) {
+                                        console.log('📦 API Response:', response);
+
+                                        const isSuccess = response.responseCode === 0 || response.responseCode === 200;
+
+                                        if (isSuccess) {
+                                            const statusCount = data.statuses?.length || 0;
+                                            const picklistCount = data.picklist?.length || 0;
+                                            const message = `Successfully processed ${statusCount} status update(s) and ${picklistCount} picklist item(s)`;
+
+                                            OverlayManager.success({
+                                                message: message,
+                                                duration: 3000
+                                            });
+                                            console.log('✅', message);
+                                        } else {
+                                            const errorMsg = response.responseMessage || response.message || 'Unknown error';
+                                            OverlayManager.error({
+                                                message: `Update failed: ${errorMsg}`,
+                                                duration: 4000
+                                            });
+                                            console.log('❌ Update failed:', errorMsg);
+                                        }
+
+                                        // Call original callback
+                                        if (callback) callback(response);
+                                    };
+
+                                    // Call original with wrapped callback
+                                    return originalPost.call(this, endpoint, data, wrappedCallback, errorCallback);
+                                }
+
+                                // Not the target endpoint, call original
+                                return originalPost.apply(this, arguments);
+                            };
+
+                            console.log('✅ tf.service.post interceptor installed');
+                            console.log('💡 Test overlay with: OverlayManager.success({message: "Test!", duration: 3000})');
+                            return true;
+                        }
+                        return false;
+                    }
+
+                    // Try to intercept immediately
+                    if (!interceptTfService()) {
+                        // tf.service not ready yet, wait for it
+                        console.log('⏳ Waiting for tf.service to be available...');
+
+                        const checkInterval = setInterval(() => {
+                            if (interceptTfService()) {
+                                clearInterval(checkInterval);
+                            }
+                        }, 100);
+
+                        // Give up after 10 seconds
+                        setTimeout(() => {
+                            clearInterval(checkInterval);
+                            if (typeof window.tf === 'undefined' || !window.tf.service) {
+                                console.warn('⚠️ tf.service not found after 10 seconds');
+                            }
+                        }, 10000);
+                    }
+
+                    // Also intercept fetch for PersonalizedAndCustomizedOrders API (fallback)
+                    const originalFetch = window.fetch;
+                    if (!window.fetch._apiOverlayIntercepted) {
+                        window.fetch = async function(...args) {
+                            const url = args[0];
+                            const options = args[1] || {};
+
+                            // Debug: Log all fetch calls
+                            console.log('🌐 Fetch intercepted:', url);
+
+                            // Check if this is the PersonalizedAndCustomizedOrders API
+                            const isTargetAPI = typeof url === 'string' &&
+                                url.includes('/api/Order/PersonalizedAndCustomizedOrders');
+
+                            if (isTargetAPI) {
+                                console.log('🎯🎯🎯 PersonalizedAndCustomizedOrders API MATCHED!');
+                                console.log('Request body:', options.body);
+
+                                try {
+                                    // Make the actual request
+                                    const response = await originalFetch.apply(this, args);
+
+                                    // Clone response so we can read it
+                                    const responseClone = response.clone();
+
+                                    // Read the response
+                                    const data = await responseClone.json();
+
+                                    console.log('📦 API Response:', data);
+
+                                    // Determine success/failure
+                                    const isSuccess = response.ok && response.status >= 200 && response.status < 300;
+
+                                    // Extract request data for display
+                                    let requestData = {};
+                                    try {
+                                        if (options.body) {
+                                            requestData = JSON.parse(options.body);
+                                        }
+                                    } catch (e) {
+                                        console.warn('Could not parse request body:', e);
+                                    }
+
+                                    // Build message based on response
+                                    let message = '';
+
+                                    if (isSuccess) {
+                                        // Count processed items
+                                        const statusCount = requestData.statuses?.length || 0;
+                                        const picklistCount = requestData.picklist?.length || 0;
+
+                                        message = `Successfully processed ${statusCount} status update(s) and ${picklistCount} picklist item(s)`;
+
+                                        // Show success overlay
+                                        OverlayManager.success({
+                                            message: message,
+                                            duration: 3000
+                                        });
+                                    } else {
+                                        // Error handling
+                                        const errorMsg = data.message || data.error || 'Unknown error';
+                                        message = `API Error: ${errorMsg}`;
+
+                                        // Show error overlay
+                                        OverlayManager.error({
+                                            message: message,
+                                            duration: 4000
+                                        });
+                                    }
+
+                                    // Log to popup controller for history
+                                    console.log(`${isSuccess ? '✅' : '❌'} ${message}`);
+
+                                    return response;
+                                } catch (error) {
+                                    console.error('❌ API Request failed:', error);
+
+                                    // Show error overlay
+                                    OverlayManager.error({
+                                        message: `Request failed: ${error.message}`,
+                                        duration: 4000
+                                    });
+
+                                    throw error;
+                                }
+                            }
+
+                            // Not the target API, proceed normally
+                            return originalFetch.apply(this, args);
+                        };
+                        window.fetch._apiOverlayIntercepted = true;
+                        console.log('✅ API overlay interceptor installed');
+                        console.log('💡 Test overlay with: OverlayManager.success({message: "Test!", duration: 3000})');
+                    }
+
+                    // Also intercept XMLHttpRequest
+                    const originalXHRSend = XMLHttpRequest.prototype.send;
+                    if (!XMLHttpRequest.prototype.send._apiOverlayIntercepted) {
+                        XMLHttpRequest.prototype.send = function(...args) {
+                            const url = this._url || '';
+
+                            if (url.includes('/api/Order/PersonalizedAndCustomizedOrders')) {
+                                console.log('🎯 PersonalizedAndCustomizedOrders XHR detected');
+
+                                this.addEventListener('readystatechange', function() {
+                                    if (this.readyState === 4) {
+                                        try {
+                                            const isSuccess = this.status >= 200 && this.status < 300;
+                                            let data = {};
+
+                                            try {
+                                                data = JSON.parse(this.responseText);
+                                            } catch (e) {
+                                                console.warn('Could not parse XHR response:', e);
+                                            }
+
+                                            if (isSuccess) {
+                                                OverlayManager.success({
+                                                    message: 'Order status updated successfully',
+                                                    duration: 3000
+                                                });
+                                            } else {
+                                                const errorMsg = data.message || data.error || `HTTP ${this.status}`;
+                                                OverlayManager.error({
+                                                    message: `Update failed: ${errorMsg}`,
+                                                    duration: 4000
+                                                });
+                                            }
+                                        } catch (error) {
+                                            console.error('Error handling XHR response:', error);
+                                        }
+                                    }
+                                });
+                            }
+
+                            return originalXHRSend.apply(this, args);
+                        };
+
+                        // Also intercept XHR open to capture URL
+                        const originalXHROpen = XMLHttpRequest.prototype.open;
+                        XMLHttpRequest.prototype.open = function(method, url, ...rest) {
+                            this._url = url;
+                            return originalXHROpen.apply(this, [method, url, ...rest]);
+                        };
+
+                        XMLHttpRequest.prototype.send._apiOverlayIntercepted = true;
+                        console.log('✅ XHR API overlay interceptor installed');
+                    }
+                } else {
+                    console.warn('⚠️ OverlayManager or PopupController not loaded');
+                }
+
                 if (typeof addItemLineIdColumn === 'function' && typeof populateItemLineIds === 'function') {
                     // Add column immediately
                     console.log('🔄 Adding Item Line ID column');
@@ -350,7 +711,9 @@
             pattern: /^#outbound\/packing(\?.*)?$/i,
             action: () => {
                 console.log('🚀 Matched #outbound/packing route');
-                if (typeof makeSkuItemsClickable === 'function') {
+
+                // ========== SKU AND QTY CLICKABLE FEATURE ==========
+                if (typeof makeSkuItemsClickable === 'function' || typeof makeQtyItemsClickable === 'function') {
                     // Set up MutationObserver to watch for table data changes
                     const observer = new MutationObserver((mutations) => {
                         // Check if any mutations added SKU elements
@@ -364,8 +727,13 @@
                         });
 
                         if (hasSkuChanges) {
-                            console.log('🔄 Table data changed, updating clickable SKUs');
-                            makeSkuItemsClickable();
+                            console.log('🔄 Table data changed, updating clickable SKUs and quantities');
+                            if (typeof makeSkuItemsClickable === 'function') {
+                                makeSkuItemsClickable();
+                            }
+                            if (typeof makeQtyItemsClickable === 'function') {
+                                makeQtyItemsClickable();
+                            }
                         }
                     });
 
@@ -377,42 +745,223 @@
 
                     // Also try immediately in case elements already exist
                     setTimeout(() => {
-                        console.log('🔄 Initial attempt to make SKUs clickable');
-                        makeSkuItemsClickable();
+                        console.log('🔄 Initial attempt to make SKUs and quantities clickable');
+                        if (typeof makeSkuItemsClickable === 'function') {
+                            makeSkuItemsClickable();
+                        }
+                        if (typeof makeQtyItemsClickable === 'function') {
+                            makeQtyItemsClickable();
+                        }
                     }, 500);
 
-                    console.log('✅ MutationObserver set up for SKU table monitoring');
+                    console.log('✅ MutationObserver set up for SKU and Qty table monitoring');
                 } else {
-                    console.warn('⚠️ makeSkuItemsClickable not loaded');
+                    console.warn('⚠️ makeSkuItemsClickable and makeQtyItemsClickable not loaded');
+                }
+
+                // ========== AUTO PRINT BUTTONS FEATURE ==========
+                if (typeof handleShipmentModalAppearance === 'function' &&
+                    typeof setupCreateShipmentButtonListener === 'function') {
+                    console.log('🖨️ Auto Print Buttons feature enabled');
+
+                    // Set up listener for Create Shipment button
+                    const setupCreateShipmentButton = () => {
+                        if (setupCreateShipmentButtonListener()) {
+                            console.log('✅ Create Shipment button listener active');
+                        } else {
+                            // Button not found yet, try again
+                            setTimeout(setupCreateShipmentButton, 1000);
+                        }
+                    };
+
+                    // Try to set up Create Shipment button listener
+                    setTimeout(setupCreateShipmentButton, 500);
+
+                    // Set up MutationObserver to watch for shipment modal
+                    const modalObserver = new MutationObserver((mutations) => {
+                        mutations.forEach(mutation => {
+                            // Check for added nodes
+                            mutation.addedNodes.forEach(node => {
+                                if (node.nodeType === 1) {
+                                    // Check if the modal or its container was added
+                                    if (node.id === '_modal_block_ui' ||
+                                        node.id === 'shipment-created' ||
+                                        node.querySelector?.('#shipment-created')) {
+
+                                        console.log('🔄 Shipment modal detected by router');
+                                        setTimeout(handleShipmentModalAppearance, 100);
+                                    }
+
+                                    // Check if Create Shipment button was added
+                                    if (node.id === 'create-shipment' ||
+                                        node.querySelector?.('#create-shipment')) {
+
+                                        console.log('🔄 Create Shipment button detected');
+                                        setTimeout(setupCreateShipmentButton, 100);
+                                    }
+                                }
+                            });
+
+                            // Check for attribute changes (like style changes that show the modal)
+                            if (mutation.type === 'attributes' &&
+                                mutation.target.id === '_modal_block_ui') {
+
+                                setTimeout(handleShipmentModalAppearance, 100);
+                            }
+                        });
+                    });
+
+                    // Start observing
+                    modalObserver.observe(document.body, {
+                        childList: true,
+                        subtree: true,
+                        attributes: true,
+                        attributeFilter: ['style', 'class']
+                    });
+
+                    // Try immediately in case modal already exists
+                    setTimeout(() => {
+                        handleShipmentModalAppearance();
+                    }, 500);
+
+                    console.log('✅ Auto Print Buttons observer set up');
+                } else {
+                    console.warn('⚠️ Auto Print Buttons functions not loaded');
                 }
             },
-            description: 'SKU item linker for outbound packing page'
+            description: 'SKU and Qty item linker + Auto print buttons for outbound packing page'
         },
         {
-            name: 'PO Test Route',
-            pattern: /^#PO$/i,
+            name: 'Outbound Shipment List Route',
+            pattern: /^#outbound\/shipment/i,
             action: () => {
-                console.log('🚀 Matched #PO route');
-                if (typeof func1 === 'function') {
-                    func1();
-                } else {
-                    console.warn('⚠️ func1 not loaded');
+                console.log('🚀 Matched #outbound/shipment route');
+                console.log('📍 Full hash:', window.location.hash);
+
+                function addPackingSlipColumn() {
+                    const table = document.getElementById('outbshipment-table');
+                    if (!table) {
+                        console.log('⚠️ Table #outbshipment-table not found');
+                        return;
+                    }
+
+                    const thead = table.querySelector('thead tr');
+                    const tbody = table.querySelector('tbody');
+
+                    if (!thead || !tbody) {
+                        console.log('⚠️ Table header or body not found');
+                        return;
+                    }
+
+                    // Add header if it doesn't exist
+                    if (!thead.querySelector('th.packing-slip-column')) {
+                        // Find the "Shipment #" column to insert before it
+                        const shipmentHeader = Array.from(thead.querySelectorAll('th')).find(th =>
+                            th.textContent.includes('Shipment') && th.textContent.includes('#')
+                        );
+
+                        if (!shipmentHeader) {
+                            console.log('⚠️ Could not find Shipment # column');
+                            return;
+                        }
+
+                        // Create new header
+                        const newHeader = document.createElement('th');
+                        newHeader.className = 'packing-slip-column numberid_width';
+                        newHeader.textContent = 'Packing Slip';
+                        newHeader.style.width = '98px';
+                        newHeader.setAttribute('locale-res', 'PackingSlip');
+
+                        // Insert before Shipment # column
+                        shipmentHeader.parentNode.insertBefore(newHeader, shipmentHeader);
+                        console.log('✅ Added packing slip header');
+                    }
+
+                    // Process rows (always run this, even if header exists)
+                    const rows = tbody.querySelectorAll('tr');
+                    let addedCount = 0;
+
+                    console.log(`📊 Processing ${rows.length} rows for packing slip links`);
+
+                    rows.forEach(row => {
+                        // Skip if already has packing slip cell
+                        if (row.querySelector('td.packing-slip-column')) {
+                            return;
+                        }
+
+                        // Find the hidden shipment ID cell
+                        const hiddenIdCell = row.querySelector('td.hide_column.dtfc-fixed-left');
+                        if (!hiddenIdCell) {
+                            console.log('⚠️ Could not find hidden ID cell in row');
+                            return;
+                        }
+
+                        const shipmentId = hiddenIdCell.textContent.trim();
+
+                        // Find the shipment # cell to insert before it
+                        const shipmentCell = row.querySelector('td.shipmentno');
+                        if (!shipmentCell) {
+                            console.log('⚠️ Could not find shipment # cell in row');
+                            return;
+                        }
+
+                        // Create new cell with link
+                        const newCell = document.createElement('td');
+                        newCell.className = 'packing-slip-column';
+
+                        const link = document.createElement('a');
+                        link.href = `#outbound/packingSlipdetail?id=${shipmentId}`;
+                        link.textContent = 'View';
+                        link.style.color = '#007bff';
+                        link.style.textDecoration = 'underline';
+                        link.style.cursor = 'pointer';
+
+                        newCell.appendChild(link);
+
+                        // Insert before shipment # cell
+                        shipmentCell.parentNode.insertBefore(newCell, shipmentCell);
+                        addedCount++;
+                    });
+
+                    console.log(`✅ Added packing slip links to ${addedCount} rows`);
                 }
+
+                // Try adding column immediately
+                setTimeout(() => {
+                    console.log('🔄 Initial attempt to add packing slip column');
+                    addPackingSlipColumn();
+                }, 500);
+
+                // Set up MutationObserver to watch for table changes
+                const observer = new MutationObserver((mutations) => {
+                    const hasTableChanges = mutations.some(mutation => {
+                        return Array.from(mutation.addedNodes).some(node => {
+                            return node.nodeType === 1 && (
+                                node.matches?.('table#outbshipment-table') ||
+                                node.querySelector?.('table#outbshipment-table') ||
+                                node.matches?.('tr[role="row"]') ||
+                                node.querySelector?.('tr[role="row"]')
+                            );
+                        });
+                    });
+
+                    if (hasTableChanges) {
+                        console.log('🔄 Table structure changed, re-adding packing slip column');
+                        setTimeout(() => {
+                            addPackingSlipColumn();
+                        }, 100);
+                    }
+                });
+
+                // Start observing the document body for changes
+                observer.observe(document.body, {
+                    childList: true,
+                    subtree: true
+                });
+
+                console.log('✅ Packing slip column route configured with observer');
             },
-            description: 'Test route for PO page'
-        },
-        {
-            name: 'Inbound Test Route',
-            pattern: /^#inbound$/i,
-            action: () => {
-                console.log('🚀 Matched #inbound route');
-                if (typeof func3 === 'function') {
-                    func3();
-                } else {
-                    console.warn('⚠️ func3 not loaded');
-                }
-            },
-            description: 'Test route for Inbound page'
+            description: 'Adds packing slip column to outbound shipment table'
         }
     ];
 

@@ -10,4 +10,5 @@ public interface ITemplateService
     Task<Template> UpdateTemplateAsync(Template template);
     Task<bool> DeleteTemplateAsync(int id);
     Task<Template?> GetTemplateByPageIdAsync(int pageId);
+    Task<IEnumerable<TemplateColumn>> GetTemplateColumnsAsync(int templateId);
 }

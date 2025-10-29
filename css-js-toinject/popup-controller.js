@@ -156,152 +156,161 @@ const PopupController = (() => {
   };
 })();
 
-// Add popup styles
-if (!document.getElementById('cji-popup-styles')) {
-  const style = document.createElement('style');
-  style.id = 'cji-popup-styles';
-  style.textContent = `
-    .cji-popup {
-      position: fixed;
-      width: 280px;
-      background: white;
-      border-radius: 8px;
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-      z-index: 999998;
-      opacity: 0;
-      transform: scale(0.9);
-      transition: opacity 0.2s, transform 0.2s;
-      pointer-events: none;
-    }
+// Add popup styles when DOM is ready
+function injectPopupStyles() {
+  if (!document.getElementById('cji-popup-styles')) {
+    const style = document.createElement('style');
+    style.id = 'cji-popup-styles';
+    style.textContent = `
+      .cji-popup {
+        position: fixed;
+        width: 280px;
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+        z-index: 999998;
+        opacity: 0;
+        transform: scale(0.9);
+        transition: opacity 0.2s, transform 0.2s;
+        pointer-events: none;
+      }
 
-    .cji-popup-visible {
-      opacity: 1;
-      transform: scale(1);
-      pointer-events: auto;
-    }
+      .cji-popup-visible {
+        opacity: 1;
+        transform: scale(1);
+        pointer-events: auto;
+      }
 
-    .cji-popup-top-left {
-      top: 20px;
-      left: 20px;
-    }
+      .cji-popup-top-left {
+        top: 20px;
+        left: 20px;
+      }
 
-    .cji-popup-top-right {
-      top: 20px;
-      right: 20px;
-    }
+      .cji-popup-top-right {
+        top: 20px;
+        right: 20px;
+      }
 
-    .cji-popup-bottom-left {
-      bottom: 20px;
-      left: 20px;
-    }
+      .cji-popup-bottom-left {
+        bottom: 20px;
+        left: 20px;
+      }
 
-    .cji-popup-bottom-right {
-      bottom: 20px;
-      right: 20px;
-    }
+      .cji-popup-bottom-right {
+        bottom: 20px;
+        right: 20px;
+      }
 
-    .cji-popup-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 12px 16px;
-      border-bottom: 1px solid #e0e0e0;
-      cursor: move;
-      user-select: none;
-    }
+      .cji-popup-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 12px 16px;
+        border-bottom: 1px solid #e0e0e0;
+        cursor: move;
+        user-select: none;
+      }
 
-    .cji-popup-title {
-      font-weight: 600;
-      font-size: 14px;
-    }
+      .cji-popup-title {
+        font-weight: 600;
+        font-size: 14px;
+      }
 
-    .cji-popup-close {
-      background: none;
-      border: none;
-      font-size: 24px;
-      line-height: 1;
-      color: #999;
-      cursor: pointer;
-      padding: 0;
-      width: 24px;
-      height: 24px;
-    }
+      .cji-popup-close {
+        background: none;
+        border: none;
+        font-size: 24px;
+        line-height: 1;
+        color: #999;
+        cursor: pointer;
+        padding: 0;
+        width: 24px;
+        height: 24px;
+      }
 
-    .cji-popup-close:hover {
-      color: #333;
-    }
+      .cji-popup-close:hover {
+        color: #333;
+      }
 
-    .cji-popup-body {
-      padding: 12px;
-    }
+      .cji-popup-body {
+        padding: 12px;
+      }
 
-    #cji-popup-buttons {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
+      #cji-popup-buttons {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
 
-    .cji-popup-btn {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 10px 12px;
-      background: #f5f5f5;
-      border: 1px solid #ddd;
-      border-radius: 6px;
-      cursor: pointer;
-      font-size: 14px;
-      transition: background 0.2s;
-    }
+      .cji-popup-btn {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 12px;
+        background: #f5f5f5;
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 14px;
+        transition: background 0.2s;
+      }
 
-    .cji-popup-btn:hover {
-      background: #e8e8e8;
-    }
+      .cji-popup-btn:hover {
+        background: #e8e8e8;
+      }
 
-    .cji-popup-btn:active {
-      background: #d8d8d8;
-    }
+      .cji-popup-btn:active {
+        background: #d8d8d8;
+      }
 
-    .cji-btn-icon {
-      font-size: 18px;
-    }
+      .cji-btn-icon {
+        font-size: 18px;
+      }
 
-    .cji-btn-label {
-      flex: 1;
-    }
+      .cji-btn-label {
+        flex: 1;
+      }
 
-    .cji-popup-dark {
-      background: #2d2d2d;
-      color: #fff;
-    }
+      .cji-popup-dark {
+        background: #2d2d2d;
+        color: #fff;
+      }
 
-    .cji-popup-dark .cji-popup-header {
-      border-bottom-color: #444;
-    }
+      .cji-popup-dark .cji-popup-header {
+        border-bottom-color: #444;
+      }
 
-    .cji-popup-dark .cji-popup-close {
-      color: #aaa;
-    }
+      .cji-popup-dark .cji-popup-close {
+        color: #aaa;
+      }
 
-    .cji-popup-dark .cji-popup-close:hover {
-      color: #fff;
-    }
+      .cji-popup-dark .cji-popup-close:hover {
+        color: #fff;
+      }
 
-    .cji-popup-dark .cji-popup-btn {
-      background: #3d3d3d;
-      border-color: #555;
-      color: #fff;
-    }
+      .cji-popup-dark .cji-popup-btn {
+        background: #3d3d3d;
+        border-color: #555;
+        color: #fff;
+      }
 
-    .cji-popup-dark .cji-popup-btn:hover {
-      background: #4d4d4d;
-    }
+      .cji-popup-dark .cji-popup-btn:hover {
+        background: #4d4d4d;
+      }
 
-    .cji-popup-dark .cji-popup-btn:active {
-      background: #5d5d5d;
-    }
-  `;
-  document.head.appendChild(style);
+      .cji-popup-dark .cji-popup-btn:active {
+        background: #5d5d5d;
+      }
+    `;
+    (document.head || document.documentElement).appendChild(style);
+  }
+}
+
+// Inject styles when DOM is ready
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', injectPopupStyles);
+} else {
+  injectPopupStyles();
 }
 
 // Keyboard shortcut to toggle popup (Ctrl+Shift+P)

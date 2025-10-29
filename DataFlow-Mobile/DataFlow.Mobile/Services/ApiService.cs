@@ -1,8 +1,10 @@
+using System.Net;
 using System.Text.Json;
 using System.Text;
 using DataFlow.Mobile.Models;
 using DataFlow.Mobile.Services.Interfaces;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace DataFlow.Mobile.Services;
 
@@ -12,75 +14,78 @@ public class ApiService : IApiService
     private readonly ILogger<ApiService> _logger;
     private readonly IAuthenticationService _authService;
     private readonly INetworkService _networkService;
+    private readonly IServiceScopeFactory _scopeFactory;
 
     public ApiService(
         IHttpClientFactory httpClientFactory,
         ILogger<ApiService> logger,
         IAuthenticationService authService,
-        INetworkService networkService)
+        INetworkService networkService,
+        IServiceScopeFactory scopeFactory)
     {
         _httpClientFactory = httpClientFactory;
         _logger = logger;
         _authService = authService;
         _networkService = networkService;
+        _scopeFactory = scopeFactory;
     }
 
-    public async Task<ApiResponse<T>> GetAsync<T>(int pageId)
+    public async Task<ApiResponse<T>> GetAsync<T>(int pageId, CancellationToken cancellationToken = default)
     {
-        return await ExecutePageRequestAsync<T>(pageId, HttpMethod.Get);
+        return await ExecutePageRequestAsync<T>(pageId, HttpMethod.Get, cancellationToken);
     }
 
-    public async Task<ApiResponse<T>> GetAsync<T>(string url, Dictionary<string, string>? headers = null, int? pageId = null)
-    {
-        if (pageId.HasValue)
-        {
-            var authHeaders = await _authService.GetAuthenticationHeadersAsync(pageId.Value);
-            headers = MergeHeaders(headers, authHeaders);
-        }
-        return await ExecuteRequestAsync<T>(HttpMethod.Get, url, null, headers);
-    }
-
-    public async Task<ApiResponse<T>> PostAsync<T>(string url, object? data = null, Dictionary<string, string>? headers = null, int? pageId = null)
+    public async Task<ApiResponse<T>> GetAsync<T>(string url, Dictionary<string, string>? headers = null, int? pageId = null, CancellationToken cancellationToken = default)
     {
         if (pageId.HasValue)
         {
             var authHeaders = await _authService.GetAuthenticationHeadersAsync(pageId.Value);
             headers = MergeHeaders(headers, authHeaders);
         }
-        return await ExecuteRequestAsync<T>(HttpMethod.Post, url, data, headers);
+        return await ExecuteRequestAsync<T>(HttpMethod.Get, url, null, headers, cancellationToken);
     }
 
-    public async Task<ApiResponse<T>> PutAsync<T>(string url, object? data = null, Dictionary<string, string>? headers = null, int? pageId = null)
+    public async Task<ApiResponse<T>> PostAsync<T>(string url, object? data = null, Dictionary<string, string>? headers = null, int? pageId = null, CancellationToken cancellationToken = default)
     {
         if (pageId.HasValue)
         {
             var authHeaders = await _authService.GetAuthenticationHeadersAsync(pageId.Value);
             headers = MergeHeaders(headers, authHeaders);
         }
-        return await ExecuteRequestAsync<T>(HttpMethod.Put, url, data, headers);
+        return await ExecuteRequestAsync<T>(HttpMethod.Post, url, data, headers, cancellationToken);
     }
 
-    public async Task<ApiResponse<T>> DeleteAsync<T>(string url, Dictionary<string, string>? headers = null, int? pageId = null)
+    public async Task<ApiResponse<T>> PutAsync<T>(string url, object? data = null, Dictionary<string, string>? headers = null, int? pageId = null, CancellationToken cancellationToken = default)
     {
         if (pageId.HasValue)
         {
             var authHeaders = await _authService.GetAuthenticationHeadersAsync(pageId.Value);
             headers = MergeHeaders(headers, authHeaders);
         }
-        return await ExecuteRequestAsync<T>(HttpMethod.Delete, url, null, headers);
+        return await ExecuteRequestAsync<T>(HttpMethod.Put, url, data, headers, cancellationToken);
     }
 
-    public async Task<ApiResponse<T>> GetRawAsync<T>(string url, Dictionary<string, string>? headers = null)
+    public async Task<ApiResponse<T>> DeleteAsync<T>(string url, Dictionary<string, string>? headers = null, int? pageId = null, CancellationToken cancellationToken = default)
     {
-        return await ExecuteRequestAsync<T>(HttpMethod.Get, url, null, headers);
+        if (pageId.HasValue)
+        {
+            var authHeaders = await _authService.GetAuthenticationHeadersAsync(pageId.Value);
+            headers = MergeHeaders(headers, authHeaders);
+        }
+        return await ExecuteRequestAsync<T>(HttpMethod.Delete, url, null, headers, cancellationToken);
     }
 
-    public async Task<ApiResponse<T>> PostRawAsync<T>(string url, object? data = null, Dictionary<string, string>? headers = null)
+    public async Task<ApiResponse<T>> GetRawAsync<T>(string url, Dictionary<string, string>? headers = null, CancellationToken cancellationToken = default)
     {
-        return await ExecuteRequestAsync<T>(HttpMethod.Post, url, data, headers);
+        return await ExecuteRequestAsync<T>(HttpMethod.Get, url, null, headers, cancellationToken);
     }
 
-    public async Task<bool> TestConnectionAsync(string url, Dictionary<string, string>? headers = null)
+    public async Task<ApiResponse<T>> PostRawAsync<T>(string url, object? data = null, Dictionary<string, string>? headers = null, CancellationToken cancellationToken = default)
+    {
+        return await ExecuteRequestAsync<T>(HttpMethod.Post, url, data, headers, cancellationToken);
+    }
+
+    public async Task<bool> TestConnectionAsync(string url, Dictionary<string, string>? headers = null, CancellationToken cancellationToken = default)
     {
         try
         {
@@ -102,7 +107,7 @@ public class ApiService : IApiService
                 }
             }
 
-            var response = await client.SendAsync(request);
+            var response = await client.SendAsync(request, cancellationToken);
             _logger.LogInformation("Connection test for {Url}: {StatusCode}", url, response.StatusCode);
             return response.IsSuccessStatusCode;
         }
@@ -113,7 +118,7 @@ public class ApiService : IApiService
         }
     }
 
-    public async Task<bool> TestPageConnectionAsync(int pageId)
+    public async Task<bool> TestPageConnectionAsync(int pageId, CancellationToken cancellationToken = default)
     {
         try
         {
@@ -125,9 +130,9 @@ public class ApiService : IApiService
             }
 
             // Get the page to test its endpoint
-            using var scope = _httpClientFactory.GetService<IServiceScope>();
+            using var scope = _scopeFactory.CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<DataFlowDbContext>();
-            var page = await context.Pages.FindAsync(pageId);
+            var page = await context.Pages.FindAsync(new object?[] { pageId }, cancellationToken);
 
             if (page == null)
             {
@@ -136,7 +141,7 @@ public class ApiService : IApiService
             }
 
             var authHeaders = await _authService.GetAuthenticationHeadersAsync(pageId);
-            return await TestConnectionAsync(page.ApiEndpoint, authHeaders);
+            return await TestConnectionAsync(page.ApiEndpoint, authHeaders, cancellationToken);
         }
         catch (Exception ex)
         {
@@ -145,12 +150,12 @@ public class ApiService : IApiService
         }
     }
 
-    public async Task<ApiResponse<object>> ExecutePageDataRequestAsync(int pageId)
+    public async Task<ApiResponse<object>> ExecutePageDataRequestAsync(int pageId, CancellationToken cancellationToken = default)
     {
-        return await ExecutePageRequestAsync<object>(pageId, HttpMethod.Get);
+        return await ExecutePageRequestAsync<object>(pageId, HttpMethod.Get, cancellationToken);
     }
 
-    private async Task<ApiResponse<T>> ExecutePageRequestAsync<T>(int pageId, HttpMethod method)
+    private async Task<ApiResponse<T>> ExecutePageRequestAsync<T>(int pageId, HttpMethod method, CancellationToken cancellationToken = default)
     {
         try
         {
@@ -162,9 +167,9 @@ public class ApiService : IApiService
             }
 
             // Get page configuration
-            using var scope = _httpClientFactory.GetService<IServiceScope>();
+            using var scope = _scopeFactory.CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<DataFlowDbContext>();
-            var page = await context.Pages.FindAsync(pageId);
+            var page = await context.Pages.FindAsync(new object?[] { pageId }, cancellationToken);
 
             if (page == null)
             {
@@ -181,7 +186,7 @@ public class ApiService : IApiService
 
             _logger.LogInformation("Executing API request for page {PageId}: {Method} {Url}", pageId, method, page.ApiEndpoint);
 
-            return await ExecuteRequestAsync<T>(method, page.ApiEndpoint, null, allHeaders);
+            return await ExecuteRequestAsync<T>(method, page.ApiEndpoint, null, allHeaders, cancellationToken);
         }
         catch (Exception ex)
         {
@@ -190,7 +195,7 @@ public class ApiService : IApiService
         }
     }
 
-    private async Task<ApiResponse<T>> ExecuteRequestAsync<T>(HttpMethod method, string url, object? data, Dictionary<string, string>? headers)
+    private async Task<ApiResponse<T>> ExecuteRequestAsync<T>(HttpMethod method, string url, object? data, Dictionary<string, string>? headers, CancellationToken cancellationToken = default)
     {
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         var requestId = Guid.NewGuid().ToString("N")[..8];
@@ -217,7 +222,11 @@ public class ApiService : IApiService
                 });
                 request.Content = new StringContent(jsonData, Encoding.UTF8, "application/json");
 
-                _logger.LogDebug("Request {RequestId} body: {Body}", requestId, jsonData);
+                if (_logger.IsEnabled(LogLevel.Debug))
+                {
+                    _logger.LogDebug("Request {RequestId} body: {Body}", requestId,
+                        jsonData?.Length > 2048 ? jsonData.Substring(0, 2048) + "..." : jsonData);
+                }
             }
 
             if (headers != null)
@@ -237,7 +246,7 @@ public class ApiService : IApiService
 
             _logger.LogInformation("Sending {Method} request to {Url} (ID: {RequestId})", method, url, requestId);
 
-            var response = await client.SendAsync(request);
+            var response = await client.SendAsync(request, cancellationToken);
             stopwatch.Stop();
 
             var content = await response.Content.ReadAsStringAsync();
@@ -247,7 +256,11 @@ public class ApiService : IApiService
 
             if (!string.IsNullOrEmpty(content))
             {
-                _logger.LogDebug("Response {RequestId} body: {Body}", requestId, content);
+                if (_logger.IsEnabled(LogLevel.Debug))
+                {
+                    _logger.LogDebug("Response {RequestId} body: {Body}", requestId,
+                        content?.Length > 2048 ? content.Substring(0, 2048) + "..." : content);
+                }
             }
 
             var responseHeaders = response.Headers.ToDictionary(
@@ -387,6 +400,34 @@ public class ApiService : IApiService
         {
             _logger.LogWarning(ex, "Failed to parse headers JSON: {HeadersJson}", headersJson);
             return new Dictionary<string, string>();
+        }
+    }
+
+    public async Task<ApiResponse<object>> GetDataAsync(DataPage page, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(page.ApiUrl))
+            {
+                return new ApiResponse<object>
+                {
+                    IsSuccess = false,
+                    ErrorMessage = "Page does not have an API URL configured",
+                    StatusCode = HttpStatusCode.BadRequest
+                };
+            }
+
+            return await GetAsync<object>(page.ApiUrl, null, page.Id, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting data for page {PageId}", page.Id);
+            return new ApiResponse<object>
+            {
+                IsSuccess = false,
+                ErrorMessage = $"Error getting data: {ex.Message}",
+                StatusCode = HttpStatusCode.InternalServerError
+            };
         }
     }
 }

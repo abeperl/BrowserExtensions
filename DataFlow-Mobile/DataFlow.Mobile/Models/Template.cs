@@ -17,7 +17,7 @@ public class Template
 
     public string? FieldMappings { get; set; }
 
-    public string? VisibleColumns { get; set; }
+    public string? VisibleColumnsConfig { get; set; }
 
     public int? ColorSchemeId { get; set; }
 
@@ -70,8 +70,16 @@ public class Template
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
     // Navigation properties
-    public ICollection<Page> Pages { get; set; } = [];
+    public ICollection<DataPage> Pages { get; set; } = [];
     public ICollection<TemplateColumn> Columns { get; set; } = [];
+
+    // Additional properties for compatibility
+    public string? Configuration { get; set; }
+    public string? ColumnsConfiguration { get; set; }
+
+    [Required]
+    [MaxLength(50)]
+    public string LayoutType { get; set; } = "List";
 
     // Computed properties for easier access
     public ICollection<TemplateColumn> VisibleColumns =>

@@ -140,4 +140,42 @@ public class GenericRepository<T> : IGenericRepository<T> where T : class
     {
         return await _dbSet.AnyAsync(predicate);
     }
+
+    // Additional convenience methods used by services
+    public virtual async Task<IEnumerable<T>> GetAsync(Expression<Func<T, bool>> predicate)
+    {
+        return await FindAsync(predicate);
+    }
+
+    public virtual async Task<IEnumerable<T>> GetAsync<TKey>(Expression<Func<T, bool>> predicate, Func<IQueryable<T>, IOrderedQueryable<T>> orderBy)
+    {
+        IQueryable<T> query = _dbSet.Where(predicate);
+        if (orderBy != null)
+        {
+            query = orderBy(query);
+        }
+        return await query.ToListAsync();
+    }
+
+    public virtual async Task<T?> GetAsync(int id)
+    {
+        return await GetByIdAsync(id);
+    }
+
+    public virtual T Update(T entity)
+    {
+        _dbSet.Update(entity);
+        return entity;
+    }
+
+    public virtual void Delete(T entity)
+    {
+        _dbSet.Remove(entity);
+    }
+
+    public virtual T Add(T entity)
+    {
+        _dbSet.Add(entity);
+        return entity;
+    }
 }

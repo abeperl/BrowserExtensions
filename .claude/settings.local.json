@@ -16,7 +16,17 @@
       "Bash(del \"C:\\Users\\User\\source\\repos\\BrowserExtensions\\DataFlow-Mobile\\DataFlow.Mobile\\Models\\PageModel.cs\")",
       "Bash(move:*)",
       "Bash(sed:*)",
-      "Bash(emulator:*)"
+      "Bash(emulator:*)",
+      "Bash(adb:*)",
+      "Bash(timeout:*)",
+      "Read(//c/Users/User/**)",
+      "Bash(cat:*)",
+      "Bash(mkdir:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(del \"c:\\Users\\User\\source\\repos\\BrowserExtensions\\css-js-toinject\\index.js\")",
+      "Bash(del \"c:\\Users\\User\\source\\repos\\BrowserExtensions\\css-js-toinject\\sku-qty-focus.js\")",
+      "Bash(node -e:*)"
     ],
     "deny": []
   }

@@ -48,5 +48,12 @@ public class AudioConfigModel
     [Required]
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
+    // Additional properties for compatibility
+    public string FilePath
+    {
+        get => AudioFileName;
+        set => AudioFileName = value;
+    }
+
     public ICollection<ActionModel> Actions { get; set; } = [];
 }

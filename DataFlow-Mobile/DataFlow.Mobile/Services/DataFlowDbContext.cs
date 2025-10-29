@@ -9,7 +9,7 @@ public class DataFlowDbContext : DbContext
     {
     }
 
-    public DbSet<Page> Pages { get; set; }
+    public DbSet<DataPage> Pages { get; set; }
     public DbSet<Template> Templates { get; set; }
     public DbSet<PageAction> Actions { get; set; }
     public DbSet<AuthenticationConfig> AuthenticationConfigs { get; set; }
@@ -23,8 +23,8 @@ public class DataFlowDbContext : DbContext
     {
         base.OnModelCreating(modelBuilder);
 
-        // Configure Page entity
-        modelBuilder.Entity<Page>(entity =>
+        // Configure DataPage entity
+        modelBuilder.Entity<DataPage>(entity =>
         {
             entity.HasKey(e => e.Id);
             entity.Property(e => e.Name).IsRequired().HasMaxLength(100);
@@ -171,7 +171,7 @@ public class DataFlowDbContext : DbContext
                 Name = "Default List Template",
                 Description = "Standard list layout for displaying API data",
                 LayoutType = "List",
-                ColorScheme = "Default",
+                ColorSchemeId = 1,
                 CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc),
                 UpdatedAt = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc)
             }
