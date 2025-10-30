@@ -69,21 +69,65 @@ if (submitButton) {
 }
 ```
 
+## Error Handling
+
+### Automatic Error Recovery
+
+When an error occurs during submission (API error, validation error, etc.), the system automatically:
+
+1. **Displays error message** via overlay popup
+2. **Clears both input fields** (`product-scan` and `status-scan`)
+3. **Refocuses on product-scan** field for next scan
+4. **Preserves status selection** in dropdown for retry
+
+This ensures a smooth workflow even when errors occur - no need to manually clear fields or click back into the input.
+
+### Error Detection Methods
+
+Errors are caught from multiple sources:
+
+- **Snackbar messages**: `cs-danger` and `cs-warning` types
+- **API response codes**: Non-success response codes (not 0 or 200)
+- **API exceptions**: Network errors, timeouts, etc.
+- **All HTTP methods**: `tf.service.post`, `fetch`, and `XMLHttpRequest`
+
+### Error Handler Implementation
+
+**Global Error Handler** ([router.js:232-253](router.js#L232-L253))
+```javascript
+window._handleScanError = function() {
+    const productInput = document.getElementById('product-scan');
+    const statusInput = document.getElementById('status-scan');
+
+    // Clear both inputs
+    if (productInput) productInput.value = '';
+    if (statusInput) statusInput.value = '';
+
+    // Refocus on product input
+    setTimeout(() => {
+        if (productInput) productInput.focus();
+    }, 100);
+};
+```
+
 ## Benefits
 
 ### Before (Manual Process)
 1. Scan product ID
 2. Wait for status to auto-fill
 3. **Manually press Enter** to submit
-4. Repeat for next item
+4. If error: **Manually clear fields**, click back into input
+5. Repeat for next item
 
 ### After (Automated Process)
 1. Scan product ID
 2. Form auto-submits immediately
-3. Repeat for next item
+3. If error: **Fields auto-clear**, cursor returns to scan field
+4. Repeat for next item
 
-**Time saved**: ~1-2 seconds per item
+**Time saved**: ~1-2 seconds per item (success) + ~3-5 seconds per error
 **For 100 items**: 100-200 seconds saved (~2-3 minutes)
+**Error handling**: Additional 3-5 seconds saved per error occurrence
 
 ## Configuration
 
@@ -96,22 +140,55 @@ No configuration needed. The feature activates automatically when:
 
 Watch console for these messages:
 
+### Success Flow
 ```
 🚀 Setting up product-scan auto-submit
 ✅ Product-scan auto-submit configured
 📦 Product scanned: "ITEM123", Status: "Ready"
 ✅ Both product and status filled, auto-submitting...
 ✅ Auto-submit triggered
+✅ Successfully processed 1 status update(s) and 1 picklist item(s)
+```
+
+### Error Flow
+```
+📦 Product scanned: "INVALID123", Status: "Ready"
+✅ Both product and status filled, auto-submitting...
+❌ Update failed: Item not found
+🧹 Cleared product-scan input
+🧹 Cleared status-scan input
+🎯 Refocused on product-scan input
 ```
 
 ## Debugging
 
-If auto-submit isn't working:
+### Auto-Submit Not Working
 
 1. Check if status dropdown has a value selected
 2. Verify both inputs exist: `#product-scan` and `#status-scan`
 3. Look for console warnings
 4. Test manual submission to ensure form is working
+
+### Error Handling Not Working
+
+1. Check console for error messages
+2. Verify `window._handleScanError` function exists
+3. Test by triggering a known error (scan invalid item)
+4. Check if error overlay appears
+
+### Manual Testing
+
+```javascript
+// Test auto-submit function
+window.setupProductScanAutoSubmit();
+
+// Test error handler
+window._handleScanError();
+
+// Check if functions exist
+console.log(typeof window.setupProductScanAutoSubmit); // should be 'function'
+console.log(typeof window._handleScanError); // should be 'function'
+```
 
 ## Code Locations
 
