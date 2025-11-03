@@ -19,7 +19,7 @@ const AUTO_PRINT_CONFIG = {
 
 /**
  * Finds and clicks the Packing Slip button
- * Intercepts window.open to change popup to new tab
+ * Note: TabManager handles window.open interception automatically
  */
 function clickPackingSlipButton() {
     const packingSlipBtn = document.getElementById('btnPrintPackSlip');
@@ -37,61 +37,19 @@ function clickPackingSlipButton() {
     console.log('   Button display:', window.getComputedStyle(packingSlipBtn).display);
 
     if (AUTO_PRINT_CONFIG.debugMode) {
-        console.log('🖨️ Clicking Packing Slip button');
+        console.log('🖨️ Clicking Packing Slip button (TabManager will handle window.open)');
     }
 
-    // Intercept window.open to change popup to tab
-    const originalWindowOpen = window.open;
-    let intercepted = false;
-
-    window.open = function(url, target, features) {
-        if (!intercepted) {
-            intercepted = true;
-            if (AUTO_PRINT_CONFIG.debugMode) {
-                console.log('✅ Packing Slip - intercepting window.open');
-                console.log('   URL:', url);
-                console.log('   Original target:', target);
-                console.log('   Original features:', features);
-            }
-
-            // Restore original window.open
-            window.open = originalWindowOpen;
-
-            // Open in NEW TAB instead of popup window
-            const result = originalWindowOpen.call(this, url, '_blank');
-
-            if (AUTO_PRINT_CONFIG.debugMode) {
-                console.log('✅ Packing Slip opened in new tab');
-            }
-
-            return result;
-        }
-        return originalWindowOpen.apply(this, arguments);
-    };
-
-    // Click the button
+    // Click the button (TabManager handles window.open interception)
     packingSlipBtn.click();
     console.log('✅ Packing Slip button clicked');
-
-    // Restore after timeout if not intercepted
-    setTimeout(() => {
-        if (!intercepted) {
-            window.open = originalWindowOpen;
-            console.warn('⚠️⚠️⚠️ Packing Slip did NOT call window.open!');
-            console.log('   This means the button either:');
-            console.log('   1. Modal closed before we could click');
-            console.log('   2. Button uses different method to open window');
-            console.log('   3. Button is disabled or not clickable');
-        }
-    }, 1000);
 
     return true;
 }
 
 /**
  * Finds and clicks the Print Carton Label button
- * Intercepts window.open to change popup to new tab
- * Returns a Promise that resolves when the print window opens
+ * Note: TabManager handles window.open interception automatically
  */
 function clickCartonLabelButton() {
     const cartonLabelBtn = document.getElementById('box-label');
@@ -102,112 +60,76 @@ function clickCartonLabelButton() {
     }
 
     if (AUTO_PRINT_CONFIG.debugMode) {
-        console.log('🖨️ Clicking Carton Label button');
+        console.log('🖨️ Clicking Carton Label button (TabManager will handle window.open)');
     }
 
-    // Return a promise that resolves when the window.open is called
+    // Return a promise that resolves after button click
     return new Promise((resolve) => {
-        // Intercept window.open temporarily to change popup to tab
-        const originalWindowOpen = window.open;
-        let intercepted = false;
-
-        window.open = function(url, target, features) {
-            if (!intercepted) {
-                intercepted = true;
-                if (AUTO_PRINT_CONFIG.debugMode) {
-                    console.log('✅ Carton Label - intercepting window.open');
-                    console.log('   Original target:', target);
-                    console.log('   Original features:', features);
-                }
-
-                // Restore original window.open
-                window.open = originalWindowOpen;
-
-                // Open in NEW TAB instead of popup window
-                // Use '_blank' target without features to open as tab
-                const result = originalWindowOpen.call(this, url, '_blank');
-
-                if (AUTO_PRINT_CONFIG.debugMode) {
-                    console.log('✅ Carton Label opened in new tab');
-                }
-
-                // Resolve after a short delay to ensure tab is ready
-                setTimeout(() => resolve(result), 1500);
-
-                return result;
-            }
-            return originalWindowOpen.apply(this, arguments);
-        };
-
-        // Click the button
+        // Click the button (TabManager handles window.open interception)
         cartonLabelBtn.click();
 
-        // Fallback timeout in case window.open isn't called
+        // Small delay to ensure tab opens
         setTimeout(() => {
-            if (!intercepted) {
-                window.open = originalWindowOpen;
-                if (AUTO_PRINT_CONFIG.debugMode) {
-                    console.log('⚠️ Carton Label window.open not detected, proceeding anyway');
-                }
-                resolve(null);
+            if (AUTO_PRINT_CONFIG.debugMode) {
+                console.log('✅ Carton Label button clicked');
             }
-        }, 3000);
+            resolve(true);
+        }, 500);
     });
 }
 
 /**
  * Combined action that clicks both buttons simultaneously
  * Both tabs open at the same time (modal may close after first click)
+ * Note: TabManager handles window.open interception automatically
  */
 async function printAllButtons() {
     console.log('🖨️🖨️ Print All - Starting...');
-    console.log('💡 Strategy: Click BOTH buttons immediately (tabs will open independently)');
+    console.log('💡 Strategy: Click PACKING SLIP FIRST, then CARTON LABEL');
+    console.log('   (Carton label click closes modal, so packing slip must go first)');
 
     try {
-        // Intercept window.open globally to convert all popups to tabs
-        const originalWindowOpen = window.open;
-        const openedWindows = [];
-
-        window.open = function(url, _target, features) {
-            console.log('🪟 window.open intercepted:');
-            console.log('   URL:', url);
-            console.log('   Original features:', features);
-
-            // Open in tab instead
-            const result = originalWindowOpen.call(this, url, '_blank');
-            openedWindows.push(result);
-
-            console.log('✅ Opened as tab');
-            return result;
-        };
-
-        // Click both buttons with minimal delay
-        console.log('📦 Clicking Carton Label...');
-        const cartonBtn = document.getElementById('box-label');
-        if (cartonBtn) {
-            cartonBtn.click();
-        } else {
-            console.warn('⚠️ Carton Label button not found');
-        }
-
-        // Small delay to ensure first click registers
-        await new Promise(resolve => setTimeout(resolve, 100));
-
-        console.log('📄 Clicking Packing Slip...');
+        // Step 1: Click PACKING SLIP button FIRST (before modal closes)
+        console.log('📄 Step 1: Clicking Packing Slip...');
         const packingBtn = document.getElementById('btnPrintPackSlip');
         if (packingBtn) {
+            console.log('   ✅ Packing slip button found');
+            console.log('   Button visible:', packingBtn.offsetParent !== null);
+            console.log('   Button disabled:', packingBtn.disabled);
+            console.log('   Button onclick:', packingBtn.onclick);
+            console.log('   Button getAttribute onclick:', packingBtn.getAttribute('onclick'));
+            console.log('   Button data-value:', packingBtn.getAttribute('data-value'));
+
             packingBtn.click();
+            console.log('   ✅ Packing slip button clicked');
         } else {
             console.warn('⚠️ Packing Slip button not found');
         }
 
-        // Wait for windows to open
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        // Small delay between clicks
+        await new Promise(resolve => setTimeout(resolve, 100));
 
-        // Restore original window.open
-        window.open = originalWindowOpen;
+        // Step 2: Click CARTON LABEL button SECOND
+        console.log('📦 Step 2: Clicking Carton Label...');
+        const cartonBtn = document.getElementById('box-label');
+        if (cartonBtn) {
+            console.log('   ✅ Carton label button found');
+            console.log('   Button onclick:', cartonBtn.onclick);
+            console.log('   Button getAttribute onclick:', cartonBtn.getAttribute('onclick'));
+            console.log('   Button data-value:', cartonBtn.getAttribute('data-value'));
 
-        console.log(`✅ Print All completed - ${openedWindows.length} tab(s) opened`);
+            cartonBtn.click();
+            console.log('   ✅ Carton label button clicked');
+        } else {
+            console.warn('⚠️ Carton Label button not found');
+        }
+
+        // Wait for both tabs to open
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
+        console.log('✅ Print All completed - both tabs should be open');
+        console.log('   Tab 1: Packing Slip (opened first)');
+        console.log('   Tab 2: Carton Label (opened second)');
         return true;
 
     } catch (error) {
@@ -257,7 +179,7 @@ function addPrintAllButton() {
         font-size: 14px !important;
         padding: 10px 20px !important;
     `;
-    printAllBtn.textContent = '🖨️ Print All (2 Tabs)';
+    printAllBtn.textContent = '🖨️ Print All (Slip + Label)';
     printAllBtn.setAttribute('data-value', 'print-all');
 
     // Add click handler
@@ -295,105 +217,160 @@ function autoClickPrintAll() {
 }
 
 /**
- * Monitors the "Create Shipment" button and triggers print all after it's clicked
+ * DEPRECATED: This function is no longer used.
+ * We don't monitor the "Create Shipment" button anymore.
+ * Instead, we auto-click ONLY when the success modal appears.
  */
 function setupCreateShipmentButtonListener() {
-    const createShipmentBtn = document.getElementById('create-shipment');
-
-    if (!createShipmentBtn) {
-        if (AUTO_PRINT_CONFIG.debugMode) {
-            console.log('⚠️ Create Shipment button not found');
-        }
-        return false;
-    }
-
-    // Check if already has listener
-    if (createShipmentBtn._autoPrintListenerAdded) {
-        if (AUTO_PRINT_CONFIG.debugMode) {
-            console.log('ℹ️ Create Shipment button already has listener');
-        }
-        return true;
-    }
-
-    // Initialize flag
-    window._shouldAutoClickPrintAll = false;
-
-    // Add click event listener
-    createShipmentBtn.addEventListener('click', () => {
-        console.log('🔔🔔🔔 CREATE SHIPMENT BUTTON CLICKED! 🔔🔔🔔');
-        console.log('🔔 Setting auto-click flag to TRUE');
-
-        // Set flag to auto-click when modal appears
-        window._shouldAutoClickPrintAll = true;
-
-        console.log('🔔 Flag value:', window._shouldAutoClickPrintAll);
-    }, true); // Use capture phase to ensure we catch the event
-
-    createShipmentBtn._autoPrintListenerAdded = true;
-
-    console.log('✅ Create Shipment button listener added');
-    console.log('   Button ID:', createShipmentBtn.id);
-    console.log('   Button text:', createShipmentBtn.textContent.trim());
+    console.log('ℹ️ setupCreateShipmentButtonListener called but NOT setting up listener');
+    console.log('   Auto-click will trigger based on modal appearance only');
     return true;
+}
+
+/**
+ * Waits for buttons to become visible before clicking them
+ * Returns a promise that resolves when both buttons are visible
+ */
+async function waitForButtonsVisible() {
+    console.log('⏳ Waiting for buttons to become visible...');
+
+    const maxAttempts = 20;
+    const delayMs = 100;
+
+    for (let i = 0; i < maxAttempts; i++) {
+        const packingBtn = document.getElementById('btnPrintPackSlip');
+        const cartonBtn = document.getElementById('box-label');
+
+        if (packingBtn && cartonBtn) {
+            const packingVisible = packingBtn.offsetParent !== null;
+            const cartonVisible = cartonBtn.offsetParent !== null;
+
+            console.log(`   Attempt ${i + 1}/${maxAttempts}:`, {
+                packingVisible,
+                cartonVisible
+            });
+
+            if (packingVisible && cartonVisible) {
+                console.log('✅ Both buttons are now visible!');
+                return true;
+            }
+        }
+
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+    }
+
+    console.warn('⚠️ Timeout waiting for buttons to become visible');
+    return false;
 }
 
 /**
  * Main handler for shipment modal appearance
  * This should be called by the router when the modal is detected
+ * IMPORTANT: Only triggers on "Shipment Created Success" modal (id="shipment-created")
+ * DOES NOT trigger on "Create Shipment Details" modal (id="shipment-detail")
  */
-function handleShipmentModalAppearance() {
+async function handleShipmentModalAppearance() {
     console.log('🎯 handleShipmentModalAppearance called');
 
-    const modal = document.getElementById('shipment-created');
-
-    if (!modal) {
-        console.log('⚠️ Modal #shipment-created not found');
-        return;
-    }
-
-    // Check if modal is visible
+    // Check if modal container is visible
     const modalBlockUI = document.getElementById('_modal_block_ui');
     const isVisible = modalBlockUI &&
                      modalBlockUI.classList.contains('loader_block_ui') &&
                      modalBlockUI.style.display !== 'none';
 
-    console.log('📊 Modal visibility check:');
+    console.log('📊 Modal container visibility check:');
     console.log('   modalBlockUI exists:', !!modalBlockUI);
     console.log('   has loader_block_ui class:', modalBlockUI?.classList.contains('loader_block_ui'));
     console.log('   display style:', modalBlockUI?.style.display);
     console.log('   isVisible:', isVisible);
 
     if (!isVisible) {
-        console.log('⚠️ Modal not visible, exiting');
+        console.log('⚠️ Modal container not visible, exiting');
         return;
     }
 
-    console.log('✅ Shipment created modal detected and visible!');
+    // CRITICAL: Check which modal is displayed
+    // BOTH modals exist in the DOM simultaneously but only ONE is visible at a time:
+    // 1. id="shipment-detail" - The "Create Shipment" modal (WRONG - do NOT trigger)
+    // 2. id="shipment-created" - The "Success" modal (RIGHT - trigger here)
 
-    // Add the button
+    const createModal = document.getElementById('shipment-detail');
+    const successModal = document.getElementById('shipment-created');
+
+    console.log('📊 Modal identification:');
+    console.log('   "Create Shipment" modal (shipment-detail) exists:', !!createModal);
+    console.log('   "Success" modal (shipment-created) exists:', !!successModal);
+
+    // Check which modal is actually VISIBLE (not just present in DOM)
+    const createModalVisible = createModal && createModal.offsetParent !== null;
+    const successModalVisible = successModal && successModal.offsetParent !== null;
+
+    console.log('📊 Modal visibility:');
+    console.log('   "Create Shipment" modal visible:', createModalVisible);
+    console.log('   "Success" modal visible:', successModalVisible);
+
+    // If the "Create Shipment" modal is VISIBLE, DO NOT TRIGGER
+    if (createModalVisible) {
+        console.log('❌ WRONG MODAL: The "Create Shipment Details" modal is VISIBLE (id="shipment-detail")');
+        console.log('   Button text: "Create Shipment"');
+        console.log('   We DO NOT trigger on this modal - exiting');
+        return;
+    }
+
+    // If the "Success" modal is NOT visible, exit
+    if (!successModalVisible) {
+        console.log('⚠️ Success modal (id="shipment-created") not visible, exiting');
+        return;
+    }
+
+    console.log('✅ Correct modal detected: "Shipment Created Success" modal is VISIBLE (id="shipment-created")!');
+
+    // Check for print buttons
+    const packingSlipBtn = successModal.querySelector('#btnPrintPackSlip');
+    const cartonLabelBtn = successModal.querySelector('#box-label');
+
+    console.log('📊 Print button check:');
+    console.log('   Packing Slip button found:', !!packingSlipBtn);
+    console.log('   Carton Label button found:', !!cartonLabelBtn);
+
+    if (!packingSlipBtn || !cartonLabelBtn) {
+        console.log('⚠️ Print buttons not found in success modal, exiting');
+        return;
+    }
+
+    // Wait for buttons to become visible
+    const packingVisible = packingSlipBtn.offsetParent !== null;
+    const cartonVisible = cartonLabelBtn.offsetParent !== null;
+
+    console.log('📊 Initial button visibility:');
+    console.log('   Packing Slip visible:', packingVisible);
+    console.log('   Carton Label visible:', cartonVisible);
+
+    if (!packingVisible && !cartonVisible) {
+        console.log('⏳ Buttons not visible yet, waiting...');
+        const buttonsVisible = await waitForButtonsVisible();
+
+        if (!buttonsVisible) {
+            console.log('❌ Buttons never became visible, exiting');
+            return;
+        }
+    }
+
+    console.log('✅ Print buttons are visible!');
+
+    // Add the Print All button
     if (addPrintAllButton()) {
         console.log('📊 Auto-click check:');
-        console.log('   window._shouldAutoClickPrintAll:', window._shouldAutoClickPrintAll);
         console.log('   AUTO_PRINT_CONFIG.autoClickEnabled:', AUTO_PRINT_CONFIG.autoClickEnabled);
 
-        // Only auto-click if Create Shipment button was pressed
-        if (window._shouldAutoClickPrintAll && AUTO_PRINT_CONFIG.autoClickEnabled) {
+        if (AUTO_PRINT_CONFIG.autoClickEnabled) {
             console.log('✅✅✅ CONDITIONS MET - Auto-clicking Print All in ' + AUTO_PRINT_CONFIG.autoClickDelay + 'ms');
 
             setTimeout(() => {
                 autoClickPrintAll();
-                // Reset flag
-                window._shouldAutoClickPrintAll = false;
-                console.log('🔄 Flag reset to false');
             }, AUTO_PRINT_CONFIG.autoClickDelay);
         } else {
-            console.log('❌ NOT auto-clicking:');
-            if (!window._shouldAutoClickPrintAll) {
-                console.log('   ❌ Create Shipment was NOT clicked (flag is false)');
-            }
-            if (!AUTO_PRINT_CONFIG.autoClickEnabled) {
-                console.log('   ❌ Auto-click is disabled in config');
-            }
+            console.log('❌ Auto-click disabled in config');
         }
     } else {
         console.log('❌ Failed to add Print All button');

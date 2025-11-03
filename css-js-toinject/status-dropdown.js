@@ -200,5 +200,64 @@
         return true;
     };
 
+    /**
+     * Setup auto-submit for product-scan input
+     * Monitors product-scan input and auto-submits when status is already filled
+     * @returns {boolean} Success status
+     */
+    window.setupProductScanAutoSubmit = function() {
+        const productInput = document.getElementById('product-scan');
+        if (!productInput) {
+            console.warn('⚠️ product-scan input not found');
+            return false;
+        }
+
+        console.log('🚀 Setting up product-scan auto-submit');
+
+        // Monitor input changes on product-scan
+        productInput.addEventListener('input', function() {
+            const productValue = this.value.trim();
+            const statusInput = document.getElementById('status-scan');
+            const statusValue = statusInput ? statusInput.value.trim() : '';
+
+            console.log(`📦 Product scanned: "${productValue}", Status: "${statusValue}"`);
+
+            // If product has value AND status has value, auto-submit
+            if (productValue && statusValue) {
+                console.log('✅ Both product and status filled, auto-submitting...');
+
+                // Small delay to ensure value is fully set
+                setTimeout(() => {
+                    // Simulate Enter key press on the status input
+                    const enterEvent = new KeyboardEvent('keydown', {
+                        key: 'Enter',
+                        code: 'Enter',
+                        keyCode: 13,
+                        which: 13,
+                        bubbles: true,
+                        cancelable: true
+                    });
+
+                    statusInput.dispatchEvent(enterEvent);
+
+                    // Also try triggering on the product input
+                    productInput.dispatchEvent(enterEvent);
+
+                    // Try finding and clicking the submit button as fallback
+                    const submitButton = document.querySelector('#scan-product-modal .modal-box-button[type="submit"]');
+                    if (submitButton) {
+                        console.log('🔘 Clicking submit button as fallback');
+                        submitButton.click();
+                    }
+
+                    console.log('✅ Auto-submit triggered');
+                }, 100);
+            }
+        });
+
+        console.log('✅ Product-scan auto-submit configured');
+        return true;
+    };
+
     console.log('✅ Status Dropdown Functions Loaded');
 })();

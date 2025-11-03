@@ -182,17 +182,25 @@
                         }
                     }, 500);
 
-                    // Setup auto-fill for status-scan input
-                    const statusInputObserver = new MutationObserver((mutations, obs) => {
+                    // Setup auto-fill for status-scan input and auto-submit for product-scan
+                    const modalInputsObserver = new MutationObserver((mutations, obs) => {
                         const statusInput = document.getElementById('status-scan');
-                        if (statusInput) {
-                            console.log('✅ status-scan input found, setting up auto-fill');
+                        const productInput = document.getElementById('product-scan');
+
+                        if (statusInput && productInput) {
+                            console.log('✅ Both inputs found, setting up auto-fill and auto-submit');
                             setupStatusAutoFill();
+
+                            // Setup auto-submit if function is available
+                            if (typeof setupProductScanAutoSubmit === 'function') {
+                                setupProductScanAutoSubmit();
+                            }
+
                             obs.disconnect();
                         }
                     });
 
-                    statusInputObserver.observe(document.body, {
+                    modalInputsObserver.observe(document.body, {
                         childList: true,
                         subtree: true
                     });
@@ -200,9 +208,16 @@
                     // Try immediately
                     setTimeout(() => {
                         const statusInput = document.getElementById('status-scan');
-                        if (statusInput) {
+                        const productInput = document.getElementById('product-scan');
+
+                        if (statusInput && productInput) {
                             setupStatusAutoFill();
-                            statusInputObserver.disconnect();
+
+                            if (typeof setupProductScanAutoSubmit === 'function') {
+                                setupProductScanAutoSubmit();
+                            }
+
+                            modalInputsObserver.disconnect();
                         }
                     }, 500);
                 } else {
@@ -212,6 +227,30 @@
                 // ========== SNACKBAR INTERCEPTOR ==========
                 if (typeof OverlayManager !== 'undefined') {
                     console.log('🎯 Snackbar interceptor feature enabled');
+
+                    // Helper function to clear inputs and refocus on error (shared with API interceptor)
+                    window._handleScanError = function() {
+                        const productInput = document.getElementById('product-scan');
+                        const statusInput = document.getElementById('status-scan');
+
+                        if (productInput) {
+                            productInput.value = '';
+                            console.log('🧹 Cleared product-scan input');
+                        }
+
+                        if (statusInput) {
+                            statusInput.value = '';
+                            console.log('🧹 Cleared status-scan input');
+                        }
+
+                        // Refocus on product-scan after a short delay
+                        setTimeout(() => {
+                            if (productInput) {
+                                productInput.focus();
+                                console.log('🎯 Refocused on product-scan input');
+                            }
+                        }, 100);
+                    };
 
                     // Intercept snackbar.show calls and replace with OverlayManager
                     function interceptSnackbar() {
@@ -242,6 +281,11 @@
                                 });
 
                                 console.log(`✅ Replaced snackbar with ${overlayType} overlay:`, message);
+
+                                // If it's an error or warning, clear inputs and refocus
+                                if (overlayType === 'error' || overlayType === 'warning') {
+                                    window._handleScanError();
+                                }
 
                                 // Don't call original snackbar
                                 // If you want to call original as fallback, uncomment:
@@ -320,14 +364,37 @@
                                                 duration: 4000
                                             });
                                             console.log('❌ Update failed:', errorMsg);
+
+                                            // Clear inputs and refocus on error
+                                            if (typeof window._handleScanError === 'function') {
+                                                window._handleScanError();
+                                            }
                                         }
 
                                         // Call original callback
                                         if (callback) callback(response);
                                     };
 
-                                    // Call original with wrapped callback
-                                    return originalPost.call(this, endpoint, data, wrappedCallback, errorCallback);
+                                    // Wrap error callback too
+                                    const wrappedErrorCallback = function(error) {
+                                        console.log('❌ API Error:', error);
+                                        const errorMsg = error.message || error.responseMessage || 'Request failed';
+                                        OverlayManager.error({
+                                            message: `Error: ${errorMsg}`,
+                                            duration: 4000
+                                        });
+
+                                        // Clear inputs and refocus on error
+                                        if (typeof window._handleScanError === 'function') {
+                                            window._handleScanError();
+                                        }
+
+                                        // Call original error callback
+                                        if (errorCallback) errorCallback(error);
+                                    };
+
+                                    // Call original with wrapped callbacks
+                                    return originalPost.call(this, endpoint, data, wrappedCallback, wrappedErrorCallback);
                                 }
 
                                 // Not the target endpoint, call original
@@ -429,6 +496,11 @@
                                             message: message,
                                             duration: 4000
                                         });
+
+                                        // Clear inputs and refocus on error
+                                        if (typeof window._handleScanError === 'function') {
+                                            window._handleScanError();
+                                        }
                                     }
 
                                     // Log to popup controller for history
@@ -443,6 +515,11 @@
                                         message: `Request failed: ${error.message}`,
                                         duration: 4000
                                     });
+
+                                    // Clear inputs and refocus on error
+                                    if (typeof window._handleScanError === 'function') {
+                                        window._handleScanError();
+                                    }
 
                                     throw error;
                                 }
@@ -488,6 +565,11 @@
                                                     message: `Update failed: ${errorMsg}`,
                                                     duration: 4000
                                                 });
+
+                                                // Clear inputs and refocus on error
+                                                if (typeof window._handleScanError === 'function') {
+                                                    window._handleScanError();
+                                                }
                                             }
                                         } catch (error) {
                                             console.error('Error handling XHR response:', error);
@@ -712,6 +794,27 @@
             action: () => {
                 console.log('🚀 Matched #outbound/packing route');
 
+                // ========== TAB MANAGER FOR WINDOW.OPEN ==========
+                if (typeof TabManager !== 'undefined') {
+                    console.log('🪟 Tab Manager feature enabled');
+
+                    // Ensure TabManager is installed
+                    if (!window.open._tabManagerInstalled) {
+                        TabManager.install();
+                        console.log('✅ Tab Manager installed for this route');
+                    } else {
+                        console.log('ℹ️ Tab Manager already installed');
+                    }
+
+                    // Enable debug mode for visibility
+                    TabManager.setDebug(true);
+
+                    console.log('💡 All window.open() calls will now use reusable tabs');
+                    console.log('💡 Debug with: window.TabManager.printStatus()');
+                } else {
+                    console.warn('⚠️ TabManager not loaded');
+                }
+
                 // ========== SKU AND QTY CLICKABLE FEATURE ==========
                 if (typeof makeSkuItemsClickable === 'function' || typeof makeQtyItemsClickable === 'function') {
                     // Set up MutationObserver to watch for table data changes
@@ -760,22 +863,9 @@
                 }
 
                 // ========== AUTO PRINT BUTTONS FEATURE ==========
-                if (typeof handleShipmentModalAppearance === 'function' &&
-                    typeof setupCreateShipmentButtonListener === 'function') {
+                if (typeof handleShipmentModalAppearance === 'function') {
                     console.log('🖨️ Auto Print Buttons feature enabled');
-
-                    // Set up listener for Create Shipment button
-                    const setupCreateShipmentButton = () => {
-                        if (setupCreateShipmentButtonListener()) {
-                            console.log('✅ Create Shipment button listener active');
-                        } else {
-                            // Button not found yet, try again
-                            setTimeout(setupCreateShipmentButton, 1000);
-                        }
-                    };
-
-                    // Try to set up Create Shipment button listener
-                    setTimeout(setupCreateShipmentButton, 500);
+                    console.log('💡 Auto-click triggers ONLY when "Shipment Created Success" modal appears');
 
                     // Set up MutationObserver to watch for shipment modal
                     const modalObserver = new MutationObserver((mutations) => {
@@ -790,14 +880,6 @@
 
                                         console.log('🔄 Shipment modal detected by router');
                                         setTimeout(handleShipmentModalAppearance, 100);
-                                    }
-
-                                    // Check if Create Shipment button was added
-                                    if (node.id === 'create-shipment' ||
-                                        node.querySelector?.('#create-shipment')) {
-
-                                        console.log('🔄 Create Shipment button detected');
-                                        setTimeout(setupCreateShipmentButton, 100);
                                     }
                                 }
                             });
