@@ -862,10 +862,14 @@
                     console.warn('⚠️ makeSkuItemsClickable and makeQtyItemsClickable not loaded');
                 }
 
-                // ========== AUTO PRINT BUTTONS FEATURE ==========
-                if (typeof handleShipmentModalAppearance === 'function') {
-                    console.log('🖨️ Auto Print Buttons feature enabled');
-                    console.log('💡 Auto-click triggers ONLY when "Shipment Created Success" modal appears');
+                // ========== SILENT AUTO PRINT FEATURE ==========
+                if (typeof window.silentAutoPrint !== 'undefined') {
+                    console.log('🖨️ Silent Auto Print feature enabled');
+                    console.log('💡 Print mode:', window.silentAutoPrint.config.printMode);
+                    console.log('💡 Auto-click:', window.silentAutoPrint.config.autoClickEnabled ? 'ENABLED' : 'DISABLED');
+                    console.log('💡 Configured printers:');
+                    console.log('   Packing Slip:', window.silentAutoPrint.config.printerNamePackingSlip);
+                    console.log('   Carton Label:', window.silentAutoPrint.config.printerNameCartonLabel);
 
                     // Set up MutationObserver to watch for shipment modal
                     const modalObserver = new MutationObserver((mutations) => {
@@ -879,7 +883,9 @@
                                         node.querySelector?.('#shipment-created')) {
 
                                         console.log('🔄 Shipment modal detected by router');
-                                        setTimeout(handleShipmentModalAppearance, 100);
+                                        setTimeout(() => {
+                                            window.silentAutoPrint.handleModal();
+                                        }, 100);
                                     }
                                 }
                             });
@@ -888,7 +894,9 @@
                             if (mutation.type === 'attributes' &&
                                 mutation.target.id === '_modal_block_ui') {
 
-                                setTimeout(handleShipmentModalAppearance, 100);
+                                setTimeout(() => {
+                                    window.silentAutoPrint.handleModal();
+                                }, 100);
                             }
                         });
                     });
@@ -903,15 +911,58 @@
 
                     // Try immediately in case modal already exists
                     setTimeout(() => {
-                        handleShipmentModalAppearance();
+                        window.silentAutoPrint.handleModal();
                     }, 500);
 
-                    console.log('✅ Auto Print Buttons observer set up');
+                    console.log('✅ Silent Auto Print observer set up');
+
                 } else {
-                    console.warn('⚠️ Auto Print Buttons functions not loaded');
+                    console.warn('⚠️ Silent Auto Print not loaded - falling back to legacy auto-print if available');
+
+                    // Fallback to legacy auto-print-buttons.js
+                    if (typeof handleShipmentModalAppearance === 'function') {
+                        console.log('🖨️ Using legacy Auto Print Buttons');
+
+                        const modalObserver = new MutationObserver((mutations) => {
+                            mutations.forEach(mutation => {
+                                mutation.addedNodes.forEach(node => {
+                                    if (node.nodeType === 1) {
+                                        if (node.id === '_modal_block_ui' ||
+                                            node.id === 'shipment-created' ||
+                                            node.querySelector?.('#shipment-created')) {
+
+                                            console.log('🔄 Shipment modal detected by router');
+                                            setTimeout(handleShipmentModalAppearance, 100);
+                                        }
+                                    }
+                                });
+
+                                if (mutation.type === 'attributes' &&
+                                    mutation.target.id === '_modal_block_ui') {
+
+                                    setTimeout(handleShipmentModalAppearance, 100);
+                                }
+                            });
+                        });
+
+                        modalObserver.observe(document.body, {
+                            childList: true,
+                            subtree: true,
+                            attributes: true,
+                            attributeFilter: ['style', 'class']
+                        });
+
+                        setTimeout(() => {
+                            handleShipmentModalAppearance();
+                        }, 500);
+
+                        console.log('✅ Legacy Auto Print Buttons observer set up');
+                    } else {
+                        console.warn('⚠️ No auto print functions loaded');
+                    }
                 }
             },
-            description: 'SKU and Qty item linker + Auto print buttons for outbound packing page'
+            description: 'SKU and Qty item linker + Silent auto print for outbound packing page'
         },
         {
             name: 'Outbound Shipment List Route',
