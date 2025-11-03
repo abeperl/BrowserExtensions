@@ -27,7 +27,8 @@
       "Bash(del \"c:\\Users\\User\\source\\repos\\BrowserExtensions\\css-js-toinject\\index.js\")",
       "Bash(del \"c:\\Users\\User\\source\\repos\\BrowserExtensions\\css-js-toinject\\sku-qty-focus.js\")",
       "Bash(node -e:*)",
-      "Bash(del \"c:\\Users\\User\\source\\repos\\BrowserExtensions\\css-js-toinject\\IMPLEMENTATION-SUMMARY.md\")"
+      "Bash(del \"c:\\Users\\User\\source\\repos\\BrowserExtensions\\css-js-toinject\\IMPLEMENTATION-SUMMARY.md\")",
+      "Bash(mv:*)"
     ],
     "deny": []
   }
