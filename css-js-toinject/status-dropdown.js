@@ -152,7 +152,8 @@
     };
 
     /**
-     * Setup auto-fill for status-scan input
+     * Setup auto-fill and auto-submit for status-scan input
+     * Streamlined workflow: auto-fills from dropdown, auto-submits, returns focus to product-scan
      * @returns {boolean} Success status
      */
     window.setupStatusAutoFill = function() {
@@ -162,47 +163,133 @@
             return false;
         }
 
-        console.log('📎 Setting up status auto-fill');
+        console.log('📎 Setting up streamlined status auto-fill and submit');
 
-        // Auto-fill when input receives focus
+        // Sanitize input to prevent control characters from triggering browser shortcuts
+        statusInput.addEventListener('input', function(event) {
+            const originalValue = this.value;
+
+            // Log raw input for debugging (shows hex codes of special chars)
+            console.log('🔍 Status input received:', originalValue,
+                        'Char codes:', Array.from(originalValue).map(c => c.charCodeAt(0)));
+
+            // Check for Line Feed (LF = 10 = \n) or Carriage Return (CR = 13 = \r)
+            const hasLineFeed = originalValue.includes('\n');
+            const hasCarriageReturn = originalValue.includes('\r');
+
+            // Remove ALL control characters (0-31) and DEL (127)
+            const sanitized = originalValue.replace(/[\x00-\x1F\x7F]/g, '');
+
+            if (sanitized !== originalValue) {
+                console.warn('⚠️ Removed control characters from status scan');
+                this.value = sanitized;
+            }
+
+            // If scanner sent LF or CR, trigger Enter key event
+            if (hasLineFeed || hasCarriageReturn) {
+                console.log('✅ Detected Line Feed/CR from scanner - triggering Enter');
+
+                setTimeout(() => {
+                    const enterEvent = new KeyboardEvent('keydown', {
+                        key: 'Enter',
+                        code: 'Enter',
+                        keyCode: 13,
+                        which: 13,
+                        bubbles: true,
+                        cancelable: true
+                    });
+                    this.dispatchEvent(enterEvent);
+                }, 10);
+            }
+        });
+
+        // Convert Ctrl+J (Line Feed from scanner) to Enter key
+        statusInput.addEventListener('keydown', function(event) {
+            // Scanner sends Ctrl+J (Line Feed) instead of Enter
+            if (event.ctrlKey && event.key.toLowerCase() === 'j') {
+                console.log('🔄 Converting Ctrl+J (Line Feed) to Enter');
+                event.preventDefault();
+                event.stopPropagation();
+
+                // Trigger Enter key event
+                setTimeout(() => {
+                    const enterEvent = new KeyboardEvent('keydown', {
+                        key: 'Enter',
+                        code: 'Enter',
+                        keyCode: 13,
+                        which: 13,
+                        bubbles: true,
+                        cancelable: true
+                    });
+                    this.dispatchEvent(enterEvent);
+                }, 10);
+                return false;
+            }
+
+            // Block other Ctrl shortcuts
+            if (event.ctrlKey && !event.shiftKey && !event.altKey) {
+                console.warn(`⚠️ Blocked Ctrl+${event.key} shortcut from scanner`);
+                event.preventDefault();
+                event.stopPropagation();
+                return false;
+            }
+        });
+
+        // Auto-fill and auto-submit when input receives focus
         statusInput.addEventListener('focus', function() {
             const selectedStatus = window.getSelectedStatus();
 
-            if (selectedStatus && !this.value) {
-                this.value = selectedStatus;
-                console.log(`✅ Auto-filled status: ${selectedStatus}`);
+            if (selectedStatus) {
+                console.log(`✅ Auto-filling status: ${selectedStatus}`);
 
-                // Trigger input event in case the app listens to it
+                // Fill the input
+                this.value = selectedStatus;
+
+                // Trigger input event
                 const inputEvent = new Event('input', { bubbles: true });
                 this.dispatchEvent(inputEvent);
 
-                // Also trigger change event
+                // Trigger change event
                 const changeEvent = new Event('change', { bubbles: true });
                 this.dispatchEvent(changeEvent);
-            } else if (selectedStatus && this.value) {
-                console.log('ℹ️ Input already has value, not overwriting');
-            } else if (!selectedStatus) {
-                console.log('ℹ️ No status selected in dropdown');
+
+                // Small delay to ensure value is set, then auto-submit
+                setTimeout(() => {
+                    console.log('✅ Auto-submitting via Enter key');
+
+                    // Simulate Enter key press to trigger submit
+                    const enterEvent = new KeyboardEvent('keydown', {
+                        key: 'Enter',
+                        code: 'Enter',
+                        keyCode: 13,
+                        which: 13,
+                        bubbles: true,
+                        cancelable: true
+                    });
+                    this.dispatchEvent(enterEvent);
+
+                    // Also try clicking submit button as fallback
+                    const submitButton = document.querySelector('#scan-product-modal .modal-box-button[type="submit"]');
+                    if (submitButton) {
+                        console.log('🔘 Clicking submit button');
+                        submitButton.click();
+                    }
+
+                    // Let the form submission handle focus naturally
+                    console.log('⏳ Waiting for form submission to complete...');
+                }, 100);
+            } else {
+                console.log('⚠️ No status selected in dropdown - cannot auto-submit');
             }
         });
 
-        // Also auto-fill on mouseenter (in case focus doesn't trigger)
-        statusInput.addEventListener('mouseenter', function() {
-            const selectedStatus = window.getSelectedStatus();
-
-            if (selectedStatus && !this.value) {
-                this.value = selectedStatus;
-                console.log(`✅ Auto-filled status (mouseenter): ${selectedStatus}`);
-            }
-        });
-
-        console.log('✅ Status auto-fill configured');
+        console.log('✅ Streamlined status auto-fill and submit configured');
         return true;
     };
 
     /**
-     * Setup auto-submit for product-scan input
-     * Monitors product-scan input and auto-submits when status is already filled
+     * Setup product-scan input to move to status-scan
+     * Streamlined workflow: scan product -> move to status-scan (which handles the rest)
      * @returns {boolean} Success status
      */
     window.setupProductScanAutoSubmit = function() {
@@ -212,23 +299,33 @@
             return false;
         }
 
-        console.log('🚀 Setting up product-scan auto-submit');
+        console.log('🚀 Setting up product-scan workflow');
 
-        // Monitor input changes on product-scan
-        productInput.addEventListener('input', function() {
-            const productValue = this.value.trim();
-            const statusInput = document.getElementById('status-scan');
-            const statusValue = statusInput ? statusInput.value.trim() : '';
+        // Sanitize input to prevent control characters
+        productInput.addEventListener('input', function(event) {
+            const originalValue = this.value;
 
-            console.log(`📦 Product scanned: "${productValue}", Status: "${statusValue}"`);
+            // Log raw input for debugging
+            console.log('🔍 Product input received:', originalValue,
+                        'Char codes:', Array.from(originalValue).map(c => c.charCodeAt(0)));
 
-            // If product has value AND status has value, auto-submit
-            if (productValue && statusValue) {
-                console.log('✅ Both product and status filled, auto-submitting...');
+            // Check for Line Feed (LF = 10 = \n) or Carriage Return (CR = 13 = \r)
+            const hasLineFeed = originalValue.includes('\n');
+            const hasCarriageReturn = originalValue.includes('\r');
 
-                // Small delay to ensure value is fully set
+            // Remove ALL control characters (0-31) and DEL (127)
+            const sanitized = originalValue.replace(/[\x00-\x1F\x7F]/g, '');
+
+            if (sanitized !== originalValue) {
+                console.warn('⚠️ Removed control characters from product scan');
+                this.value = sanitized;
+            }
+
+            // If scanner sent LF or CR, trigger Enter key event to move to next field
+            if (hasLineFeed || hasCarriageReturn) {
+                console.log('✅ Detected Line Feed/CR from scanner - triggering Enter');
+
                 setTimeout(() => {
-                    // Simulate Enter key press on the status input
                     const enterEvent = new KeyboardEvent('keydown', {
                         key: 'Enter',
                         code: 'Enter',
@@ -237,25 +334,59 @@
                         bubbles: true,
                         cancelable: true
                     });
-
-                    statusInput.dispatchEvent(enterEvent);
-
-                    // Also try triggering on the product input
-                    productInput.dispatchEvent(enterEvent);
-
-                    // Try finding and clicking the submit button as fallback
-                    const submitButton = document.querySelector('#scan-product-modal .modal-box-button[type="submit"]');
-                    if (submitButton) {
-                        console.log('🔘 Clicking submit button as fallback');
-                        submitButton.click();
-                    }
-
-                    console.log('✅ Auto-submit triggered');
-                }, 100);
+                    this.dispatchEvent(enterEvent);
+                }, 10);
             }
         });
 
-        console.log('✅ Product-scan auto-submit configured');
+        // Convert Ctrl+J (Line Feed from scanner) to Enter key
+        productInput.addEventListener('keydown', function(event) {
+            // Scanner sends Ctrl+J (Line Feed) instead of Enter
+            if (event.ctrlKey && event.key.toLowerCase() === 'j') {
+                console.log('🔄 Converting Ctrl+J (Line Feed) to Enter');
+                event.preventDefault();
+                event.stopPropagation();
+
+                // Trigger Enter key event to move to next field
+                setTimeout(() => {
+                    const enterEvent = new KeyboardEvent('keydown', {
+                        key: 'Enter',
+                        code: 'Enter',
+                        keyCode: 13,
+                        which: 13,
+                        bubbles: true,
+                        cancelable: true
+                    });
+                    this.dispatchEvent(enterEvent);
+                }, 10);
+                return false;
+            }
+
+            // Block other Ctrl combinations (except Ctrl+A, Ctrl+C, Ctrl+V for user)
+            if (event.ctrlKey && !['a', 'c', 'v'].includes(event.key.toLowerCase())) {
+                console.warn(`⚠️ Blocked Ctrl+${event.key} shortcut from scanner`);
+                event.preventDefault();
+                event.stopPropagation();
+                return false;
+            }
+        });
+
+        // Log product scan on Enter/Tab key (let them work naturally)
+        productInput.addEventListener('keydown', function(event) {
+            if (event.key === 'Enter' || event.keyCode === 13 || event.key === 'Tab') {
+                const productValue = this.value.trim();
+
+                if (productValue) {
+                    console.log(`📦 Product scanned: "${productValue}" - allowing natural navigation`);
+                } else {
+                    console.log('⚠️ Product value is empty');
+                }
+
+                // Don't prevent default - let Enter/Tab work naturally
+            }
+        });
+
+        console.log('✅ Product-scan workflow configured');
         return true;
     };
 

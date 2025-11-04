@@ -142,52 +142,54 @@ function makeQtyItemsClickable() {
 
                 console.log('Found target row for SKU:', skuText);
 
-                // Find the qty column in this row
-                const qtyColumn = targetRow.querySelector('td.qty-column');
+                // Find the qty-wrp element (which handles the click logic)
+                const qtyWrp = targetRow.querySelector('.qty-wrp');
 
-                if (!qtyColumn) {
-                    console.error('Could not find qty column');
+                if (!qtyWrp) {
+                    console.error('Could not find .qty-wrp element');
                     return;
                 }
 
-                // Find the qty input field
-                const qtyInput = qtyColumn.querySelector('input.qty-mn');
-                const qtyDisplaySpan = qtyColumn.querySelector('span.item_added');
+                // Trigger click on qty-wrp to invoke the existing click handler
+                // This handles personalized items, disabled state, and showing/hiding inputs
+                console.log('Triggering click on .qty-wrp');
+                qtyWrp.click();
 
-                if (!qtyInput || !qtyDisplaySpan) {
-                    console.error('Could not find qty input or display span');
-                    return;
-                }
-
-                // Show the input, hide the display span
-                qtyInput.classList.remove('hide');
-                qtyDisplaySpan.style.display = 'none';
-
-                // Set the value and focus
-                qtyInput.value = qtyText;
-                qtyInput.focus();
-                qtyInput.select();
-
-                console.log(`Set quantity to: ${qtyText}`);
-
-                // Trigger events to ensure the change is registered
-                const inputEvent = new Event('input', { bubbles: true });
-                qtyInput.dispatchEvent(inputEvent);
-
-                const changeEvent = new Event('change', { bubbles: true });
-                qtyInput.dispatchEvent(changeEvent);
-
-                // Simulate blur/exit after a short delay
+                // Wait for the click handler to show the input, then set the value
                 setTimeout(() => {
-                    qtyInput.blur();
+                    const qtyInput = qtyWrp.querySelector('input.qty-mn');
 
-                    // Hide input, show display span again
-                    qtyInput.classList.add('hide');
-                    qtyDisplaySpan.style.display = '';
-                    qtyDisplaySpan.textContent = qtyText;
+                    if (!qtyInput) {
+                        console.error('Could not find qty input after click');
+                        return;
+                    }
 
-                    console.log('Exited qty input field');
-                }, 300);
+                    // Check if input is now visible
+                    if (qtyInput.classList.contains('hide')) {
+                        console.warn('Qty input still hidden - item may be personalized or disabled');
+                        return;
+                    }
+
+                    // Set the value
+                    qtyInput.value = qtyText;
+                    qtyInput.focus();
+                    qtyInput.select();
+
+                    console.log(`Set quantity to: ${qtyText}`);
+
+                    // Trigger events to ensure the change is registered
+                    const inputEvent = new Event('input', { bubbles: true });
+                    qtyInput.dispatchEvent(inputEvent);
+
+                    const changeEvent = new Event('change', { bubbles: true });
+                    qtyInput.dispatchEvent(changeEvent);
+
+                    // Simulate blur/exit after a short delay
+                    setTimeout(() => {
+                        qtyInput.blur();
+                        console.log('Exited qty input field');
+                    }, 300);
+                }, 100);
             });
 
             qtySpan.innerHTML = '';

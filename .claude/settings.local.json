@@ -28,7 +28,11 @@
       "Bash(del \"c:\\Users\\User\\source\\repos\\BrowserExtensions\\css-js-toinject\\sku-qty-focus.js\")",
       "Bash(node -e:*)",
       "Bash(del \"c:\\Users\\User\\source\\repos\\BrowserExtensions\\css-js-toinject\\IMPLEMENTATION-SUMMARY.md\")",
-      "Bash(mv:*)"
+      "Bash(mv:*)",
+      "WebSearch",
+      "WebFetch(domain:cdn.jsdelivr.net)",
+      "Bash(curl:*)",
+      "Bash(git -C \"C:\\Users\\User\\source\\repos\\BrowserExtensions\" status --short css-js-toinject/)"
     ],
     "deny": []
   }
