@@ -5,20 +5,115 @@
  * 1. Packing Slip
  * 2. Carton Label
  *
+ * APPROACH:
+ * - Intercepts window.open() calls from existing print buttons
+ * - Captures complete HTML from opened windows (reuses working button logic)
+ * - Sends captured HTML to JSPrintManager for silent printing
+ * - No manual HTML generation - leverages existing, tested print window code
+ *
  * Features:
  * - Silent printing directly to configured printers
  * - Printer validation with fallback to default printer
  * - Robust fallback mechanisms (localhost:8080, window-based)
  * - User notifications via OverlayManager
  * - Configuration-based print mode switching
+ * - Automatic JSPrintManager loading (local file + CDN fallbacks)
  *
  * Dependencies:
- * - JSPrintManager 8.0 (loaded via CDN)
+ * - JSPrintManager 8.0 (local file: ./JSPrintManager.js)
  * - OverlayManager (for notifications)
- * - jQuery (for API calls)
+ * - jQuery (for window operations)
  *
  * @see css-js-toinject/docs/SILENT-AUTO-PRINT-SPEC.md
  */
+
+// =============================================================================
+// JSPRINTMANAGER CDN LOADER
+// =============================================================================
+
+(function() {
+    'use strict';
+
+    // Check if JSPrintManager is already loaded
+    if (typeof JSPM !== 'undefined') {
+        console.log('✅ JSPrintManager already loaded');
+        return;
+    }
+
+    console.log('📦 JSPrintManager not found, loading...');
+
+    // Script URLs (in priority order: local first, then CDNs)
+    const CDN_URLS = [
+        './JSPrintManager.js',  // Local copy (primary)
+        'https://cdn.jsdelivr.net/npm/jsprintmanager@8.0.0/JSPrintManager.js',  // jsDelivr CDN
+        'https://unpkg.com/jsprintmanager@8.0.0/JSPrintManager.js',  // unpkg CDN
+        'https://cdn.neodynamic.com/jsprintmanager/8.0/JSPrintManager.js'  // Official CDN (often blocked)
+    ];
+
+    let currentCdnIndex = 0;
+
+    /**
+     * Load script from CDN with fallback support
+     * @param {string} url - CDN URL to load from
+     * @returns {Promise}
+     */
+    function loadScript(url) {
+        return new Promise((resolve, reject) => {
+            const script = document.createElement('script');
+            script.src = url;
+            script.async = true;
+
+            script.onload = () => {
+                // Verify JSPM object is available
+                if (typeof JSPM !== 'undefined') {
+                    console.log(`✅ JSPrintManager loaded successfully from: ${url}`);
+                    resolve();
+                } else {
+                    console.warn(`⚠️ Script loaded but JSPM not available from: ${url}`);
+                    reject(new Error('JSPM not available after load'));
+                }
+            };
+
+            script.onerror = () => {
+                console.warn(`❌ Failed to load JSPrintManager from: ${url}`);
+                reject(new Error(`Failed to load from ${url}`));
+            };
+
+            // Add to document
+            (document.head || document.documentElement).appendChild(script);
+        });
+    }
+
+    /**
+     * Try loading from local file and CDNs with fallback
+     */
+    async function loadWithFallback() {
+        while (currentCdnIndex < CDN_URLS.length) {
+            const url = CDN_URLS[currentCdnIndex];
+            const source = url.startsWith('./') ? 'local file' : 'CDN';
+            console.log(`🔄 Attempting to load from ${source}: ${url}`);
+
+            try {
+                await loadScript(url);
+                return; // Success!
+            } catch (error) {
+                currentCdnIndex++;
+                if (currentCdnIndex < CDN_URLS.length) {
+                    console.log(`⚠️ Trying fallback source (${currentCdnIndex + 1}/${CDN_URLS.length})...`);
+                }
+            }
+        }
+
+        // All sources failed
+        console.error('❌ Failed to load JSPrintManager from all sources');
+        console.error('⚠️ Silent printing will not be available');
+        console.error('💡 Check that JSPrintManager.js exists in css-js-toinject/ folder');
+        console.error('📖 See: css-js-toinject/docs/JSPRINTMANAGER-LOCAL-SETUP.md');
+    }
+
+    // Start loading
+    loadWithFallback();
+})();
 
 // =============================================================================
 // CONFIGURATION
@@ -189,238 +284,274 @@ async function printHTMLDocument(printerName, htmlContent, cssContent, jobName =
 }
 
 // =============================================================================
-// CONTENT GENERATION
+// WINDOW INTERCEPTION & HTML CAPTURE
 // =============================================================================
 
 /**
- * Helper function to group array by property
- * @param {Array} array - Array to group
- * @param {string} key - Property key to group by
- * @returns {Object}
+ * Storage for captured window HTML
+ * @type {Object}
  */
-function groupArrayBy(array, key) {
-    return array.reduce((result, item) => {
-        const groupKey = item[key];
-        if (!result[groupKey]) {
-            result[groupKey] = [];
-        }
-        result[groupKey].push(item);
-        return result;
-    }, {});
-}
+const capturedWindowHTML = {
+    packingSlip: null,
+    cartonLabel: null
+};
 
 /**
- * Generate Packing Slip HTML content
- * @param {number} shipmentId - Shipment ID
- * @returns {Promise<{html: string, css: string}>}
+ * Intercept window.open AND $.post to capture HTML from print operations
+ * Works with TabManager by temporarily disabling it
+ * @returns {Promise<Object>} Object with packing slip and carton label HTML
  */
-async function generatePackingSlipHTML(shipmentId) {
-    try {
-        if (SILENT_AUTO_PRINT_CONFIG.debugMode) {
-            console.log('📄 Generating Packing Slip HTML for shipment:', shipmentId);
+function interceptPrintWindows() {
+    return new Promise((resolve, reject) => {
+        // Reset captured HTML
+        capturedWindowHTML.packingSlip = null;
+        capturedWindowHTML.cartonLabel = null;
+
+        // Check if TabManager is installed and disable it temporarily
+        const tabManagerWasEnabled = typeof TabManager !== 'undefined' && TabManager.config.enabled;
+
+        const timeout = setTimeout(() => {
+            // Restore interceptors
+            if (typeof TabManager !== 'undefined' && tabManagerWasEnabled) {
+                TabManager.enable();
+            }
+            if (originalPost) {
+                $.post = originalPost;
+            }
+            reject(new Error('Timeout waiting for print content'));
+        }, 15000); // 15 second timeout
+
+        if (tabManagerWasEnabled) {
+            console.log('⚠️ TabManager detected, temporarily disabling for window capture');
+            TabManager.disable();
         }
 
-        // Fetch data from API
-        const response = await $.ajax({
-            url: `OutbondShipment/GetPackingSlipDetailByShipmentId?ShipmentId=${shipmentId}`,
-            method: 'GET'
-        });
+        // Store originals
+        const originalWindowOpen = window.open;
+        const originalPost = $.post;
 
-        if (response.responseCode !== 0 && response.responseCode !== 200) {
-            throw new Error('Failed to fetch packing slip data: ' + response.message);
-        }
+        let windowsOpened = 0;
+        let windowsCaptured = 0;
+        const maxWindows = 2; // Expecting 2 documents (packing slip + carton label)
 
-        // Calculate total quantity
-        let TotalQty = 0;
-        for (let i = 0; i < response.data.ShipmentDetails.length; i++) {
-            TotalQty += parseInt(response.data.ShipmentDetails[i].Quantity) || 0;
-        }
-        Object.assign(response.data.Shipment, { TotalQty });
+        // Intercept $.post for carton label (which POSTs to localhost:8080)
+        $.post = function(url, data, success, dataType) {
+            console.log(`📋 $.post intercepted: ${url}`);
 
-        // Group by box number
-        const boxesArray = groupArrayBy(response.data.ShipmentDetails, 'BoxNo');
-        const boxesArrayResult = Object.entries(boxesArray);
+            // Check if this is the localhost print service
+            if (url && url.includes('localhost:8080/printinvoice')) {
+                console.log('📦 Intercepted carton label POST to localhost');
 
-        // Generate HTML using template
-        const html = generatePackingSlipTemplate(response.data, boxesArrayResult);
+                // Capture the HTML being sent (only if we don't have it yet)
+                if (typeof data === 'string' && data.length > 100) {
+                    if (!capturedWindowHTML.cartonLabel) {
+                        console.log('📦 Captured Carton Label HTML from POST');
+                        capturedWindowHTML.cartonLabel = data;
+                        windowsCaptured++;
+                        console.log(`   Progress: ${windowsCaptured}/${maxWindows} documents captured`);
 
-        // Fetch CSS
-        const css = await $.ajax({
-            url: 'pages/Outbound/packing-slip.css',
-            method: 'GET',
-            dataType: 'text'
-        }).catch(() => {
-            // If CSS file doesn't exist, use minimal CSS
-            console.warn('⚠️ packing-slip.css not found, using minimal CSS');
-            return '* { font-family: sans-serif; } body { margin: 20px; }';
-        });
+                        // Check if we have both documents
+                        if (windowsCaptured >= maxWindows) {
+                            console.log(`✅ Captured all ${maxWindows} documents`);
 
-        if (SILENT_AUTO_PRINT_CONFIG.debugMode) {
-            console.log('   ✅ Packing Slip HTML generated');
-        }
+                            // Restore originals
+                            window.open = originalWindowOpen;
+                            $.post = originalPost;
+                            clearTimeout(timeout);
 
-        return { html, css };
+                            // Re-enable TabManager
+                            if (typeof TabManager !== 'undefined' && tabManagerWasEnabled) {
+                                TabManager.enable();
+                                console.log('✅ TabManager re-enabled');
+                            }
 
-    } catch (error) {
-        console.error('❌ Failed to generate Packing Slip HTML:', error);
-        throw error;
-    }
-}
+                            resolve({
+                                packingSlip: capturedWindowHTML.packingSlip,
+                                cartonLabel: capturedWindowHTML.cartonLabel
+                            });
+                        }
+                    } else {
+                        console.log('📦 Carton label already captured, ignoring duplicate POST');
+                    }
+                }
 
-/**
- * Generate Packing Slip HTML template
- * @param {Object} data - Shipment data
- * @param {Array} boxesArrayResult - Grouped boxes array
- * @returns {string} HTML string
- */
-function generatePackingSlipTemplate(data, boxesArrayResult) {
-    // Get language data helper
-    const getLang = (key) => {
-        if (typeof tf !== 'undefined' && tf.langData) {
-            return tf.langData()[key] || key;
-        }
-        return key;
-    };
+                // Don't actually POST to localhost - just intercept
+                return $.Deferred().resolve().promise();
+            }
 
-    // Get config helper
-    const getConfig = (key, defaultValue) => {
-        if (typeof common !== 'undefined' && common.getConfigByName) {
-            return common.getConfigByName(key, defaultValue);
-        }
-        return defaultValue;
-    };
+            // Pass through other POST requests
+            return originalPost.apply(this, arguments);
+        };
 
-    const BoxWisePackagingInformation = getConfig('BoxWisePackagingInformation', true);
-    const shipment = data.Shipment;
+        // Override window.open
+        window.open = function(url, target, features) {
+            windowsOpened++;
+            console.log(`📋 Window.open intercepted (${windowsOpened}/${maxWindows}):`, url);
 
-    let html = `
-        <div id="master-data">
-            <h1>Packing Slip - ${shipment.ShipmentNumber || ''}</h1>
-            <div class="shipment-info">
-                <p><strong>Order Number:</strong> ${shipment.OrderNumber || ''}</p>
-                <p><strong>Shipment Date:</strong> ${shipment.ShipmentDate || ''}</p>
-                <p><strong>Total Quantity:</strong> ${shipment.TotalQty || 0}</p>
-            </div>
-        </div>
-        <div id="items-table-wrp">
-    `;
+            // Open the window normally
+            const printWindow = originalWindowOpen.call(window, url, target, features);
 
-    // Generate table for each box
-    boxesArrayResult.forEach((boxData, index) => {
-        const boxNo = boxData[0];
-        const items = boxData[1];
+            if (!printWindow) {
+                console.error('❌ Failed to open window');
+                return null;
+            }
 
-        html += '<div class="table-pakiingsli-wrp">';
+            // Function to capture HTML from window
+            const captureHTML = () => {
+                console.log(`✅ Capturing HTML from window: ${url}`);
 
-        // Box header
-        if (BoxWisePackagingInformation && items[0] && items[0].PackageSize && items[0].PackageType) {
-            html += `
-                <h3 class="panel-box-title text-left packgae-title">
-                    <span>${getLang('PackageNo')}: ${boxNo}</span>
-                    <span class="ml-4">${getLang('PackageType')}: ${items[0].PackageType}</span>
-                    <span class="ml-4">${getLang('PackageSize')}: ${items[0].PackageSize}</span>
-                </h3>
-            `;
-        } else {
-            html += `<h3 class="panel-box-title text-left packgae-title">${getLang('PackageNo')}: ${boxNo}</h3>`;
-        }
+                try {
+                    // Get document HTML
+                    const doc = printWindow.document;
+                    const html = doc.documentElement.outerHTML;
 
-        // Items table
-        html += `
-            <table class="no_whitespace mb-20" width="100%">
-                <thead>
-                    <tr>
-                        <th>SKU</th>
-                        <th>Description</th>
-                        <th>Quantity</th>
-                    </tr>
-                </thead>
-                <tbody>
-        `;
+                    // Determine which document this is based on URL or content
+                    if (url.includes('packingSlipdetail') || url.includes('packingslip')) {
+                        if (!capturedWindowHTML.packingSlip) {
+                            console.log('📄 Captured Packing Slip HTML');
+                            capturedWindowHTML.packingSlip = html;
+                            windowsCaptured++;
+                            console.log(`   Progress: ${windowsCaptured}/${maxWindows} documents captured`);
+                        } else {
+                            console.log('📄 Packing slip already captured, ignoring duplicate');
+                        }
+                    } else if (url.includes('placard') || url.includes('carton') || url.includes('label')) {
+                        if (!capturedWindowHTML.cartonLabel) {
+                            console.log('📦 Captured Carton Label HTML from window');
+                            capturedWindowHTML.cartonLabel = html;
+                            windowsCaptured++;
+                            console.log(`   Progress: ${windowsCaptured}/${maxWindows} documents captured`);
+                        } else {
+                            console.log('📦 Carton label already captured, ignoring duplicate');
+                        }
+                    } else if (!url || url.trim() === '') {
+                        // Empty URL - likely carton label that writes HTML directly to window
+                        if (!capturedWindowHTML.cartonLabel) {
+                            console.log('📦 Captured HTML from empty URL window (likely Carton Label)');
+                            capturedWindowHTML.cartonLabel = html;
+                            windowsCaptured++;
+                            console.log(`   Progress: ${windowsCaptured}/${maxWindows} documents captured`);
+                        } else {
+                            console.log('📦 Carton label already captured, ignoring duplicate window');
+                        }
+                    } else {
+                        console.warn('⚠️ Unknown window URL:', url);
+                    }
 
-        items.forEach(item => {
-            html += `
-                <tr>
-                    <td>${item.Sku || ''}</td>
-                    <td>${item.ProductName || ''}</td>
-                    <td>${item.Quantity || 0}</td>
-                </tr>
-            `;
-        });
+                    // Close the window after capturing
+                    setTimeout(() => {
+                        printWindow.close();
+                    }, 100);
 
-        html += `
-                </tbody>
-            </table>
-        </div>
-        `;
+                    // Check if we've captured all documents
+                    if (windowsCaptured >= maxWindows) {
+                        console.log(`✅ Captured all ${maxWindows} documents`);
+
+                        // Restore interceptors
+                        window.open = originalWindowOpen;
+                        $.post = originalPost;
+                        clearTimeout(timeout);
+
+                        // Re-enable TabManager if it was enabled
+                        if (typeof TabManager !== 'undefined' && tabManagerWasEnabled) {
+                            TabManager.enable();
+                            console.log('✅ TabManager re-enabled');
+                        }
+
+                        resolve({
+                            packingSlip: capturedWindowHTML.packingSlip,
+                            cartonLabel: capturedWindowHTML.cartonLabel
+                        });
+                    }
+
+                } catch (error) {
+                    console.error('❌ Failed to capture window HTML:', error);
+                    printWindow.close();
+                }
+            };
+
+            // For hash-based routes or empty URLs, wait for content to load using polling
+            if (url.startsWith('#') || !url || url.trim() === '') {
+                const routeType = !url || url.trim() === '' ? 'Empty URL (document.write)' : 'Hash-based route';
+                console.log(`   ${routeType} detected, using polling strategy`);
+
+                let attempts = 0;
+                const maxAttempts = 50; // 5 seconds max (50 * 100ms)
+
+                const checkContent = () => {
+                    attempts++;
+
+                    try {
+                        const doc = printWindow.document;
+                        const body = doc.body;
+
+                        // Check if content has loaded (body has substantial content)
+                        if (body && body.innerHTML && body.innerHTML.length > 1000) {
+                            console.log(`   Content loaded after ${attempts * 100}ms`);
+                            captureHTML();
+                        } else if (attempts < maxAttempts) {
+                            setTimeout(checkContent, 100);
+                        } else {
+                            console.error('❌ Timeout waiting for content to load');
+                            printWindow.close();
+                        }
+                    } catch (e) {
+                        console.error('❌ Error checking content:', e);
+                        printWindow.close();
+                    }
+                };
+
+                // Start polling after small delay
+                setTimeout(checkContent, 200);
+
+            } else {
+                // For absolute URLs, use load event
+                printWindow.addEventListener('load', captureHTML);
+            }
+
+            return printWindow;
+        };
+
+        console.log('🎯 Window and POST interceptors installed');
+        console.log('   Waiting for: Packing Slip (window.open) + Carton Label ($.post)');
     });
-
-    html += '</div>';
-
-    return html;
 }
 
 /**
- * Generate Carton Label HTML content
- * @param {number} shipmentId - Shipment ID
- * @returns {Promise<{html: string, css: string}>}
+ * Click buttons to trigger print operations (reuses existing button logic)
  */
-async function generateCartonLabelHTML(shipmentId) {
-    try {
-        if (SILENT_AUTO_PRINT_CONFIG.debugMode) {
-            console.log('📦 Generating Carton Label HTML for shipment:', shipmentId);
-        }
+function clickPrintButtons() {
+    console.log('🖱️ Clicking print buttons...');
 
-        // Look for carton label content in the DOM
-        // This assumes the label has already been generated by the existing system
-        const wrp = document.querySelector('.carton-label-content, #carton-label-content, [data-carton-label]');
-
-        if (!wrp) {
-            console.warn('⚠️ Carton label content not found in DOM, attempting to generate...');
-
-            // If not in DOM, we need to generate it
-            // This would require calling the same logic that generates the label
-            // For now, throw error to trigger fallback
-            throw new Error('Carton label content not available');
-        }
-
-        const html = wrp.innerHTML;
-
-        // Fetch CSS
-        let css = await $.ajax({
-            url: 'pages/Outbound/placard.css',
-            method: 'GET',
-            dataType: 'text'
-        }).catch(() => {
-            console.warn('⚠️ placard.css not found, using minimal CSS');
-            return '';
-        });
-
-        // Add required CSS rules
-        css += `
-            * { font-family: sans-serif !important; }
-            body {
-                -webkit-print-color-adjust: exact !important;
-                print-color-adjust: exact !important;
-            }
-            .box-label-wrp {
-                page-break-inside: auto;
-                page-break-inside: avoid;
-                page-break-after: auto;
-            }
-            @page { size: letter; }
-        `;
-
-        if (SILENT_AUTO_PRINT_CONFIG.debugMode) {
-            console.log('   ✅ Carton Label HTML generated');
-        }
-
-        return { html, css };
-
-    } catch (error) {
-        console.error('❌ Failed to generate Carton Label HTML:', error);
-        throw error;
+    // Click Packing Slip button
+    const packingSlipBtn = document.getElementById('btnPrintPackSlip');
+    if (!packingSlipBtn) {
+        throw new Error('Packing Slip button not found');
     }
+    console.log('📄 Packing Slip button found:', {
+        visible: packingSlipBtn.offsetParent !== null,
+        disabled: packingSlipBtn.disabled,
+        onclick: !!packingSlipBtn.onclick
+    });
+    console.log('📄 Clicking Packing Slip button (native .click())...');
+    packingSlipBtn.click();
+    console.log('📄 Packing Slip button clicked');
+
+    // Small delay before clicking carton label
+    setTimeout(() => {
+        const cartonLabelBtn = document.getElementById('box-label');
+        if (!cartonLabelBtn) {
+            throw new Error('Carton Label button not found');
+        }
+        console.log('📦 Carton Label button found:', {
+            visible: cartonLabelBtn.offsetParent !== null,
+            disabled: cartonLabelBtn.disabled,
+            onclick: !!cartonLabelBtn.onclick
+        });
+        console.log('📦 Clicking Carton Label button (native .click())...');
+        cartonLabelBtn.click();
+        console.log('📦 Carton Label button clicked');
+    }, 200);
 }
 
 // =============================================================================
@@ -429,6 +560,7 @@ async function generateCartonLabelHTML(shipmentId) {
 
 /**
  * Main function to print both documents silently
+ * Uses window interception to capture HTML from existing print windows
  * @param {number} shipmentId - Shipment ID
  * @returns {Promise<boolean>}
  */
@@ -447,39 +579,47 @@ async function printAllSilent(shipmentId) {
             return false;
         }
 
-        // Step 2: Generate content for both documents in parallel
-        console.log('📄 Generating print content...');
+        // Step 2: Set up window interceptor and click buttons
+        console.log('📋 Setting up window interceptor...');
 
-        const [packingSlipContent, cartonLabelContent] = await Promise.all([
-            generatePackingSlipHTML(shipmentId).catch(error => {
-                console.error('❌ Packing Slip generation failed:', error);
-                return null;
-            }),
-            generateCartonLabelHTML(shipmentId).catch(error => {
-                console.error('❌ Carton Label generation failed:', error);
-                return null;
-            })
-        ]);
+        // Start window interception (returns promise that resolves when both windows are captured)
+        const capturePromise = interceptPrintWindows();
 
-        // Check if both succeeded
-        if (!packingSlipContent || !cartonLabelContent) {
-            throw new Error('Failed to generate one or more documents');
+        // Click the print buttons (they will open windows that get intercepted)
+        clickPrintButtons();
+
+        // Wait for HTML to be captured from both documents
+        console.log('⏳ Waiting for documents to be captured...');
+        const capturedHTML = await capturePromise;
+
+        // Detailed check of what we have
+        console.log('📊 Capture status:');
+        console.log(`   Packing Slip: ${capturedHTML.packingSlip ? 'YES (' + capturedHTML.packingSlip.length + ' chars)' : 'MISSING'}`);
+        console.log(`   Carton Label: ${capturedHTML.cartonLabel ? 'YES (' + capturedHTML.cartonLabel.length + ' chars)' : 'MISSING'}`);
+
+        if (!capturedHTML.packingSlip || !capturedHTML.cartonLabel) {
+            const missing = [];
+            if (!capturedHTML.packingSlip) missing.push('Packing Slip');
+            if (!capturedHTML.cartonLabel) missing.push('Carton Label');
+            throw new Error(`Failed to capture: ${missing.join(', ')}`);
         }
 
-        // Step 3: Print both documents in parallel
-        console.log('🖨️ Submitting print jobs to printer...');
+        console.log('✅ All documents captured successfully');
+
+        // Step 3: Send to JSPrintManager
+        console.log('🖨️ Sending to JSPrintManager...');
 
         const printPromises = [
             printHTMLDocument(
                 SILENT_AUTO_PRINT_CONFIG.printerNamePackingSlip,
-                packingSlipContent.html,
-                packingSlipContent.css,
+                capturedHTML.packingSlip,
+                '',  // CSS already included in full HTML
                 'Packing Slip'
             ),
             printHTMLDocument(
                 SILENT_AUTO_PRINT_CONFIG.printerNameCartonLabel,
-                cartonLabelContent.html,
-                cartonLabelContent.css,
+                capturedHTML.cartonLabel,
+                '',  // CSS already included in full HTML
                 'Carton Label'
             )
         ];
@@ -584,24 +724,24 @@ async function fallbackToLocalhost(shipmentId) {
     console.log('🔄 Falling back to localhost:8080 print service');
 
     try {
-        // Generate content
-        const [packingSlipContent, cartonLabelContent] = await Promise.all([
-            generatePackingSlipHTML(shipmentId).catch(() => null),
-            generateCartonLabelHTML(shipmentId).catch(() => null)
-        ]);
+        // Use window interception to capture HTML
+        console.log('📋 Setting up window interceptor for localhost fallback...');
+        const capturePromise = interceptPrintWindows();
+        clickPrintButtons();
 
-        if (!packingSlipContent || !cartonLabelContent) {
-            throw new Error('Failed to generate content for localhost printing');
+        console.log('⏳ Waiting for windows to load...');
+        const capturedHTML = await capturePromise;
+
+        if (!capturedHTML.packingSlip || !capturedHTML.cartonLabel) {
+            throw new Error('Failed to capture HTML for localhost printing');
         }
 
-        // Combine HTML and CSS
-        const packingSlipHTML = `<style>${packingSlipContent.css}</style>${packingSlipContent.html}`;
-        const cartonLabelHTML = `<style>${cartonLabelContent.css}</style>${cartonLabelContent.html}`;
+        console.log('✅ HTML captured, sending to localhost print service');
 
         // Send to localhost service
         const printPromises = [
-            $.post('http://localhost:8080/printinvoice', packingSlipHTML),
-            $.post('http://localhost:8080/printinvoice', cartonLabelHTML)
+            $.post('http://localhost:8080/printinvoice', capturedHTML.packingSlip),
+            $.post('http://localhost:8080/printinvoice', capturedHTML.cartonLabel)
         ];
 
         await Promise.all(printPromises);
@@ -797,6 +937,14 @@ function extractShipmentIdFromModal() {
 }
 
 /**
+ * Prevent duplicate calls tracking
+ */
+let _lastHandleModalCall = {
+    shipmentId: null,
+    timestamp: 0
+};
+
+/**
  * Handle shipment modal appearance
  * This should be called by the router when the success modal is detected
  */
@@ -854,6 +1002,20 @@ async function handleShipmentModalAppearance() {
         return;
     }
 
+    // PREVENT DUPLICATE CALLS: Check if we just processed this shipment
+    const now = Date.now();
+    if (_lastHandleModalCall.shipmentId === shipmentId &&
+        (now - _lastHandleModalCall.timestamp) < 2000) {
+        console.log('⚠️ Duplicate call detected, ignoring (same shipment within 2 seconds)');
+        return;
+    }
+
+    // Update tracking
+    _lastHandleModalCall = {
+        shipmentId,
+        timestamp: now
+    };
+
     // Check print mode configuration
     if (SILENT_AUTO_PRINT_CONFIG.printMode === 'jsprintmanager') {
         console.log('🔧 Print mode: JSPrintManager (silent)');
@@ -900,9 +1062,9 @@ if (typeof window !== 'undefined') {
         printAll: printAllSilent,
         handleModal: handleShipmentModalAppearance,
 
-        // Content generation (for testing)
-        generatePackingSlip: generatePackingSlipHTML,
-        generateCartonLabel: generateCartonLabelHTML,
+        // Window interception (for testing)
+        interceptWindows: interceptPrintWindows,
+        clickButtons: clickPrintButtons,
 
         // JSPrintManager integration
         checkJSPrintManager: checkJSPrintManagerAvailable,
@@ -949,12 +1111,14 @@ if (typeof window !== 'undefined') {
     console.log('✅ Silent Auto Print Buttons loaded');
     console.log('🔧 Debug API available at: window.silentAutoPrint');
     console.log('💡 Configuration:', SILENT_AUTO_PRINT_CONFIG);
+    console.log('💡 Approach: Intercepts window.open() to capture HTML from existing print windows');
     console.log('');
     console.log('📖 Common commands:');
     console.log('   window.silentAutoPrint.checkJSPrintManager()  - Test JSPrintManager');
     console.log('   window.silentAutoPrint.listPrinters()         - List available printers');
     console.log('   window.silentAutoPrint.setPrintMode("windows") - Switch to window mode');
     console.log('   window.silentAutoPrint.setAutoClick(false)    - Disable auto-click');
+    console.log('   window.silentAutoPrint.interceptWindows()     - Test window interception');
 }
 
 // Setup shipment ID interceptor on load
