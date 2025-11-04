@@ -592,7 +592,8 @@ async function printAllSilent(shipmentId) {
         const capturePromise = interceptPrintWindows();
 
         // Click the print buttons (they will open windows that get intercepted)
-        clickPrintButtons();
+        // IMPORTANT: Must await this since clickPrintButtons is now async
+        await clickPrintButtons();
 
         // Wait for HTML to be captured from both documents
         console.log('⏳ Waiting for documents to be captured...');
@@ -733,7 +734,9 @@ async function fallbackToLocalhost(shipmentId) {
         // Use window interception to capture HTML
         console.log('📋 Setting up window interceptor for localhost fallback...');
         const capturePromise = interceptPrintWindows();
-        clickPrintButtons();
+
+        // IMPORTANT: Must await this since clickPrintButtons is now async
+        await clickPrintButtons();
 
         console.log('⏳ Waiting for windows to load...');
         const capturedHTML = await capturePromise;
