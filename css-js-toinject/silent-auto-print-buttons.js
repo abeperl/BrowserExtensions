@@ -129,7 +129,7 @@ const SILENT_AUTO_PRINT_CONFIG = {
 
     // Auto-click behavior
     autoClickEnabled: true,         // Enable/disable auto-clicking
-    autoClickDelay: 500,           // Delay before auto-trigger (ms)
+    autoClickDelay: 2000,          // Delay before auto-trigger (ms) - increased to allow handlers to initialize
 
     // JSPrintManager settings
     jsprintmanagerTimeout: 5000,   // Timeout for client detection (ms)
@@ -519,9 +519,14 @@ function interceptPrintWindows() {
 
 /**
  * Click buttons to trigger print operations (reuses existing button logic)
+ * Now async to properly wait between clicks and allow interceptor to be ready
  */
-function clickPrintButtons() {
+async function clickPrintButtons() {
     console.log('🖱️ Clicking print buttons...');
+
+    // Wait a moment for interceptor to be fully ready
+    console.log('⏳ Waiting 300ms for interceptor to be fully ready...');
+    await new Promise(resolve => setTimeout(resolve, 300));
 
     // Click Packing Slip button
     const packingSlipBtn = document.getElementById('btnPrintPackSlip');
@@ -537,21 +542,22 @@ function clickPrintButtons() {
     packingSlipBtn.click();
     console.log('📄 Packing Slip button clicked');
 
-    // Small delay before clicking carton label
-    setTimeout(() => {
-        const cartonLabelBtn = document.getElementById('box-label');
-        if (!cartonLabelBtn) {
-            throw new Error('Carton Label button not found');
-        }
-        console.log('📦 Carton Label button found:', {
-            visible: cartonLabelBtn.offsetParent !== null,
-            disabled: cartonLabelBtn.disabled,
-            onclick: !!cartonLabelBtn.onclick
-        });
-        console.log('📦 Clicking Carton Label button (native .click())...');
-        cartonLabelBtn.click();
-        console.log('📦 Carton Label button clicked');
-    }, 200);
+    // Wait before clicking carton label
+    console.log('⏳ Waiting 200ms before clicking carton label...');
+    await new Promise(resolve => setTimeout(resolve, 200));
+
+    const cartonLabelBtn = document.getElementById('box-label');
+    if (!cartonLabelBtn) {
+        throw new Error('Carton Label button not found');
+    }
+    console.log('📦 Carton Label button found:', {
+        visible: cartonLabelBtn.offsetParent !== null,
+        disabled: cartonLabelBtn.disabled,
+        onclick: !!cartonLabelBtn.onclick
+    });
+    console.log('📦 Clicking Carton Label button (native .click())...');
+    cartonLabelBtn.click();
+    console.log('📦 Carton Label button clicked');
 }
 
 // =============================================================================
