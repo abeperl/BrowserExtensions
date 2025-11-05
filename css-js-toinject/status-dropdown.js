@@ -9,6 +9,205 @@
 
     console.log('📦 Status Dropdown Functions Loading...');
 
+    // =============================================================================
+    // SENTRY CDN LOADER & INITIALIZATION
+    // =============================================================================
+
+    /**
+     * Load Sentry SDK from CDN and initialize
+     */
+    function loadAndInitSentry() {
+        // Check if Sentry is already loaded
+        if (typeof Sentry !== 'undefined') {
+            initializeSentry();
+            return;
+        }
+
+        // Check if document.head is available
+        if (!document.head) {
+            // Wait for DOM to be ready
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', loadAndInitSentry);
+                return;
+            }
+            // DOM is ready but head still doesn't exist - this shouldn't happen
+            console.warn('⚠️ document.head not available - cannot load Sentry SDK');
+            return;
+        }
+
+        // Load Sentry SDK from CDN
+        const script = document.createElement('script');
+        script.src = 'https://js.sentry-cdn.com/104595fd1de31dc644958f35b4f325ec.min.js';
+        script.crossOrigin = 'anonymous';
+        script.onload = function() {
+            console.log('✅ Sentry SDK loaded from CDN');
+            initializeSentry();
+        };
+        script.onerror = function() {
+            console.warn('⚠️ Failed to load Sentry SDK from CDN - error tracking disabled');
+        };
+        document.head.appendChild(script);
+    }
+
+    /**
+     * Initialize Sentry with configuration
+     */
+    function initializeSentry() {
+        if (typeof Sentry !== 'undefined') {
+            try {
+                Sentry.init({
+                    dsn: "https://104595fd1de31dc644958f35b4f325ec@o4510313441853440.ingest.us.sentry.io/4510313480454144",
+                    // Add context about the script
+                    beforeSend(event) {
+                        event.tags = event.tags || {};
+                        event.tags.script = 'status-dropdown.js';
+                        event.tags.feature = 'status-auto-fill';
+                        return event;
+                    },
+                    // Capture unhandled errors
+                    tracesSampleRate: 0,
+                    environment: 'production'
+                });
+                console.log('✅ Sentry initialized for status-dropdown.js');
+            } catch (error) {
+                console.warn('⚠️ Failed to initialize Sentry:', error.message);
+            }
+        }
+    }
+
+    // Load Sentry
+    loadAndInitSentry();
+
+    // =============================================================================
+    // ERROR TRACKING - Monitor for business logic errors
+    // =============================================================================
+
+    /**
+     * Monitor for snackbar errors and log to Sentry
+     */
+    function setupErrorMonitoring() {
+        console.log('🔍 Setting up error monitoring...');
+
+        // Wait for document.body to be available
+        function setupMutationObserver() {
+            if (!document.body) {
+                // Wait for DOM to be ready
+                if (document.readyState === 'loading') {
+                    document.addEventListener('DOMContentLoaded', setupMutationObserver);
+                    return;
+                }
+                // Retry after a short delay
+                setTimeout(setupMutationObserver, 100);
+                return;
+            }
+
+            // Monitor for error overlays appearing in the DOM
+            const observer = new MutationObserver((mutations) => {
+                mutations.forEach((mutation) => {
+                    mutation.addedNodes.forEach((node) => {
+                        // Check if this is an error overlay
+                        if (node.nodeType === 1 && node.classList) {
+                            if (node.classList.contains('error-overlay') ||
+                                node.id === 'error-overlay' ||
+                                (node.classList.contains('overlay') && node.textContent.includes('Error'))) {
+
+                                const errorMessage = node.textContent || node.innerText || 'Unknown error';
+                                console.warn(`⚠️ Error overlay detected: ${errorMessage}`);
+
+                                if (typeof Sentry !== 'undefined') {
+                                    const productValue = document.getElementById('product-scan')?.value;
+                                    const statusValue = document.getElementById('status-scan')?.value;
+
+                                    Sentry.captureMessage(`Error Overlay: ${errorMessage}`, {
+                                        level: 'error',
+                                        tags: {
+                                            action: 'product-scan-error',
+                                            error_type: 'overlay_error',
+                                            source: 'mutation_observer'
+                                        },
+                                        extra: {
+                                            errorMessage: errorMessage.trim(),
+                                            productScanned: productValue || 'none',
+                                            statusScanned: statusValue || 'none',
+                                            timestamp: new Date().toISOString(),
+                                            overlayHtml: node.outerHTML?.substring(0, 500)
+                                        }
+                                    });
+                                }
+                            }
+                        }
+                    });
+                });
+            });
+
+            // Start observing the document body for added nodes
+            observer.observe(document.body, {
+                childList: true,
+                subtree: true
+            });
+
+            console.log('✅ MutationObserver setup - watching for error overlays');
+        }
+
+        setupMutationObserver();
+
+        // Intercept snackbar.show calls to track server-side errors
+        function interceptSnackbar() {
+            if (typeof snackbar !== 'undefined' && snackbar.show) {
+                const originalShow = snackbar.show;
+
+                // Check if already wrapped
+                if (originalShow._sentryWrapped) {
+                    console.log('ℹ️ snackbar.show already wrapped for Sentry');
+                    return;
+                }
+
+                snackbar.show = function(message, type) {
+                    // Log errors and warnings to Sentry
+                    if (type === 'cs-danger' || type === 'cs-warning') {
+                        console.warn(`⚠️ Server error via snackbar: ${message} (${type})`);
+
+                        if (typeof Sentry !== 'undefined') {
+                            const productValue = document.getElementById('product-scan')?.value;
+                            const statusValue = document.getElementById('status-scan')?.value;
+
+                            Sentry.captureMessage(`Server Error: ${message}`, {
+                                level: type === 'cs-danger' ? 'error' : 'warning',
+                                tags: {
+                                    action: 'product-scan-error',
+                                    error_type: 'server_validation',
+                                    snackbar_type: type,
+                                    source: 'snackbar_interception'
+                                },
+                                extra: {
+                                    errorMessage: message,
+                                    productScanned: productValue || 'none',
+                                    statusScanned: statusValue || 'none',
+                                    timestamp: new Date().toISOString()
+                                }
+                            });
+                        }
+                    }
+
+                    // Call original function
+                    return originalShow.apply(this, arguments);
+                };
+
+                snackbar.show._sentryWrapped = true;
+                console.log('✅ snackbar.show wrapped for Sentry tracking');
+            } else {
+                // Retry after a delay
+                setTimeout(interceptSnackbar, 500);
+            }
+        }
+
+        interceptSnackbar();
+        console.log('✅ Error monitoring enabled - watching for overlays and snackbar errors');
+    }
+
+    // Setup error monitoring immediately
+    setupErrorMonitoring();
+
     /**
      * Get third-party item statuses from localStorage
      * @returns {Array} Array of status objects
@@ -169,10 +368,6 @@
         statusInput.addEventListener('input', function(event) {
             const originalValue = this.value;
 
-            // Log raw input for debugging (shows hex codes of special chars)
-            console.log('🔍 Status input received:', originalValue,
-                        'Char codes:', Array.from(originalValue).map(c => c.charCodeAt(0)));
-
             // Check for Line Feed (LF = 10 = \n) or Carriage Return (CR = 13 = \r)
             const hasLineFeed = originalValue.includes('\n');
             const hasCarriageReturn = originalValue.includes('\r');
@@ -242,42 +437,131 @@
             if (selectedStatus) {
                 console.log(`✅ Auto-filling status: ${selectedStatus}`);
 
-                // Fill the input
-                this.value = selectedStatus;
+                try {
+                    // Fill the input
+                    this.value = selectedStatus;
 
-                // Trigger input event
-                const inputEvent = new Event('input', { bubbles: true });
-                this.dispatchEvent(inputEvent);
+                    // Trigger input event
+                    const inputEvent = new Event('input', { bubbles: true });
+                    this.dispatchEvent(inputEvent);
 
-                // Trigger change event
-                const changeEvent = new Event('change', { bubbles: true });
-                this.dispatchEvent(changeEvent);
+                    // Trigger change event
+                    const changeEvent = new Event('change', { bubbles: true });
+                    this.dispatchEvent(changeEvent);
 
-                // Small delay to ensure value is set, then auto-submit
-                setTimeout(() => {
-                    console.log('✅ Auto-submitting via Enter key');
+                    // Small delay to ensure value is set, then auto-submit
+                    const statusInputElement = this;
+                    setTimeout(() => {
+                        try {
+                            console.log('✅ Auto-submitting via Enter key');
 
-                    // Simulate Enter key press to trigger submit
-                    const enterEvent = new KeyboardEvent('keydown', {
-                        key: 'Enter',
-                        code: 'Enter',
-                        keyCode: 13,
-                        which: 13,
-                        bubbles: true,
-                        cancelable: true
-                    });
-                    this.dispatchEvent(enterEvent);
+                            // Capture context for error logging
+                            const context = {
+                                statusValue: selectedStatus,
+                                productValue: document.getElementById('product-scan')?.value,
+                                modalVisible: !!document.querySelector('#scan-product-modal'),
+                                submitButtonExists: !!document.querySelector('#scan-product-modal .modal-box-button[type="submit"]'),
+                                timestamp: new Date().toISOString()
+                            };
 
-                    // Also try clicking submit button as fallback
-                    const submitButton = document.querySelector('#scan-product-modal .modal-box-button[type="submit"]');
-                    if (submitButton) {
-                        console.log('🔘 Clicking submit button');
-                        submitButton.click();
+                            // Simulate Enter key press to trigger submit
+                            const enterEvent = new KeyboardEvent('keydown', {
+                                key: 'Enter',
+                                code: 'Enter',
+                                keyCode: 13,
+                                which: 13,
+                                bubbles: true,
+                                cancelable: true
+                            });
+                            statusInputElement.dispatchEvent(enterEvent);
+
+                            // Also try clicking submit button as fallback
+                            const submitButton = document.querySelector('#scan-product-modal .modal-box-button[type="submit"]');
+                            if (submitButton) {
+                                console.log('🔘 Clicking submit button');
+                                submitButton.click();
+                            } else {
+                                // Submit button not found - log to Sentry
+                                const error = new Error('Submit button not found in modal');
+                                console.error('❌ Submit failed:', error.message);
+
+                                if (typeof Sentry !== 'undefined') {
+                                    Sentry.captureException(error, {
+                                        level: 'warning',
+                                        tags: {
+                                            action: 'auto-submit-status',
+                                            reason: 'submit-button-missing'
+                                        },
+                                        extra: context
+                                    });
+                                }
+                            }
+
+                            // Monitor for submission success/failure
+                            setTimeout(() => {
+                                // Check if modal is still visible (submission failed)
+                                const modalStillVisible = !!document.querySelector('#scan-product-modal:not(.hide)');
+
+                                if (modalStillVisible) {
+                                    const error = new Error('Status submit may have failed - modal still visible');
+                                    console.error('❌ Submit verification failed:', error.message);
+
+                                    if (typeof Sentry !== 'undefined') {
+                                        Sentry.captureException(error, {
+                                            level: 'warning',
+                                            tags: {
+                                                action: 'auto-submit-status',
+                                                reason: 'modal-still-visible'
+                                            },
+                                            extra: {
+                                                ...context,
+                                                verificationTime: new Date().toISOString()
+                                            }
+                                        });
+                                    }
+                                } else {
+                                    console.log('✅ Submit verification passed - modal closed');
+                                }
+                            }, 500);
+
+                            // Let the form submission handle focus naturally
+                            console.log('⏳ Waiting for form submission to complete...');
+                        } catch (error) {
+                            console.error('❌ Error during auto-submit:', error);
+
+                            if (typeof Sentry !== 'undefined') {
+                                Sentry.captureException(error, {
+                                    level: 'error',
+                                    tags: {
+                                        action: 'auto-submit-status',
+                                        reason: 'exception-during-submit'
+                                    },
+                                    extra: {
+                                        statusValue: selectedStatus,
+                                        productValue: document.getElementById('product-scan')?.value,
+                                        timestamp: new Date().toISOString()
+                                    }
+                                });
+                            }
+                        }
+                    }, 100);
+                } catch (error) {
+                    console.error('❌ Error during status auto-fill:', error);
+
+                    if (typeof Sentry !== 'undefined') {
+                        Sentry.captureException(error, {
+                            level: 'error',
+                            tags: {
+                                action: 'auto-fill-status',
+                                reason: 'exception-during-fill'
+                            },
+                            extra: {
+                                statusValue: selectedStatus,
+                                timestamp: new Date().toISOString()
+                            }
+                        });
                     }
-
-                    // Let the form submission handle focus naturally
-                    console.log('⏳ Waiting for form submission to complete...');
-                }, 100);
+                }
             } else {
                 console.log('⚠️ No status selected in dropdown - cannot auto-submit');
             }
@@ -304,10 +588,6 @@
         // Sanitize input to prevent control characters
         productInput.addEventListener('input', function(event) {
             const originalValue = this.value;
-
-            // Log raw input for debugging
-            console.log('🔍 Product input received:', originalValue,
-                        'Char codes:', Array.from(originalValue).map(c => c.charCodeAt(0)));
 
             // Check for Line Feed (LF = 10 = \n) or Carriage Return (CR = 13 = \r)
             const hasLineFeed = originalValue.includes('\n');
