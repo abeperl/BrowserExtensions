@@ -177,18 +177,32 @@ function makeQtyItemsClickable() {
 
                     console.log(`Set quantity to: ${qtyText}`);
 
-                    // Trigger events to ensure the change is registered
-                    const inputEvent = new Event('input', { bubbles: true });
-                    qtyInput.dispatchEvent(inputEvent);
+                    // Trigger Enter keypress to invoke the page's quantity update logic
+                    // This triggers the jQuery handler: $("#table-items-added").on("keypress", ".qty-mn", ...)
+                    // Try jQuery trigger first (most reliable for jQuery event handlers)
+                    if (typeof $ !== 'undefined' && $.fn) {
+                        $(qtyInput).trigger($.Event('keypress', { keyCode: 13, which: 13 }));
+                        console.log('Triggered Enter keypress via jQuery');
+                    } else {
+                        // Fallback to native event
+                        const keypressEvent = new KeyboardEvent('keypress', {
+                            key: 'Enter',
+                            code: 'Enter',
+                            bubbles: true,
+                            cancelable: true
+                        });
 
-                    const changeEvent = new Event('change', { bubbles: true });
-                    qtyInput.dispatchEvent(changeEvent);
+                        // Add deprecated properties for compatibility
+                        Object.defineProperty(keypressEvent, 'keyCode', {
+                            get: () => 13
+                        });
+                        Object.defineProperty(keypressEvent, 'which', {
+                            get: () => 13
+                        });
 
-                    // Simulate blur/exit after a short delay
-                    setTimeout(() => {
-                        qtyInput.blur();
-                        console.log('Exited qty input field');
-                    }, 300);
+                        qtyInput.dispatchEvent(keypressEvent);
+                        console.log('Triggered Enter keypress via native event');
+                    }
                 }, 100);
             });
 
