@@ -14,6 +14,7 @@ public class ApiPollSchedulerService : BackgroundService
     private readonly IEmailNotificationService _email;
     private readonly SchedulerConfig _schedulerCfg;
     private readonly OrderTracker _tracker;
+    private readonly IHostApplicationLifetime _lifetime;
 
     public ApiPollSchedulerService(
         ILogger<ApiPollSchedulerService> logger,
@@ -21,7 +22,8 @@ public class ApiPollSchedulerService : BackgroundService
         IOptions<SchedulerConfig> schedulerConfig,
         IOrderApiService apiService,
         ISubActionExecutor actionExecutor,
-        IEmailNotificationService email)
+        IEmailNotificationService email,
+        IHostApplicationLifetime lifetime)
     {
         _logger = logger;
         _cfg = apiConfig.Value;
@@ -29,6 +31,7 @@ public class ApiPollSchedulerService : BackgroundService
         _apiService = apiService;
         _actionExecutor = actionExecutor;
         _email = email;
+        _lifetime = lifetime;
         _tracker = new OrderTracker(_cfg.ProcessedIdsPath, logger);
     }
 
@@ -43,6 +46,7 @@ public class ApiPollSchedulerService : BackgroundService
         _logger.LogInformation("API polling starting. Interval: {Seconds}s", _schedulerCfg.IntervalSeconds);
         _logger.LogInformation("API Base URL: {BaseUrl}", _cfg.BaseUrl);
         _logger.LogInformation("Sub-actions configured: {Count}", _cfg.SubActions.Count);
+        _logger.LogInformation("Manual mode: {ManualMode}", _cfg.ManualMode);
 
         // Initial delay to allow service to fully start
         await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
@@ -64,6 +68,36 @@ public class ApiPollSchedulerService : BackgroundService
                 {
                     _logger.LogInformation("Processing {Count} orders", orders.Count);
 
+                    // Execute any configured batch sub-actions (e.g., CreatePicklistBatch) once per poll cycle
+                    var batchActions = _cfg.SubActions
+                        .Where(a => a.Enabled)
+                        .Where(a => a.Type.Equals("CreatePicklistBatch", StringComparison.OrdinalIgnoreCase))
+                        .ToList();
+                    var hasBatch = batchActions.Count > 0;
+
+                    if (batchActions.Count > 0)
+                    {
+                        var idList = orders.Select(o => o.Id).ToList();
+                        foreach (var action in batchActions)
+                        {
+                            try
+                            {
+                                _logger.LogInformation("Executing batch action: {Name}", action.Name);
+                                await _actionExecutor.ExecuteBatchCreatePicklistAsync(action, idList, stoppingToken);
+                                _logger.LogInformation("Batch action '{Name}' completed successfully", action.Name);
+                            }
+                            catch (Exception ex)
+                            {
+                                _logger.LogError(ex, "Batch action '{Name}' failed: {Message}", action.Name, ex.Message);
+                                if (!action.ContinueOnError)
+                                {
+                                    _logger.LogWarning("Halting poll cycle due to batch action failure (ContinueOnError=false)");
+                                    throw;
+                                }
+                            }
+                        }
+                    }
+
                     var processedCount = 0;
                     var skippedCount = 0;
                     var failedCount = 0;
@@ -82,7 +116,7 @@ public class ApiPollSchedulerService : BackgroundService
 
                         try
                         {
-                            _logger.LogInformation("Processing order: {OrderId}", order.Id);
+                            _logger.Log(hasBatch ? LogLevel.Debug : LogLevel.Information, "Processing order: {OrderId}", order.Id);
 
                             // Execute sub-actions for this order
                             await _actionExecutor.ExecuteActionsForOrderAsync(order.Id, order.RawData, stoppingToken);
@@ -91,7 +125,7 @@ public class ApiPollSchedulerService : BackgroundService
                             _tracker.MarkProcessed(order.Id);
                             processedCount++;
 
-                            _logger.LogInformation("Successfully processed order: {OrderId}", order.Id);
+                            _logger.Log(hasBatch ? LogLevel.Debug : LogLevel.Information, "Successfully processed order: {OrderId}", order.Id);
                         }
                         catch (Exception ex)
                         {
@@ -124,10 +158,18 @@ public class ApiPollSchedulerService : BackgroundService
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Unexpected error in API polling: {Message}", ex.Message);
-                await _email.TrySendAsync(
-                    subject: "ScheduledPrintService: API Polling Error",
-                    body: $"Unexpected error polling API at {DateTime.Now:u}.\nError: {ex.Message}\n\nStack: {ex.StackTrace}",
-                    ct: stoppingToken);
+                    await _email.TrySendAsync(
+                        subject: "ScheduledPrintService: API Polling Error",
+                        body: $"Unexpected error polling API at {DateTime.Now:u}.\nError: {ex.Message}\n\nStack: {ex.StackTrace}",
+                        ct: stoppingToken);
+            }
+
+            // Exit immediately if in manual mode
+            if (_cfg.ManualMode)
+            {
+                _logger.LogInformation("Manual mode enabled - exiting after single run");
+                _lifetime.StopApplication();
+                return; // Exit cleanly without waiting for cancellation
             }
 
             // Wait for next interval

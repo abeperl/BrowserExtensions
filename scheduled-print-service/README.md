@@ -83,3 +83,28 @@ Set `Printer:Mode` to `Windows` and specify `PrinterName`. This sends raw PDF by
 * If config changes don't seem to take effect, confirm `appsettings.json` is present in the output folder and that logs show: `Config Flags => Demo.Enabled=... Scheduler.Enabled=...`.
 * For dev cleanup, you can run `scheduled-print-service/dev-move-artifacts.ps1` to move any stray `logs/`, `out/`, `chromium-cache/`, `printed-urls.txt`, `output.txt`, `error.txt` from repo root into `scheduled-print-service/`.
 * IMPORTANT: When using the helper scripts, invoke them from the existing shell (e.g. `powershell -ExecutionPolicy Bypass -File .\scheduled-print-service\dev-use-local-data.ps1` OR simply `./scheduled-print-service/dev-use-local-data.ps1`). Avoid starting a new pwsh instance that then exits, or the environment variable will not persist for the subsequent run.
+
+## API polling and batch picklist sub-action
+When `Api.Enabled=true`, the service polls `GetOrdersList` and executes configured `SubActions`.
+
+To create pending order picklists in batches of ~10 IDs, add this sub-action to `Api.SubActions` in `appsettings.json`:
+
+```jsonc
+{
+  "Type": "CreatePicklistBatch",
+  "Name": "Create Pending Order Picklist Batch",
+  "Endpoint": "/api/PickList/CreatePendingOrderPicklist",
+  "Method": "POST",
+  "BatchSize": 10,
+  "QuickShip": false,
+  "ContinueOnError": true
+}
+```
+
+This runs once per poll cycle, batching the current list of order IDs and POSTing a payload like:
+
+```json
+{ "orderId": [2470,2482,2479,2478,2477,2476,2473,2472,2471,2468], "QuickShip": false }
+```
+
+Authentication headers, WarehouseId, and cookies are taken from `Api` settings.

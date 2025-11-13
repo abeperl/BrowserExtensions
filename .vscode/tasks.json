@@ -5,6 +5,19 @@
 			"label": "Zip Extension Files",
 			"type": "shell",
 			"command": "Compress-Archive -Path c:\\Users\\User\\source\\repos\\BrowserExtensions\\scan-overlay-extension\\* -DestinationPath c:\\Users\\User\\source\\repos\\BrowserExtensions\\scan-overlay-extension.zip -Force"
+		},
+		{
+			"label": "build-scheduled-print-service",
+			"command": "dotnet",
+			"type": "process",
+			"args": [
+				"build",
+				"${workspaceFolder}/scheduled-print-service/ScheduledPrintService/ScheduledPrintService.csproj",
+				"/property:GenerateFullPaths=true",
+				"/consoleloggerparameters:NoSummary;ForceNoAlign"
+			],
+			"problemMatcher": "$msCompile",
+			"group": "build"
 		}
 	]
 }

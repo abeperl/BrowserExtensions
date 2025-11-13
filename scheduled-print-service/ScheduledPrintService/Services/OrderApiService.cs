@@ -40,6 +40,7 @@ public class OrderApiService : IOrderApiService
     {
         _httpClient.BaseAddress = new Uri(_config.BaseUrl);
         _httpClient.DefaultRequestHeaders.Clear();
+        _httpClient.Timeout = TimeSpan.FromSeconds(200);
 
         // Add Bearer token
         if (!string.IsNullOrEmpty(_config.BearerToken))
@@ -66,6 +67,53 @@ public class OrderApiService : IOrderApiService
         }
     }
 
+    private async Task<HttpResponseMessage> SendWithRetryAsync(Func<HttpRequestMessage> requestFactory, CancellationToken ct)
+    {
+        var attempts = Math.Max(1, _config.RetryMaxAttempts);
+        var baseDelay = Math.Max(50, _config.RetryBaseDelayMs);
+        var maxDelay = Math.Max(baseDelay, _config.RetryMaxDelayMs);
+        var rng = new Random();
+        HttpResponseMessage? lastResponse = null;
+
+        for (int attempt = 1; attempt <= attempts; attempt++)
+        {
+            ct.ThrowIfCancellationRequested();
+            lastResponse?.Dispose();
+            using var req = requestFactory();
+            try
+            {
+                var resp = await _httpClient.SendAsync(req, ct);
+                if ((int)resp.StatusCode >= 200 && (int)resp.StatusCode < 300)
+                {
+                    return resp;
+                }
+                if (resp.StatusCode == System.Net.HttpStatusCode.TooManyRequests || (int)resp.StatusCode >= 500)
+                {
+                    lastResponse = resp;
+                }
+                else
+                {
+                    return resp;
+                }
+            }
+            catch (HttpRequestException ex)
+            {
+                _logger.LogWarning(ex, "HTTP error on attempt {Attempt}/{Max}", attempt, attempts);
+            }
+
+            if (attempt == attempts) break;
+            var jitter = rng.Next(0, baseDelay);
+            var delay = Math.Min(maxDelay, (int)(baseDelay * Math.Pow(2, attempt - 1)) + jitter);
+            _logger.LogWarning("Retrying in {Delay}ms (attempt {Next}/{Max})", delay, attempt + 1, attempts);
+            try { await Task.Delay(delay, ct); } catch (TaskCanceledException) { break; }
+        }
+
+        return lastResponse ?? new HttpResponseMessage(System.Net.HttpStatusCode.ServiceUnavailable)
+        {
+            Content = new StringContent("Request failed after retries.")
+        };
+    }
+
     public async Task<List<OrderRecord>> GetOrdersListAsync(CancellationToken ct = default)
     {
         try
@@ -74,19 +122,24 @@ public class OrderApiService : IOrderApiService
             var requestPayload = BuildRequestPayload();
             var jsonContent = JsonSerializer.Serialize(requestPayload, new JsonSerializerOptions
             {
-                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+                PropertyNamingPolicy = null
             });
 
             _logger.LogInformation("Calling GetOrdersList API...");
             _logger.LogDebug("Request payload: {Payload}", jsonContent);
 
-            var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
-            var response = await _httpClient.PostAsync("/api/order/GetOrdersList", content, ct);
+            Func<HttpRequestMessage> factory = () =>
+            {
+                var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
+                return new HttpRequestMessage(HttpMethod.Post, "/api/order/GetOrdersList") { Content = content };
+            };
 
+            var response = await SendWithRetryAsync(factory, ct);
             response.EnsureSuccessStatusCode();
 
             var responseBody = await response.Content.ReadAsStringAsync(ct);
             _logger.LogInformation("API call successful. Response length: {Length}", responseBody.Length);
+            _logger.LogDebug("Response body: {Body}", responseBody);
 
             // Parse JSON and extract order records
             var orders = ParseOrderRecords(responseBody);
@@ -109,40 +162,52 @@ public class OrderApiService : IOrderApiService
     private object BuildRequestPayload()
     {
         var req = _config.DefaultRequest;
+        var dateFrom = string.IsNullOrWhiteSpace(req.DateFrom) ? "2018-01-07" : req.DateFrom;
+        var dateTo = string.IsNullOrWhiteSpace(req.DateTo) ? DateTime.Today.ToString("yyyy-MM-dd") : req.DateTo;
+
+        // Use configured columns if provided, else fallback to a minimal column set
+        object columnsObject;
+        if (_config.OrdersListColumns.HasValue)
+        {
+            columnsObject = _config.OrdersListColumns.Value;
+        }
+        else
+        {
+            columnsObject = new object[]
+            {
+                new { data = 0, name = "", searchable = true, orderable = false, search = new { value = "", regex = false } },
+                new { data = 1, name = "", searchable = true, orderable = false, search = new { value = "", regex = false } }
+            };
+        }
+
         return new
         {
             draw = req.Draw,
-            columns = new object[]
-            {
-                new { data = 0, name = "", searchable = true, orderable = true, search = new { value = "", regex = false } },
-                new { data = 1, name = "", searchable = true, orderable = true, search = new { value = "", regex = false } },
-                new { data = new[] { 14 }, name = "", searchable = true, orderable = true, search = new { value = "", regex = false } },
-                new { data = new[] { 4 }, name = "", searchable = true, orderable = true, search = new { value = "", regex = false } },
-                new { data = new[] { 3 }, name = "", searchable = true, orderable = true, search = new { value = "", regex = false } },
-                new { data = new[] { 13 }, name = "", searchable = true, orderable = true, search = new { value = "", regex = false } },
-                new { data = 6, name = "", searchable = true, orderable = true, search = new { value = "", regex = false } },
-                new { data = 7, name = "", searchable = true, orderable = true, search = new { value = "", regex = false } }
-            },
+            columns = columnsObject,
             order = new[] { new { column = 5, dir = "asc" } },
             start = req.Start,
             length = req.Length,
             search = new { value = "", regex = false },
             clientID = req.ClientID,
+            Customer = req.Customer,
             statusName = req.StatusName,
             ChannelId = req.ChannelId,
             CreatedBy = req.CreatedBy,
-            PaymentMethod = req.PaymentMethod,
-            dateFrom = req.DateFrom,
-            dateTo = req.DateTo,
+            PaymentMethod = string.IsNullOrEmpty(req.PaymentMethodString) ? req.PaymentMethod.ToString() : req.PaymentMethodString,
+            dateFrom = dateFrom,
+            dateTo = dateTo,
             isdropship = req.IsDropship,
             carrierId = req.CarrierId,
             pickupDate = req.PickupDate,
             NotSchedule = req.NotSchedule,
             isQuickOrder = req.IsQuickOrder,
+            clientorderstatusid = req.ClientOrderStatusId.ToString(),
+            clientorderstatusdetailid = req.ClientOrderStatusDetailId.ToString(),
+            orderTypeFulfillment = req.OrderTypeFulfillment,
+            CutOffOrders = req.CutOffOrders,
             BackOrders = req.BackOrders,
             IsPersonalized = req.IsPersonalized,
-            clientorderstatusid = req.ClientOrderStatusId,
-            clientorderstatusdetailid = req.ClientOrderStatusDetailId
+            InStock = req.InStock
         };
     }
 
@@ -155,9 +220,30 @@ public class OrderApiService : IOrderApiService
             using var doc = JsonDocument.Parse(jsonResponse);
             var root = doc.RootElement;
 
-            if (!root.TryGetProperty("data", out var dataElement) || dataElement.ValueKind != JsonValueKind.Array)
+            // Support both shapes:
+            // 1) { "data": [ ... ] }
+            // 2) { "data": { "data": [ ... ] } }
+            JsonElement dataElement;
+            if (root.TryGetProperty("data", out var topData))
             {
-                _logger.LogWarning("Response does not contain 'data' array");
+                if (topData.ValueKind == JsonValueKind.Array)
+                {
+                    dataElement = topData;
+                }
+                else if (topData.ValueKind == JsonValueKind.Object && topData.TryGetProperty("data", out var nestedData) && nestedData.ValueKind == JsonValueKind.Array)
+                {
+                    dataElement = nestedData;
+                }
+                else
+                {
+                    _logger.LogWarning("Response 'data' property found but not an array. Kind={Kind}", topData.ValueKind);
+                    return records;
+                }
+            }
+            else
+            {
+                _logger.LogWarning("Response does not contain 'data' property at root. Sample: {Sample}",
+                    jsonResponse.Length > 300 ? jsonResponse.Substring(0, 300) + "..." : jsonResponse);
                 return records;
             }
 

@@ -15,15 +15,21 @@ var exeDir = AppContext.BaseDirectory;
 builder.Configuration.AddJsonFile(Path.Combine(exeDir, "appsettings.json"), optional: true, reloadOnChange: true);
 
 // Configure Serilog (console + file)
+var logDir = DataPaths.EnsureDir("logs");
+var logPathPattern = Path.Combine(logDir, "scheduled-print-service-.log");
 Log.Logger = new LoggerConfiguration()
     .ReadFrom.Configuration(builder.Configuration)
     .Enrich.FromLogContext()
     .WriteTo.Console()
-    .WriteTo.File(path: Path.Combine(DataPaths.EnsureDir("logs"), "scheduled-print-service-.log"), rollingInterval: RollingInterval.Day)
+    .WriteTo.File(path: logPathPattern, rollingInterval: RollingInterval.Day)
     .CreateLogger();
 
 builder.Logging.ClearProviders();
 builder.Logging.AddSerilog(Log.Logger, dispose: true);
+
+// Announce file logging location
+var todayLog = Path.Combine(logDir, $"scheduled-print-service-{DateTime.Now:yyyyMMdd}.log");
+Log.Information("File logging enabled. Directory: {Dir}. Today log: {File}", logDir, todayLog);
 
 // Bind configuration sections
 builder.Services.Configure<PdfConfig>(builder.Configuration.GetSection("Pdf"));
@@ -63,9 +69,17 @@ builder.Services.AddSingleton<IEmailNotificationService, EmailNotificationServic
 builder.Services.AddHttpClient<IOrderApiService, OrderApiService>();
 builder.Services.AddHttpClient<ISubActionExecutor, SubActionExecutor>();
 
-// Hosted services: demo (optional), scheduler, and API polling
+// Hosted services: demo (optional), scheduler (conditional), and API polling
 builder.Services.AddHostedService<DemoRunnerService>();
-builder.Services.AddHostedService<PrintSchedulerService>();
+var schedulerFeatureEnabled = builder.Configuration.GetSection("Scheduler").GetValue<bool>("Enabled");
+if (schedulerFeatureEnabled)
+{
+    builder.Services.AddHostedService<PrintSchedulerService>();
+}
+else
+{
+    Log.Information("PrintSchedulerService disabled by config; not registering.");
+}
 builder.Services.AddHostedService<ApiPollSchedulerService>();
 
 // Enable Windows Service integration (no console window when installed)
