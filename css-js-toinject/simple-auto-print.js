@@ -3,9 +3,8 @@
  *
  * Simplified approach:
  * 1. Wait for shipment modal to appear
- * 2. Click "Packing Slip" button
+ * 2. Click "View Invoice" button
  * 3. Click "Print Carton Label" button
- * 4. Force PrintWithUtility = false for Carton Label
  */
 
 (function() {
@@ -19,17 +18,10 @@
 
     const CONFIG = {
         autoClickEnabled: true,
-        autoClickDelay: 2000,  // Wait 2s after modal appears
+        autoClickDelay: 500,  // Wait 500ms after modal appears (reduced for faster response)
 
         // Delay between clicking buttons (ms)
         delayBetweenClicks: 500,
-
-        // Wait time after clicking carton label before disabling context (ms)
-        // This ensures the button's async operations complete while context is still enabled
-        contextCleanupDelay: 2000,
-
-        // Force PrintWithUtility to false for carton labels
-        forcePrintWithUtilityFalse: true,
 
         debugMode: true
     };
@@ -79,59 +71,43 @@
     }
 
     // =============================================================================
-    // PRINTWITHTILITY OVERRIDE
+    // URL INTERCEPTION FOR PRINT SERVICE
     // =============================================================================
 
     /**
-     * Flag to track if we're currently printing carton label
-     * This allows the override to only apply to carton labels, not packing slips
+     * Override $.post to redirect print service URLs
+     * Only intercepts when called from PrintShipmentLabelSlipSoftPrint or PrintCartonLabelPrint
+     * Changes: http://localhost:8080/printinvoice -> https://server:5555/print
      */
-    let isCartonLabelContext = false;
+    function setupPrintServiceUrlInterceptor() {
+        if (typeof $ !== 'undefined' && $.post) {
+            const originalPost = $.post;
 
-    /**
-     * Context-aware override for PrintWithUtility config
-     * Only returns false when we're in carton label context
-     */
-    function overridePrintWithUtility() {
-        if (CONFIG.forcePrintWithUtilityFalse && typeof common !== 'undefined' && common.getConfigByName) {
-            const originalGetConfig = common.getConfigByName;
+            $.post = function(url, data, success, dataType) {
+                // Only intercept if this is the exact print service call
+                // Check: URL is localhost:8080/printinvoice AND data contains HTML content (CSS styles)
+                if (url && url.includes('localhost:8080/printinvoice') &&
+                    typeof data === 'string' && data.includes('<style')) {
 
-            common.getConfigByName = function(configName, defaultValue) {
-                // Intercept PrintWithUtility and check context
-                if (configName === 'PrintWithUtility') {
-                    if (isCartonLabelContext) {
-                        console.log('🔧 PrintWithUtility intercepted - forcing FALSE for CARTON LABEL');
-                        return false;  // Force false for carton label
-                    } else {
-                        console.log('🔧 PrintWithUtility intercepted - using ORIGINAL for PACKING SLIP');
-                        return originalGetConfig.call(this, configName, defaultValue);
-                    }
+                    const newUrl = 'https://server:5555/print';
+                    console.log(`🔀 Redirecting print service URL (HTML print job):`);
+                    console.log(`   From: ${url}`);
+                    console.log(`   To: ${newUrl}`);
+                    console.log(`   Data size: ${data.length} bytes`);
+
+                    // Call original $.post with new URL
+                    return originalPost.call(this, newUrl, data, success, dataType);
                 }
 
-                // All other configs pass through normally
-                return originalGetConfig.call(this, configName, defaultValue);
+                // Pass through all other POST requests unchanged
+                return originalPost.apply(this, arguments);
             };
 
-            console.log('✅ PrintWithUtility context-aware override installed');
+            console.log('✅ Print service URL interceptor installed (HTML print jobs only)');
+            console.log('   Redirecting: localhost:8080/printinvoice → https://server:5555/print');
             return true;
         }
         return false;
-    }
-
-    /**
-     * Enable carton label context (makes override return false)
-     */
-    function enableCartonLabelContext() {
-        isCartonLabelContext = true;
-        console.log('🏷️ Carton label context ENABLED (PrintWithUtility will be FALSE)');
-    }
-
-    /**
-     * Disable carton label context (makes override use original value)
-     */
-    function disableCartonLabelContext() {
-        isCartonLabelContext = false;
-        console.log('📄 Carton label context DISABLED (PrintWithUtility will use original)');
     }
 
     // =============================================================================
@@ -147,41 +123,30 @@
         console.log('═══════════════════════════════════════════');
 
         try {
-            // STEP 0: Install context-aware override (but keep context disabled for now)
-            console.log('\n🔧 STEP 0: Installing context-aware override...');
-            overridePrintWithUtility();
-            disableCartonLabelContext();  // Ensure disabled for packing slip
+            // STEP 1: Click View Invoice button
+            console.log('\n📄 STEP 1: Clicking View Invoice button...');
 
-            // STEP 1: Click Packing Slip button (with context disabled)
-            console.log('\n📄 STEP 1: Clicking Packing Slip button...');
-            console.log('   Context: DISABLED (will use original PrintWithUtility value)');
+            const viewInvoiceBtn = document.querySelector('button[data-value="pinvoice"]');
 
-            const packingSlipBtn = document.getElementById('btnPrintPackSlip');
-
-            if (!packingSlipBtn) {
-                throw new Error('Packing Slip button not found (id: btnPrintPackSlip)');
+            if (!viewInvoiceBtn) {
+                throw new Error('View Invoice button not found (selector: button[data-value="pinvoice"])');
             }
 
             console.log('   Button found:', {
-                visible: packingSlipBtn.offsetParent !== null,
-                disabled: packingSlipBtn.disabled,
-                hasOnclick: !!packingSlipBtn.onclick
+                visible: viewInvoiceBtn.offsetParent !== null,
+                disabled: viewInvoiceBtn.disabled,
+                hasOnclick: !!viewInvoiceBtn.onclick
             });
 
-            packingSlipBtn.click();
-            console.log('✅ Packing Slip button clicked');
+            viewInvoiceBtn.click();
+            console.log('✅ View Invoice button clicked');
 
             // Wait before next button
             console.log(`⏳ Waiting ${CONFIG.delayBetweenClicks}ms before next button...`);
             await new Promise(resolve => setTimeout(resolve, CONFIG.delayBetweenClicks));
 
-            // STEP 2: Enable carton label context
-            console.log('\n📦 STEP 2: Enabling Carton Label context...');
-            enableCartonLabelContext();
-
-            // STEP 3: Click Carton Label button (with context enabled)
-            console.log('📦 STEP 3: Clicking Carton Label button...');
-            console.log('   Context: ENABLED (will force PrintWithUtility to FALSE)');
+            // STEP 2: Click Carton Label button
+            console.log('\n📦 STEP 2: Clicking Carton Label button...');
 
             const cartonLabelBtn = document.getElementById('box-label');
 
@@ -198,17 +163,6 @@
             cartonLabelBtn.click();
             console.log('✅ Carton Label button clicked');
 
-            // STEP 4: Wait for button's async operations to complete before cleanup
-            console.log('\n🔧 STEP 4: Waiting for carton label operations to complete...');
-            console.log(`   (Keeping context ENABLED for ${CONFIG.contextCleanupDelay}ms)`);
-
-            // Wait for the button's async operations to complete
-            await new Promise(resolve => setTimeout(resolve, CONFIG.contextCleanupDelay));
-
-            // Now it's safe to disable context
-            console.log('🔧 STEP 5: Cleanup...');
-            disableCartonLabelContext();
-
             console.log('\n✅ All buttons clicked successfully!');
             console.log('═══════════════════════════════════════════\n');
 
@@ -224,9 +178,6 @@
 
         } catch (error) {
             console.error('❌ Button click failed:', error);
-
-            // Make sure to disable context on error
-            disableCartonLabelContext();
 
             if (typeof OverlayManager !== 'undefined') {
                 OverlayManager.error({
@@ -316,18 +267,14 @@
             clickButtons: clickPrintButtons,
             handleModal: handleModalAppearance,
 
-            // Context control (for debugging)
-            enableCartonContext: enableCartonLabelContext,
-            disableCartonContext: disableCartonLabelContext,
-            isCartonContext: () => isCartonLabelContext,
+            // Interceptors
+            setupUrlInterceptor: setupPrintServiceUrlInterceptor,
 
             // Utilities
             setAutoClick: (enabled) => {
                 CONFIG.autoClickEnabled = enabled;
                 console.log(`🔧 Auto-click ${enabled ? 'enabled' : 'disabled'}`);
             },
-
-            overridePrintUtility: overridePrintWithUtility,
 
             // Get current shipment ID
             getShipmentId: () => window._lastShipmentId
@@ -337,7 +284,7 @@
         console.log('🔧 Debug API: window.simpleAutoPrint');
         console.log('💡 Manual trigger: window.simpleAutoPrint.clickButtons()');
         console.log('💡 Disable auto: window.simpleAutoPrint.setAutoClick(false)');
-        console.log('💡 Check context: window.simpleAutoPrint.isCartonContext()');
+        console.log('💡 Print service URL: localhost:8080/printinvoice → https://server:5555/print');
         console.log('');
     }
 
@@ -345,12 +292,17 @@
     // INITIALIZATION
     // =============================================================================
 
-    // Setup interceptor
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', setupShipmentIdInterceptor);
-    } else {
+    // Setup interceptors
+    function initializeInterceptors() {
         setupShipmentIdInterceptor();
+        setupPrintServiceUrlInterceptor();
     }
 
-    console.log('📌 Shipment ID interceptor ready');
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initializeInterceptors);
+    } else {
+        initializeInterceptors();
+    }
+
+    console.log('📌 All interceptors ready');
 })();

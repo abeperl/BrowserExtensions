@@ -321,6 +321,16 @@
                     console.warn('⚠️ OverlayManager not loaded - snackbar interception disabled');
                 }
 
+                // ========== MODAL INTERCEPTOR ==========
+                if (typeof window.modalInterceptor !== 'undefined' && typeof OverlayManager !== 'undefined') {
+                    console.log('🎯 Modal interceptor feature enabled');
+                    console.log('💡 Native modals will be replaced with OverlayManager displays');
+                    console.log('💡 Disable with: window.modalInterceptor.disable()');
+                    console.log('💡 Restore with: window.modalInterceptor.restore()');
+                } else {
+                    console.warn('⚠️ Modal interceptor or OverlayManager not loaded');
+                }
+
                 // ========== API RESPONSE OVERLAY FEATURE ==========
                 if (typeof OverlayManager !== 'undefined') {
                     console.log('🎯 API response overlay feature enabled');
@@ -692,6 +702,72 @@
             action: () => {
                 console.log('🚀 Matched #Outbound/shipmentdetails route');
 
+                // EARLY: Disable TabManager reuse for this route so print windows are true popups
+                // Rationale: Reused tabs caused late CSS injection after print dialog opened.
+                if (typeof TabManager !== 'undefined') {
+                    try {
+                        TabManager.disable();
+                        console.log('⚙️ TabManager disabled for Shipment Details route to allow early print CSS injection');
+                    } catch(e) { /* ignore */ }
+                }
+
+                // ========== BOX LABEL FORMAT INJECTOR ==========
+                if (!window._boxLabelMonitorInstalled) {
+                    console.log('📋 Installing box label format monitor...');
+
+                    const customCSS = `
+                        /* Hide "Box No" line in top section */
+                        .top-info-section .text:first-child { display: none !important; }
+                        /* Hide Customer ID (first child) */
+                        .ship-info-section > .text.sm-text:first-child { display: none !important; }
+                        /* Hide "To:" (second child after Customer ID) */
+                        .ship-info-section > .text:nth-child(2) { display: none !important; }
+                        /* Enlarge Tel line (any remaining sm-text elements) */
+                        .ship-info-section .text.sm-text { font-size: 40px !important; margin-top: 10px !important; }
+                        /* Adjust top section padding */
+                        .top-info-section { padding-top: 10px !important; padding-bottom: 20px !important; margin-bottom: 20px !important; text-align: center !important; }
+                        /* Ensure ship section horizontal padding retained */
+                        .ship-info-section { padding: 0 20px !important; }
+                    `;
+
+                    const processedWindows = new WeakSet();
+
+                    // Make injector globally accessible (no window.open wrapping)
+                    window._injectBoxLabelCSS = function(targetWindow) {
+                        try {
+                            if (!targetWindow || !targetWindow.document || processedWindows.has(targetWindow)) {
+                                return false;
+                            }
+
+                            const doc = targetWindow.document;
+                            
+                            if (doc.readyState === 'loading') {
+                                return false;
+                            }
+
+                            const isBoxLabelWindow = doc.querySelector('.box-label-wrp') !== null;
+                            
+                            if (isBoxLabelWindow && !doc.getElementById('box-label-format-override')) {
+                                const style = doc.createElement('style');
+                                style.id = 'box-label-format-override';
+                                style.textContent = customCSS;
+                                doc.head.appendChild(style);
+                                console.log('✅ BOX LABEL CSS INJECTED');
+                                processedWindows.add(targetWindow);
+                                return true;
+                            }
+                        } catch (error) {
+                            // Silent fail for cross-origin
+                        }
+                        return false;
+                    };
+
+                    window._boxLabelMonitorInstalled = true;
+                    console.log('✅ Box label format monitor function installed (no window.open wrapping)');
+                } else {
+                    console.log('ℹ️ Box label format monitor already installed');
+                }
+
                 // Function to inject CSS overrides into document or iframe
                 function injectEnhancedStyles(doc) {
                     // Check if already injected
@@ -794,14 +870,81 @@
             action: () => {
                 console.log('🚀 Matched #outbound/packing route');
 
-                // ========== TAB MANAGER FOR WINDOW.OPEN ==========
+                // EARLY: Disable TabManager for packing route to ensure window.open interception
+                // by box label injector occurs BEFORE user triggers print.
+                if (typeof TabManager !== 'undefined') {
+                    try {
+                        TabManager.disable();
+                        console.log('⚙️ TabManager disabled for Outbound Packing route to avoid delayed CSS injection');
+                    } catch(e) { /* ignore */ }
+                }
+
+                // ========== BOX LABEL FORMAT INJECTOR ==========
+                if (!window._boxLabelMonitorInstalled) {
+                    console.log('📋 Installing box label format monitor...');
+
+                    const customCSS = `
+                        /* Hide "Box No" line */
+                        .top-info-section .text:first-child { display: none !important; }
+                        /* Hide Customer ID (first child) */
+                        .ship-info-section > .text.sm-text:first-child { display: none !important; }
+                        /* Hide "To:" (second child) */
+                        .ship-info-section > .text:nth-child(2) { display: none !important; }
+                        /* Enlarge Tel line (remaining sm-text) */
+                        .ship-info-section .text.sm-text { font-size: 40px !important; margin-top: 10px !important; }
+                        /* Adjust top section spacing */
+                        .top-info-section { padding-top: 10px !important; padding-bottom: 20px !important; margin-bottom: 20px !important; text-align: center !important; }
+                        .ship-info-section { padding: 0 20px !important; }
+                    `;
+                    
+                    // Track all windows we've tried
+                    const processedWindows = new WeakSet();
+
+                    // Function to inject CSS (globally accessible)
+                    window._injectBoxLabelCSS = function(targetWindow) {
+                        try {
+                            if (!targetWindow || !targetWindow.document || processedWindows.has(targetWindow)) {
+                                return false;
+                            }
+
+                            const doc = targetWindow.document;
+                            
+                            // Check if document is ready
+                            if (doc.readyState === 'loading') {
+                                return false;
+                            }
+
+                            const isBoxLabelWindow = doc.querySelector('.box-label-wrp') !== null;
+                            
+                            if (isBoxLabelWindow && !doc.getElementById('box-label-format-override')) {
+                                const style = doc.createElement('style');
+                                style.id = 'box-label-format-override';
+                                style.textContent = customCSS;
+                                doc.head.appendChild(style);
+                                console.log('✅ BOX LABEL CSS INJECTED');
+                                processedWindows.add(targetWindow);
+                                return true;
+                            }
+                        } catch (error) {
+                            // Silent fail for cross-origin
+                        }
+                        return false;
+                    };
+
+                    window._boxLabelMonitorInstalled = true;
+                    console.log('✅ Box label format monitor function installed (no window.open wrapping)');
+                } else {
+                    console.log('ℹ️ Box label format monitor already installed');
+                }
+
+                // ========== TAB MANAGER FOR WINDOW.OPEN - INSTALL SECOND ==========
                 if (typeof TabManager !== 'undefined') {
                     console.log('🪟 Tab Manager feature enabled');
 
                     // Ensure TabManager is installed
                     if (!window.open._tabManagerInstalled) {
                         TabManager.install();
-                        console.log('✅ Tab Manager installed for this route');
+                        console.log('✅ Tab Manager installed');
                     } else {
                         console.log('ℹ️ Tab Manager already installed');
                     }
@@ -809,7 +952,22 @@
                     // Enable debug mode for visibility
                     TabManager.setDebug(true);
 
-                    console.log('💡 All window.open() calls will now use reusable tabs');
+                    // Monitor TabManager's tabs for box labels
+                    if (TabManager.tabs && window._injectBoxLabelCSS) {
+                        console.log('🔍 Setting up interval to monitor TabManager tabs for box labels...');
+                        setInterval(() => {
+                            for (const [url, tabInfo] of Object.entries(TabManager.tabs)) {
+                                if (tabInfo.window && !tabInfo.window.closed) {
+                                    try {
+                                        window._injectBoxLabelCSS(tabInfo.window);
+                                    } catch (e) { /* ignore */ }
+                                }
+                            }
+                        }, 300);
+                        console.log('✅ TabManager tab monitoring active');
+                    }
+
+                    console.log('💡 All window.open() calls will now use reusable tabs WITH box label monitoring');
                     console.log('💡 Debug with: window.TabManager.printStatus()');
                 } else {
                     console.warn('⚠️ TabManager not loaded');

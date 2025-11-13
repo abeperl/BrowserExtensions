@@ -2,7 +2,7 @@
  * Silent Auto Print Buttons - JSPrintManager Integration
  *
  * Provides silent printing capabilities using JSPrintManager for:
- * 1. Packing Slip
+ * 1. View Invoice
  * 2. Carton Label
  *
  * APPROACH:
@@ -116,6 +116,41 @@
 })();
 
 // =============================================================================
+// URL INTERCEPTION FOR PRINT SERVICE
+// =============================================================================
+
+/**
+ * Override $.post to redirect print service URLs
+ * Changes: http://localhost:8080/printinvoice -> https://server:5555/print
+ */
+function setupPrintServiceUrlInterceptor() {
+    if (typeof $ !== 'undefined' && $.post) {
+        const originalPost = $.post;
+
+        $.post = function(url, data, success, dataType) {
+            // Intercept localhost:8080/printinvoice and redirect to server:5555/print
+            if (url && url.includes('localhost:8080/printinvoice')) {
+                const newUrl = 'https://server:5555/print';  // HTTPS to avoid mixed content error
+                console.log(`🔀 [Silent Print] Redirecting print service URL:`);
+                console.log(`   From: ${url}`);
+                console.log(`   To: ${newUrl}`);
+
+                // Call original $.post with new URL
+                return originalPost.call(this, newUrl, data, success, dataType);
+            }
+
+            // Pass through all other POST requests unchanged
+            return originalPost.apply(this, arguments);
+        };
+
+        console.log('✅ [Silent Print] Print service URL interceptor installed');
+        console.log('   Redirecting: localhost:8080/printinvoice → https://server:5555/print');
+        return true;
+    }
+    return false;
+}
+
+// =============================================================================
 // CONFIGURATION
 // =============================================================================
 
@@ -124,12 +159,12 @@ const SILENT_AUTO_PRINT_CONFIG = {
     printMode: 'jsprintmanager',  // Options: 'jsprintmanager' | 'windows'
 
     // Printer configuration (must match Windows printer name exactly)
-    printerNamePackingSlip: 'Brother HL-L6200DW series',
+    printerNameViewInvoice: 'Brother HL-L6200DW series',
     printerNameCartonLabel: 'Brother HL-L6200DW series',
 
     // Auto-click behavior
     autoClickEnabled: true,         // Enable/disable auto-clicking
-    autoClickDelay: 2000,          // Delay before auto-trigger (ms) - increased to allow handlers to initialize
+    autoClickDelay: 500,           // Delay before auto-trigger (ms) - reduced for faster response
 
     // JSPrintManager settings
     jsprintmanagerTimeout: 5000,   // Timeout for client detection (ms)
@@ -292,19 +327,19 @@ async function printHTMLDocument(printerName, htmlContent, cssContent, jobName =
  * @type {Object}
  */
 const capturedWindowHTML = {
-    packingSlip: null,
+    viewInvoice: null,
     cartonLabel: null
 };
 
 /**
  * Intercept window.open AND $.post to capture HTML from print operations
  * Works with TabManager by temporarily disabling it
- * @returns {Promise<Object>} Object with packing slip and carton label HTML
+ * @returns {Promise<Object>} Object with view invoice and carton label HTML
  */
 function interceptPrintWindows() {
     return new Promise((resolve, reject) => {
         // Reset captured HTML
-        capturedWindowHTML.packingSlip = null;
+        capturedWindowHTML.viewInvoice = null;
         capturedWindowHTML.cartonLabel = null;
 
         // Check if TabManager is installed and disable it temporarily
@@ -366,7 +401,7 @@ function interceptPrintWindows() {
                             }
 
                             resolve({
-                                packingSlip: capturedWindowHTML.packingSlip,
+                                viewInvoice: capturedWindowHTML.viewInvoice,
                                 cartonLabel: capturedWindowHTML.cartonLabel
                             });
                         }
@@ -406,14 +441,14 @@ function interceptPrintWindows() {
                     const html = doc.documentElement.outerHTML;
 
                     // Determine which document this is based on URL or content
-                    if (url.includes('packingSlipdetail') || url.includes('packingslip')) {
-                        if (!capturedWindowHTML.packingSlip) {
-                            console.log('📄 Captured Packing Slip HTML');
-                            capturedWindowHTML.packingSlip = html;
+                    if (url.includes('invoicedetail') || url.includes('invoice')) {
+                        if (!capturedWindowHTML.viewInvoice) {
+                            console.log('📄 Captured View Invoice HTML');
+                            capturedWindowHTML.viewInvoice = html;
                             windowsCaptured++;
                             console.log(`   Progress: ${windowsCaptured}/${maxWindows} documents captured`);
                         } else {
-                            console.log('📄 Packing slip already captured, ignoring duplicate');
+                            console.log('📄 View invoice already captured, ignoring duplicate');
                         }
                     } else if (url.includes('placard') || url.includes('carton') || url.includes('label')) {
                         if (!capturedWindowHTML.cartonLabel) {
@@ -459,7 +494,7 @@ function interceptPrintWindows() {
                         }
 
                         resolve({
-                            packingSlip: capturedWindowHTML.packingSlip,
+                            viewInvoice: capturedWindowHTML.viewInvoice,
                             cartonLabel: capturedWindowHTML.cartonLabel
                         });
                     }
@@ -513,7 +548,7 @@ function interceptPrintWindows() {
         };
 
         console.log('🎯 Window and POST interceptors installed');
-        console.log('   Waiting for: Packing Slip (window.open) + Carton Label ($.post)');
+        console.log('   Waiting for: View Invoice (window.open) + Carton Label ($.post)');
     });
 }
 
@@ -528,19 +563,19 @@ async function clickPrintButtons() {
     console.log('⏳ Waiting 300ms for interceptor to be fully ready...');
     await new Promise(resolve => setTimeout(resolve, 300));
 
-    // Click Packing Slip button
-    const packingSlipBtn = document.getElementById('btnPrintPackSlip');
-    if (!packingSlipBtn) {
-        throw new Error('Packing Slip button not found');
+    // Click View Invoice button
+    const viewInvoiceBtn = document.querySelector('button[data-value="pinvoice"]');
+    if (!viewInvoiceBtn) {
+        throw new Error('View Invoice button not found');
     }
-    console.log('📄 Packing Slip button found:', {
-        visible: packingSlipBtn.offsetParent !== null,
-        disabled: packingSlipBtn.disabled,
-        onclick: !!packingSlipBtn.onclick
+    console.log('📄 View Invoice button found:', {
+        visible: viewInvoiceBtn.offsetParent !== null,
+        disabled: viewInvoiceBtn.disabled,
+        onclick: !!viewInvoiceBtn.onclick
     });
-    console.log('📄 Clicking Packing Slip button (native .click())...');
-    packingSlipBtn.click();
-    console.log('📄 Packing Slip button clicked');
+    console.log('📄 Clicking View Invoice button (native .click())...');
+    viewInvoiceBtn.click();
+    console.log('📄 View Invoice button clicked');
 
     // Wait before clicking carton label
     console.log('⏳ Waiting 200ms before clicking carton label...');
@@ -601,12 +636,12 @@ async function printAllSilent(shipmentId) {
 
         // Detailed check of what we have
         console.log('📊 Capture status:');
-        console.log(`   Packing Slip: ${capturedHTML.packingSlip ? 'YES (' + capturedHTML.packingSlip.length + ' chars)' : 'MISSING'}`);
+        console.log(`   View Invoice: ${capturedHTML.viewInvoice ? 'YES (' + capturedHTML.viewInvoice.length + ' chars)' : 'MISSING'}`);
         console.log(`   Carton Label: ${capturedHTML.cartonLabel ? 'YES (' + capturedHTML.cartonLabel.length + ' chars)' : 'MISSING'}`);
 
-        if (!capturedHTML.packingSlip || !capturedHTML.cartonLabel) {
+        if (!capturedHTML.viewInvoice || !capturedHTML.cartonLabel) {
             const missing = [];
-            if (!capturedHTML.packingSlip) missing.push('Packing Slip');
+            if (!capturedHTML.viewInvoice) missing.push('View Invoice');
             if (!capturedHTML.cartonLabel) missing.push('Carton Label');
             throw new Error(`Failed to capture: ${missing.join(', ')}`);
         }
@@ -618,10 +653,10 @@ async function printAllSilent(shipmentId) {
 
         const printPromises = [
             printHTMLDocument(
-                SILENT_AUTO_PRINT_CONFIG.printerNamePackingSlip,
-                capturedHTML.packingSlip,
+                SILENT_AUTO_PRINT_CONFIG.printerNameViewInvoice,
+                capturedHTML.viewInvoice,
                 '',  // CSS already included in full HTML
-                'Packing Slip'
+                'View Invoice'
             ),
             printHTMLDocument(
                 SILENT_AUTO_PRINT_CONFIG.printerNameCartonLabel,
@@ -741,7 +776,7 @@ async function fallbackToLocalhost(shipmentId) {
         console.log('⏳ Waiting for windows to load...');
         const capturedHTML = await capturePromise;
 
-        if (!capturedHTML.packingSlip || !capturedHTML.cartonLabel) {
+        if (!capturedHTML.viewInvoice || !capturedHTML.cartonLabel) {
             throw new Error('Failed to capture HTML for localhost printing');
         }
 
@@ -749,7 +784,7 @@ async function fallbackToLocalhost(shipmentId) {
 
         // Send to localhost service
         const printPromises = [
-            $.post('http://localhost:8080/printinvoice', capturedHTML.packingSlip),
+            $.post('http://localhost:8080/printinvoice', capturedHTML.viewInvoice),
             $.post('http://localhost:8080/printinvoice', capturedHTML.cartonLabel)
         ];
 
@@ -925,15 +960,15 @@ function extractShipmentIdFromModal() {
     }
 
     // Strategy 3: Check button data attributes
-    const packingSlipBtn = document.getElementById('btnPrintPackSlip');
-    if (packingSlipBtn && packingSlipBtn.dataset.shipmentId) {
-        console.log('📌 Found shipment ID on button:', packingSlipBtn.dataset.shipmentId);
-        return parseInt(packingSlipBtn.dataset.shipmentId);
+    const viewInvoiceBtn = document.querySelector('button[data-value="pinvoice"]');
+    if (viewInvoiceBtn && viewInvoiceBtn.dataset.shipmentId) {
+        console.log('📌 Found shipment ID on button:', viewInvoiceBtn.dataset.shipmentId);
+        return parseInt(viewInvoiceBtn.dataset.shipmentId);
     }
 
     // Strategy 4: Parse from button onclick
-    if (packingSlipBtn && packingSlipBtn.onclick) {
-        const onclickStr = packingSlipBtn.onclick.toString();
+    if (viewInvoiceBtn && viewInvoiceBtn.onclick) {
+        const onclickStr = viewInvoiceBtn.onclick.toString();
         const match = onclickStr.match(/id=(\d+)/);
         if (match) {
             console.log('📌 Extracted shipment ID from onclick:', match[1]);
@@ -1096,14 +1131,14 @@ if (typeof window !== 'undefined') {
         },
 
         setPrinter: (job, printerName) => {
-            if (job === 'packingSlip') {
-                SILENT_AUTO_PRINT_CONFIG.printerNamePackingSlip = printerName;
-                console.log(`🔧 Packing Slip printer set to: ${printerName}`);
+            if (job === 'viewInvoice') {
+                SILENT_AUTO_PRINT_CONFIG.printerNameViewInvoice = printerName;
+                console.log(`🔧 View Invoice printer set to: ${printerName}`);
             } else if (job === 'cartonLabel') {
                 SILENT_AUTO_PRINT_CONFIG.printerNameCartonLabel = printerName;
                 console.log(`🔧 Carton Label printer set to: ${printerName}`);
             } else {
-                console.error('❌ Invalid job type. Use "packingSlip" or "cartonLabel"');
+                console.error('❌ Invalid job type. Use "viewInvoice" or "cartonLabel"');
             }
         },
 
@@ -1114,13 +1149,17 @@ if (typeof window !== 'undefined') {
 
         // Shipment ID utilities
         extractShipmentId: extractShipmentIdFromModal,
-        getLastShipmentId: () => window._lastShipmentId
+        getLastShipmentId: () => window._lastShipmentId,
+
+        // Interceptors
+        setupUrlInterceptor: setupPrintServiceUrlInterceptor
     };
 
     console.log('✅ Silent Auto Print Buttons loaded');
     console.log('🔧 Debug API available at: window.silentAutoPrint');
     console.log('💡 Configuration:', SILENT_AUTO_PRINT_CONFIG);
     console.log('💡 Approach: Intercepts window.open() to capture HTML from existing print windows');
+    console.log('💡 Print service URL: localhost:8080/printinvoice → https://server:5555/print');
     console.log('');
     console.log('📖 Common commands:');
     console.log('   window.silentAutoPrint.checkJSPrintManager()  - Test JSPrintManager');
@@ -1130,9 +1169,14 @@ if (typeof window !== 'undefined') {
     console.log('   window.silentAutoPrint.interceptWindows()     - Test window interception');
 }
 
-// Setup shipment ID interceptor on load
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', setupShipmentIdInterceptor);
-} else {
+// Setup interceptors on load
+function initializeInterceptors() {
     setupShipmentIdInterceptor();
+    setupPrintServiceUrlInterceptor();
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeInterceptors);
+} else {
+    initializeInterceptors();
 }

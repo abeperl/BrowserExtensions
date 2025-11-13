@@ -1,0 +1,37 @@
+/**
+ * Box Label Print Format Overrides
+ * Modifies dynamically generated HTML for carton label printing
+ */
+
+/* Hide "Box No : 1" line */
+.top-info-section .text:first-child {
+    display: none !important;
+}
+
+/* Hide "To:" text */
+.ship-info-section .text[style*="font-size: 40px"]:first-of-type {
+    display: none !important;
+}
+
+/* Put phone numbers on same line */
+.top-info-section .text[style*="font-size: 30px"] {
+    display: inline-block !important;
+    margin-right: 20px !important;
+}
+
+/* Remove extra padding from top-info-section */
+.top-info-section {
+    padding-top: 10px !important;
+    padding-bottom: 20px !important;
+    margin-bottom: 20px !important;
+}
+
+/* Ensure customer info section has proper spacing */
+.ship-info-section {
+    padding: 0 20px !important;
+}
+
+/* Optional: Adjust spacing between phone numbers if needed */
+.top-info-section .text[style*="font-size: 30px"]:last-child {
+    margin-right: 0 !important;
+}
