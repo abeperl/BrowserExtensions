@@ -2,11 +2,24 @@ namespace ScheduledPrintService.Models;
 
 public class ApiConfig
 {
+    // Number identifier from PrimaryApi.ApiNumber
+    public int ApiNumber { get; set; }
     public bool Enabled { get; set; }
     public string BaseUrl { get; set; } = "https://mj.3plnext.com";
     public string BearerToken { get; set; } = string.Empty;
     public int WarehouseId { get; set; } = 1;
     public Dictionary<string, string> Cookies { get; set; } = new();
+
+    // Primary API request definition (from database PrimaryApi row)
+    public string PrimaryEndpoint { get; set; } = "/api/order/GetOrdersList";
+    public string PrimaryHttpMethod { get; set; } = "POST";
+    // Optional raw JSON payload to send for primary request. When null/empty, DefaultRequest is serialized instead.
+    public string? PrimaryPayload { get; set; }
+
+    // Login credentials for token renewal
+    public string UserEmail { get; set; } = string.Empty;
+    public string Password { get; set; } = string.Empty;
+
     public OrdersListRequest DefaultRequest { get; set; } = new();
     public System.Text.Json.JsonElement? OrdersListColumns { get; set; }
 
@@ -93,4 +106,28 @@ public class SubAction
 
     // For CreatePicklistBatch: whether to QuickShip
     public bool QuickShip { get; set; } = false;
+
+    // For CreatePicklistBatch: whether to force create picklist
+    public bool ForceCreatePicklist { get; set; } = false;
+
+    // Chaining support: store response data in context with this key
+    public string? OutputVariableName { get; set; }
+
+    // Chaining support: use data from previous action stored in context
+    public bool UseChainedInput { get; set; } = false;
+
+    // Chaining support: map context variable to action parameter (e.g., {picklistId} -> context["picklistIds"])
+    public Dictionary<string, string> ChainedInputMapping { get; set; } = new();
+
+    // For GetUrlAndPrint: wait for network idle before capturing
+    public int WaitForNetworkIdleMs { get; set; } = 3000;
+
+    // For GetUrlAndPrint: make all hidden inputs visible
+    public bool MakeHiddenVisible { get; set; } = false;
+
+    // Chaining support: JSON path to extract array data for iteration (e.g., "data" to get data array)
+    public string? ChainedArrayJsonPath { get; set; }
+
+    // Chaining support: JSON path to extract specific field from each item (e.g., "pickListId")
+    public string? ChainedItemFieldPath { get; set; }
 }

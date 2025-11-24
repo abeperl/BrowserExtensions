@@ -54,7 +54,9 @@
       "Bash(del HTMLZebraPrinterService-v1.1.0-HTTPS.zip)",
       "Bash(del HTMLZebraPrinterService-v1.1.0-HTTPS.zip 2)",
       "Bash(NUL)",
-      "Bash(test:*)"
+      "Bash(test:*)",
+      "Bash(python:*)",
+      "Bash(sqlite3:*)"
     ],
     "deny": []
   }

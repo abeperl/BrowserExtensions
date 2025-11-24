@@ -23,15 +23,18 @@ public class OrderApiService : IOrderApiService
     private readonly ILogger<OrderApiService> _logger;
     private readonly HttpClient _httpClient;
     private readonly ApiConfig _config;
+    private readonly ITokenRenewalService _tokenRenewal;
 
     public OrderApiService(
         ILogger<OrderApiService> logger,
         HttpClient httpClient,
-        IOptions<ApiConfig> apiConfig)
+        IOptions<ApiConfig> apiConfig,
+        ITokenRenewalService tokenRenewal)
     {
         _logger = logger;
         _httpClient = httpClient;
         _config = apiConfig.Value;
+        _tokenRenewal = tokenRenewal;
 
         ConfigureHttpClient();
     }
@@ -42,12 +45,7 @@ public class OrderApiService : IOrderApiService
         _httpClient.DefaultRequestHeaders.Clear();
         _httpClient.Timeout = TimeSpan.FromSeconds(200);
 
-        // Add Bearer token
-        if (!string.IsNullOrEmpty(_config.BearerToken))
-        {
-            _httpClient.DefaultRequestHeaders.Authorization =
-                new AuthenticationHeaderValue("Bearer", _config.BearerToken);
-        }
+        UpdateHttpClientAuth();
 
         // Add custom headers
         _httpClient.DefaultRequestHeaders.Add("Accept", "*/*");
@@ -58,11 +56,27 @@ public class OrderApiService : IOrderApiService
         _httpClient.DefaultRequestHeaders.Add("Referer", $"{_config.BaseUrl}/");
         _httpClient.DefaultRequestHeaders.Add("User-Agent",
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36");
+    }
 
-        // Add cookies if configured
-        if (_config.Cookies.Count > 0)
+    private void UpdateHttpClientAuth()
+    {
+        // Get current token and cookies from renewal service
+        var token = _tokenRenewal.GetCurrentToken();
+        var cookies = _tokenRenewal.GetCurrentCookies();
+
+        // Update Bearer token
+        _httpClient.DefaultRequestHeaders.Authorization = null;
+        if (!string.IsNullOrEmpty(token))
         {
-            var cookieHeader = string.Join("; ", _config.Cookies.Select(kvp => $"{kvp.Key}={kvp.Value}"));
+            _httpClient.DefaultRequestHeaders.Authorization =
+                new AuthenticationHeaderValue("Bearer", token);
+        }
+
+        // Update cookies
+        _httpClient.DefaultRequestHeaders.Remove("Cookie");
+        if (cookies.Count > 0)
+        {
+            var cookieHeader = string.Join("; ", cookies.Select(kvp => $"{kvp.Key}={kvp.Value}"));
             _httpClient.DefaultRequestHeaders.Add("Cookie", cookieHeader);
         }
     }
@@ -73,6 +87,7 @@ public class OrderApiService : IOrderApiService
         var baseDelay = Math.Max(50, _config.RetryBaseDelayMs);
         var maxDelay = Math.Max(baseDelay, _config.RetryMaxDelayMs);
         var rng = new Random();
+        var tokenRenewed = false;
         HttpResponseMessage? lastResponse = null;
 
         for (int attempt = 1; attempt <= attempts; attempt++)
@@ -83,11 +98,41 @@ public class OrderApiService : IOrderApiService
             try
             {
                 var resp = await _httpClient.SendAsync(req, ct);
-                if ((int)resp.StatusCode >= 200 && (int)resp.StatusCode < 300)
+                
+                // Check for 401 Unauthorized - token may have expired
+                if (resp.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+                {
+                    _logger.LogWarning("Received 401 Unauthorized - token may have expired");
+                    
+                    // Only attempt token renewal once per retry cycle
+                    if (!tokenRenewed)
+                    {
+                        _logger.LogInformation("Attempting to renew authentication token");
+                        tokenRenewed = await _tokenRenewal.RenewTokenAsync(ct);
+                        
+                        if (tokenRenewed)
+                        {
+                            _logger.LogInformation("Token renewed successfully, updating HTTP client");
+                            UpdateHttpClientAuth();
+                            
+                            // Don't count this as an attempt, retry immediately with new token
+                            resp.Dispose();
+                            continue;
+                        }
+                        else
+                        {
+                            _logger.LogCritical("Failed to renew token after 401 Unauthorized - service will stop");
+                            throw new TokenRenewalException("Unable to renew authentication token after receiving 401 Unauthorized");
+                        }
+                    }
+                    
+                    lastResponse = resp;
+                }
+                else if ((int)resp.StatusCode >= 200 && (int)resp.StatusCode < 300)
                 {
                     return resp;
                 }
-                if (resp.StatusCode == System.Net.HttpStatusCode.TooManyRequests || (int)resp.StatusCode >= 500)
+                else if (resp.StatusCode == System.Net.HttpStatusCode.TooManyRequests || (int)resp.StatusCode >= 500)
                 {
                     lastResponse = resp;
                 }
@@ -118,20 +163,37 @@ public class OrderApiService : IOrderApiService
     {
         try
         {
-            // Build the request payload
-            var requestPayload = BuildRequestPayload();
-            var jsonContent = JsonSerializer.Serialize(requestPayload, new JsonSerializerOptions
-            {
-                PropertyNamingPolicy = null
-            });
+            // Determine primary endpoint and method from configuration
+            var endpoint = string.IsNullOrWhiteSpace(_config.PrimaryEndpoint) ? "/api/order/GetOrdersList" : _config.PrimaryEndpoint;
+            var methodString = string.IsNullOrWhiteSpace(_config.PrimaryHttpMethod) ? "POST" : _config.PrimaryHttpMethod;
+            var httpMethod = new HttpMethod(methodString.ToUpperInvariant());
 
-            _logger.LogInformation("Calling GetOrdersList API...");
+            // Build request payload: prefer raw PrimaryPayload if supplied; otherwise serialize DefaultRequest
+            string? jsonContent = null;
+            if (!string.IsNullOrWhiteSpace(_config.PrimaryPayload) && _config.PrimaryPayload != "{}")
+            {
+                jsonContent = _config.PrimaryPayload;
+            }
+            else
+            {
+                var requestPayload = BuildRequestPayload();
+                jsonContent = JsonSerializer.Serialize(requestPayload, new JsonSerializerOptions
+                {
+                    PropertyNamingPolicy = null
+                });
+            }
+
+            _logger.LogInformation("Calling primary endpoint {Endpoint} ({Method})...", endpoint, httpMethod);
             _logger.LogDebug("Request payload: {Payload}", jsonContent);
 
             Func<HttpRequestMessage> factory = () =>
             {
-                var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
-                return new HttpRequestMessage(HttpMethod.Post, "/api/order/GetOrdersList") { Content = content };
+                var req = new HttpRequestMessage(httpMethod, endpoint);
+                if (httpMethod != HttpMethod.Get && jsonContent is not null)
+                {
+                    req.Content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
+                }
+                return req;
             };
 
             var response = await SendWithRetryAsync(factory, ct);
@@ -141,9 +203,18 @@ public class OrderApiService : IOrderApiService
             _logger.LogInformation("API call successful. Response length: {Length}", responseBody.Length);
             _logger.LogDebug("Response body: {Body}", responseBody);
 
+            // Log first 500 chars of response for debugging
+            var preview = responseBody.Length > 500 ? responseBody.Substring(0, 500) : responseBody;
+            _logger.LogInformation("Response preview: {Preview}...", preview);
+
             // Parse JSON and extract order records
             var orders = ParseOrderRecords(responseBody);
             _logger.LogInformation("Extracted {Count} order records", orders.Count);
+            
+            if (orders.Count > 0)
+            {
+                _logger.LogInformation("First record ID: {Id}", orders[0].Id);
+            }
 
             return orders;
         }
@@ -154,7 +225,7 @@ public class OrderApiService : IOrderApiService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Unexpected error calling GetOrdersList API");
+            _logger.LogError(ex, "Unexpected error calling primary endpoint {Endpoint}", _config.PrimaryEndpoint);
             throw;
         }
     }

@@ -150,3 +150,4 @@ secrets.json
 .claude/*
 !.claude/.gitkeep
 .lollms/
+scheduled-print-service/out/20251111_115318525_demo-print.pdf

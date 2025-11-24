@@ -20,7 +20,8 @@ public static class DataPaths
             }
             else
             {
-                root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "ScheduledPrintService");
+                // Production path on network share
+                root = @"E:\Share\server\servern\Software\ScheduledPrintService";
             }
 
             Directory.CreateDirectory(root);

@@ -22,6 +22,23 @@ Includes a simple scheduler that fetches HTML from configured URLs periodically,
 }
 ```
 
+### Dynamic / SPA Content Rendering
+If your HTML contains client-side JavaScript that performs XHR/`fetch()` calls (e.g. React / Vue SPA fragments) the DOM may not be fully populated when the initial HTML is set. Two optional settings were added to the `Pdf` section to improve capture reliability:
+
+```jsonc
+"Pdf": {
+  "WaitForNetworkIdleMs": 3000,        // Extra delay after load for late rendering (0 = disabled)
+  "WaitForSelector": "#data-loaded"   // Wait for a specific element to appear (empty = disabled)
+}
+```
+The print workflow now attempts:
+1. `SetContentAsync` of provided HTML
+2. Optional `WaitForSelector`
+3. Attempt a non-fatal network idle wait
+4. Optional fixed delay (`WaitForNetworkIdleMs`)
+
+Adjust these values if printed PDFs are missing data loaded asynchronously. Prefer a specific selector over long fixed delays for faster, more deterministic output.
+
 ## Run (Development)
 ```powershell
 dotnet restore .\scheduled-print-service\ScheduledPrintService\ScheduledPrintService.csproj
@@ -48,6 +65,8 @@ Settings live in `ScheduledPrintService\appsettings.json` and are copied to the 
 
 Key sections:
 - Pdf: Chromium download/cache and PDF page options.
+  - `WaitForNetworkIdleMs`: Extra post-load delay (milliseconds) to allow async data binding to finish.
+  - `WaitForSelector`: CSS selector whose presence signals readiness; skips if blank or not found before timeout.
 - Printer:
   - `Mode`: `File` or `Windows`
   - `OutputDirectory`: used in File mode

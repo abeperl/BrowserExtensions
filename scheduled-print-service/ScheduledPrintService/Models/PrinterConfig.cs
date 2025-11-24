@@ -2,7 +2,7 @@ namespace ScheduledPrintService.Models;
 
 public class PrinterConfig
 {
-    // Modes: File (write PDF to directory), Windows (send to Windows spooler) - Windows not yet implemented
+    // Modes: File (write PDF to directory), Windows (send to Windows spooler)
     public string Mode { get; set; } = "File";
     public string? PrinterName { get; set; }
     public string? FallbackPrinterName { get; set; }

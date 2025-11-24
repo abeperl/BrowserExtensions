@@ -10,10 +10,7 @@
       "args": [],
       "cwd": "${workspaceFolder}/scheduled-print-service/ScheduledPrintService",
       "console": "internalConsole",
-      "stopAtEntry": false,
-      "env": {
-        "SCHEDULED_PRINT_DATA_ROOT": "${workspaceFolder}/scheduled-print-service"
-      }
+      "stopAtEntry": false
     },
     {
       "name": "Debug Scheduled Print Service (Manual Mode)",
@@ -25,9 +22,18 @@
       "cwd": "${workspaceFolder}/scheduled-print-service/ScheduledPrintService",
       "console": "internalConsole",
       "stopAtEntry": false,
-      "env": {
-        "SCHEDULED_PRINT_DATA_ROOT": "${workspaceFolder}/scheduled-print-service"
-      },
+      "justMyCode": false
+    },
+    {
+      "name": "Debug Scheduled Print Service (API #2 - Picklist)",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build-scheduled-print-service",
+      "program": "${workspaceFolder}/scheduled-print-service/ScheduledPrintService/bin/Debug/net8.0-windows10.0.19041.0/ScheduledPrintService.dll",
+      "args": ["--manual", "--api-number", "2"],
+      "cwd": "${workspaceFolder}/scheduled-print-service/ScheduledPrintService",
+      "console": "internalConsole",
+      "stopAtEntry": false,
       "justMyCode": false
     }
   ]
