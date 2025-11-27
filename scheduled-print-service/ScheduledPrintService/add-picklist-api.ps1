@@ -8,6 +8,17 @@ $dbPath = Join-Path $scriptDir "api_config.db"
 
 Write-Host "Adding Picklist API to database..." -ForegroundColor Cyan
 
+# Check if sqlite3 is available (check local directory first)
+$sqlite3Path = if (Test-Path ".\sqlite3.exe") { ".\sqlite3.exe" } 
+               elseif (Get-Command sqlite3 -ErrorAction SilentlyContinue) { "sqlite3" }
+               else { $null }
+
+if (-not $sqlite3Path) {
+    Write-Host "ERROR: sqlite3 not found" -ForegroundColor Red
+    Write-Host "Install with: winget install SQLite.SQLite" -ForegroundColor Yellow
+    exit 1
+}
+
 # Check if database exists
 if (-not (Test-Path $dbPath)) {
     Write-Host "ERROR: Database not found at: $dbPath" -ForegroundColor Red
@@ -91,114 +102,91 @@ $paramsJson = $paramsObj | ConvertTo-Json -Compress -Depth 10
 $headersJsonEscaped = $headersJson -replace "'", "''"
 $paramsJsonEscaped = $paramsJson -replace "'", "''"
 
-# Insert Primary API
-Write-Host "`nInserting Primary API #2 (Picklist Datatable)..." -ForegroundColor Cyan
+# Check if API #2 already exists
+$existing = & $sqlite3Path $dbPath "SELECT ApiNumber FROM PrimaryApi WHERE ApiNumber = 2;"
 
-$insertPrimaryApiSql = @"
-INSERT INTO PrimaryApi (ApiNumber, ApiName, BaseUrl, Endpoint, HttpMethod, Headers, Params, Payload, IsEnabled)
+if ($existing) {
+    Write-Host "`n[!] API #2 already exists - Updating..." -ForegroundColor Yellow
+    
+    # Update existing API
+    $updatePrimaryApiSql = @"
+UPDATE PrimaryApi 
+SET ApiName = 'Picklist Datatable API',
+    IsEnabled = 1,
+    BaseUrl = 'https://mj.3plnext.com',
+    BearerToken = '$bearerToken',
+    PrimaryEndpoint = '/api/Picklist/GetPicklistDatatable',
+    PrimaryHttpMethod = 'POST',
+    IdJsonPath = 'data[*][0]'
+WHERE ApiNumber = 2;
+"@
+    
+    $updatePrimaryApiSql | & $sqlite3Path $dbPath
+    
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "[X] Error updating Primary API" -ForegroundColor Red
+        exit 1
+    }
+    
+    Write-Host "[OK] Primary API #2 updated successfully" -ForegroundColor Green
+    
+    # Delete old sub-actions
+    & $sqlite3Path $dbPath "DELETE FROM SubAction WHERE ApiNumber = 2;" | Out-Null
+    Write-Host "[OK] Cleared old sub-actions" -ForegroundColor Green
+    
+} else {
+    Write-Host "`nInserting Primary API #2 (Picklist Datatable)..." -ForegroundColor Cyan
+    
+    $insertPrimaryApiSql = @"
+INSERT INTO PrimaryApi (ApiNumber, ApiName, IsEnabled, BaseUrl, BearerToken, PrimaryEndpoint, PrimaryHttpMethod, IdJsonPath)
 VALUES (
     2,
     'Picklist Datatable API',
+    1,
     'https://mj.3plnext.com',
+    '$bearerToken',
     '/api/Picklist/GetPicklistDatatable',
     'POST',
-    '$headersJsonEscaped',
-    '$paramsJsonEscaped',
-    '{}',
-    1
+    'data[*][0]'
 );
 "@
-
-$insertPrimaryApiSql | sqlite3 $dbPath
-
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "✗ Error inserting Primary API" -ForegroundColor Red
-    exit 1
+    
+    $insertPrimaryApiSql | & $sqlite3Path $dbPath
+    
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "[X] Error inserting Primary API" -ForegroundColor Red
+        exit 1
+    }
+    
+    Write-Host "[OK] Primary API #2 inserted successfully" -ForegroundColor Green
 }
 
-Write-Host "✓ Primary API #2 inserted successfully" -ForegroundColor Green
-
-# Get the inserted Primary API ID
-$primaryApiId = sqlite3 $dbPath "SELECT Id FROM PrimaryApi WHERE ApiNumber = 2;"
-
-if (-not $primaryApiId) {
-    Write-Host "✗ Error retrieving Primary API ID" -ForegroundColor Red
-    exit 1
-}
-
-Write-Host "  Primary API ID: $primaryApiId" -ForegroundColor White
+# Id column no longer exists in PrimaryApi schema; ApiNumber is the PK.
+# Log confirmation instead of querying nonexistent Id.
+Write-Host "  API #2 record ready (ApiNumber=2)" -ForegroundColor White
 
 # Sub-Action #1: Get URL and Print Manual Picking Page
 Write-Host "`nInserting Sub-Action #1 (Get URL and Print)..." -ForegroundColor Cyan
 
-$subAction1Config = @{
-    Endpoint = "https://mj.3plnext.com/#Outbound/ManualPicking?id={id}"
-    Method = "GET"
-    UseChainedInput = $true
-    ChainedArrayJsonPath = "data"
-    ChainedItemFieldPath = "[0]"
-    WaitForNetworkIdleMs = 3000
-    MakeHiddenVisible = $true
-    ContinueOnError = $true
-} | ConvertTo-Json -Compress -Depth 10
-
-$subAction1ConfigEscaped = $subAction1Config -replace "'", "''"
-
 $insertSubAction1Sql = @"
-INSERT INTO SubAction (PrimaryApiId, ActionNumber, ActionName, ActionType, Configuration, ExecutionOrder, IsEnabled)
+INSERT INTO SubAction (
+    ApiNumber, ExecutionOrder, SubActionType, SubActionName, IsEnabled,
+    Endpoint, HttpMethod, UseChainedInput, ChainedArrayJsonPath, ChainedItemFieldPath,
+    WaitForNetworkIdleMs, MakeHiddenVisible, ContinueOnError
+)
 VALUES (
-    $primaryApiId,
-    1,
-    'Get Manual Picking Page URL',
-    'GetUrlAndPrint',
-    '$subAction1ConfigEscaped',
-    1,
-    1
+    2, 1, 'GetUrlAndPrint', 'Get Manual Picking Page URL', 1,
+    'https://mj.3plnext.com/#Outbound/ManualPicking?id={id}', 'GET', 1, 'data', '[0]',
+    3000, 1, 1
 );
 "@
 
-$insertSubAction1Sql | sqlite3 $dbPath
+$insertSubAction1Sql | & $sqlite3Path $dbPath
 
 if ($LASTEXITCODE -eq 0) {
-    Write-Host "✓ Sub-Action #1 inserted" -ForegroundColor Green
+    Write-Host "[OK] Sub-Action #1 inserted" -ForegroundColor Green
 } else {
-    Write-Host "✗ Error inserting Sub-Action #1" -ForegroundColor Red
-}
-
-# Sub-Action #2: Convert HTML to PDF
-Write-Host "`nInserting Sub-Action #2 (Convert HTML to PDF)..." -ForegroundColor Cyan
-
-$subAction2Config = @{
-    Endpoint = "/api/Picklist/GetPicklistHtml/{id}"
-    Method = "GET"
-    HtmlJsonPath = "html"
-    UseChainedInput = $true
-    ChainedItemFieldPath = "[0]"
-    OutputFilePrefix = "picklist"
-    ContinueOnError = $true
-} | ConvertTo-Json -Compress -Depth 10
-
-$subAction2ConfigEscaped = $subAction2Config -replace "'", "''"
-
-$insertSubAction2Sql = @"
-INSERT INTO SubAction (PrimaryApiId, ActionNumber, ActionName, ActionType, Configuration, ExecutionOrder, IsEnabled)
-VALUES (
-    $primaryApiId,
-    2,
-    'Convert HTML to PDF and Save',
-    'GetHtmlAndPrint',
-    '$subAction2ConfigEscaped',
-    2,
-    1
-);
-"@
-
-$insertSubAction2Sql | sqlite3 $dbPath
-
-if ($LASTEXITCODE -eq 0) {
-    Write-Host "✓ Sub-Action #2 inserted" -ForegroundColor Green
-} else {
-    Write-Host "✗ Error inserting Sub-Action #2" -ForegroundColor Red
+    Write-Host "[X] Error inserting Sub-Action #1" -ForegroundColor Red
 }
 
 # Display summary
@@ -207,11 +195,11 @@ Write-Host "API #2 Added Successfully!" -ForegroundColor Green
 Write-Host "================================" -ForegroundColor Cyan
 
 Write-Host "`nAPI Details:" -ForegroundColor Yellow
-$apiDetails = sqlite3 $dbPath "SELECT 'API #' || ApiNumber || ': ' || ApiName || ' [' || HttpMethod || ' ' || BaseUrl || Endpoint || ']' FROM PrimaryApi WHERE ApiNumber = 2;"
+$apiDetails = & $sqlite3Path $dbPath "SELECT 'API #' || ApiNumber || ': ' || ApiName || ' (' || PrimaryHttpMethod || ' ' || BaseUrl || PrimaryEndpoint || ')' FROM PrimaryApi WHERE ApiNumber = 2;"
 Write-Host "  $apiDetails" -ForegroundColor White
 
 Write-Host "`nSub-Actions:" -ForegroundColor Yellow
-$subActions = sqlite3 $dbPath "SELECT '  [' || ActionNumber || '] ' || ActionName || ' (' || ActionType || ')' FROM SubAction WHERE PrimaryApiId = $primaryApiId ORDER BY ExecutionOrder;"
+$subActions = & $sqlite3Path $dbPath "SELECT '  ' || ExecutionOrder || '. ' || SubActionName || ' (' || SubActionType || ')' FROM SubAction WHERE ApiNumber = 2 ORDER BY ExecutionOrder;"
 $subActions -split "`n" | ForEach-Object { Write-Host "$_" -ForegroundColor White }
 
 Write-Host "`nYou can now run:" -ForegroundColor Yellow

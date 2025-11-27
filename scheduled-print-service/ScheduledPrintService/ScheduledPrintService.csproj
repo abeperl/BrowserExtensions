@@ -18,8 +18,8 @@
     <PackageReference Include="Serilog.Sinks.File" Version="5.0.0" />
     <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="8.0.0" />
     <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.0" />
+    <PackageReference Include="ncrontab" Version="3.3.3" />
   </ItemGroup>
-
   <ItemGroup>
     <Folder Include="Services\" />
     <Folder Include="Models\" />
@@ -34,9 +34,8 @@
     <Content Include="runtimeconfig.template.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="..\install-service.ps1">
+    <Content Include="install-service.ps1">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      <Link>install-service.ps1</Link>
     </Content>
   </ItemGroup>
 </Project>

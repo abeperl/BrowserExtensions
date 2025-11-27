@@ -9,7 +9,7 @@ namespace ScheduledPrintService.Services;
 
 public interface ITokenRenewalService
 {
-    Task<bool> RenewTokenAsync(CancellationToken ct = default);
+    Task<bool> RenewTokenAsync(CancellationToken ct = default, bool forceRefresh = false);
     string GetCurrentToken();
     Dictionary<string, string> GetCurrentCookies();
 }
@@ -19,6 +19,7 @@ public class TokenRenewalService : ITokenRenewalService
     private readonly ILogger<TokenRenewalService> _logger;
     private readonly ApiConfig _config;
     private readonly HttpClient _httpClient;
+    private readonly IDatabaseApiConfigService _dbConfigService;
     private readonly object _lock = new();
     private string _currentToken;
     private Dictionary<string, string> _currentCookies;
@@ -26,13 +27,15 @@ public class TokenRenewalService : ITokenRenewalService
     public TokenRenewalService(
         ILogger<TokenRenewalService> logger,
         IOptions<ApiConfig> apiConfig,
-        IHttpClientFactory httpClientFactory)
+        IHttpClientFactory httpClientFactory,
+        IDatabaseApiConfigService dbConfigService)
     {
         _logger = logger;
         _config = apiConfig.Value;
+        _dbConfigService = dbConfigService;
         _currentToken = _config.BearerToken;
         _currentCookies = new Dictionary<string, string>(_config.Cookies);
-        
+
         // Create a separate HttpClient for authentication (doesn't use the configured token)
         _httpClient = httpClientFactory.CreateClient();
         _httpClient.BaseAddress = new Uri(_config.BaseUrl);
@@ -55,25 +58,41 @@ public class TokenRenewalService : ITokenRenewalService
         }
     }
 
-    public async Task<bool> RenewTokenAsync(CancellationToken ct = default)
+    public async Task<bool> RenewTokenAsync(CancellationToken ct = default, bool forceRefresh = false)
     {
-        if (string.IsNullOrEmpty(_config.UserEmail) || string.IsNullOrEmpty(_config.Password))
+        // Load credentials from database
+        var (username, password, cachedToken, tokenExpiresAt) = _dbConfigService.LoadAuthCredentials(_config.BaseUrl);
+
+        // Check if cached token is still valid (but skip cache if forceRefresh is true)
+        if (!forceRefresh && !string.IsNullOrEmpty(cachedToken) && tokenExpiresAt.HasValue && tokenExpiresAt.Value > DateTime.UtcNow.AddMinutes(5))
         {
-            _logger.LogWarning("Cannot renew token: UserEmail or Password not configured");
+            _logger.LogInformation("Using cached token, expires at {ExpiresAt}", tokenExpiresAt);
+            lock (_lock)
+            {
+                _currentToken = cachedToken;
+            }
+            return true;
+        }
+
+        if (forceRefresh)
+        {
+            _logger.LogInformation("Force refresh requested - bypassing cached token and fetching fresh token from server");
+        }
+
+        if (string.IsNullOrEmpty(username) || string.IsNullOrEmpty(password))
+        {
+            _logger.LogWarning("Cannot renew token: Username or Password not found in database for BaseUrl={BaseUrl}", _config.BaseUrl);
             return false;
         }
 
-        lock (_lock)
-        {
-            _logger.LogInformation("Attempting to renew authentication token for user: {Email}", _config.UserEmail);
-        }
+        _logger.LogInformation("Attempting to renew authentication token for user: {Email}", username);
 
         try
         {
             var loginPayload = new
             {
-                userEmail = _config.UserEmail,
-                Password = _config.Password
+                userEmail = username,
+                Password = password
             };
 
             var requestContent = new StringContent(
@@ -176,6 +195,10 @@ public class TokenRenewalService : ITokenRenewalService
                 _currentCookies = newCookies;
                 _logger.LogInformation("Successfully renewed authentication token");
             }
+
+            // Save token to database (expires in 24 hours - adjust as needed)
+            var expiresAt = DateTime.UtcNow.AddHours(24);
+            _dbConfigService.UpdateAuthToken(_config.BaseUrl, newToken, expiresAt);
 
             return true;
         }

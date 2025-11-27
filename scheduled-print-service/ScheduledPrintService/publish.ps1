@@ -6,8 +6,8 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-$project = Join-Path $PSScriptRoot 'ScheduledPrintService/ScheduledPrintService.csproj'
-$outDir = Join-Path $PSScriptRoot "publish/$Configuration/$Runtime"
+$project = Join-Path $PSScriptRoot 'ScheduledPrintService.csproj'
+$outDir = Join-Path $PSScriptRoot "publish"
 
 $sc = $false
 if ($SelfContained) { $sc = $true }

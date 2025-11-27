@@ -37,6 +37,9 @@ public class ApiConfig
     // Manual mode: run once and exit (for debugging)
     public bool ManualMode { get; set; } = false;
 
+    // Printer name for this API (optional, uses default if not specified)
+    public string? PrinterName { get; set; }
+
     // Sub-actions to perform for each order
     public List<SubAction> SubActions { get; set; } = new();
 }
@@ -96,38 +99,50 @@ public class SubAction
     public string? HtmlJsonPath { get; set; }
 
     // For Delay: milliseconds to wait
-    public int DelayMilliseconds { get; set; }
+    public int? DelayMilliseconds { get; set; }
 
     // Continue to next action on error?
-    public bool ContinueOnError { get; set; } = true;
+    public bool? ContinueOnError { get; set; } = true;
 
     // For batch actions (e.g., CreatePicklistBatch): number of IDs per request
-    public int BatchSize { get; set; } = 10;
+    public int? BatchSize { get; set; } = 10;
 
     // For CreatePicklistBatch: whether to QuickShip
-    public bool QuickShip { get; set; } = false;
+    public bool? QuickShip { get; set; } = false;
 
     // For CreatePicklistBatch: whether to force create picklist
-    public bool ForceCreatePicklist { get; set; } = false;
+    public bool? ForceCreatePicklist { get; set; } = false;
 
     // Chaining support: store response data in context with this key
     public string? OutputVariableName { get; set; }
 
     // Chaining support: use data from previous action stored in context
-    public bool UseChainedInput { get; set; } = false;
+    public bool? UseChainedInput { get; set; } = false;
 
     // Chaining support: map context variable to action parameter (e.g., {picklistId} -> context["picklistIds"])
     public Dictionary<string, string> ChainedInputMapping { get; set; } = new();
 
     // For GetUrlAndPrint: wait for network idle before capturing
-    public int WaitForNetworkIdleMs { get; set; } = 3000;
+    public int? WaitForNetworkIdleMs { get; set; } = 3000;
 
     // For GetUrlAndPrint: make all hidden inputs visible
-    public bool MakeHiddenVisible { get; set; } = false;
+    public bool? MakeHiddenVisible { get; set; } = false;
 
     // Chaining support: JSON path to extract array data for iteration (e.g., "data" to get data array)
     public string? ChainedArrayJsonPath { get; set; }
 
     // Chaining support: JSON path to extract specific field from each item (e.g., "pickListId")
     public string? ChainedItemFieldPath { get; set; }
+
+    // Chaining filter: field name to filter on (e.g., "itemNotes")
+    public string? ChainedFilterField { get; set; }
+
+    // Chaining filter: filter type - "NotEmpty", "Contains", "NotStartsWith", "IsFilePath"
+    public string? ChainedFilterType { get; set; }
+
+    // Chaining filter: value to compare against (optional, depends on filter type)
+    public string? ChainedFilterValue { get; set; }
+
+    // Chaining filter: array index to filter on (e.g., 17 to check data[x][17])
+    public int? ChainedFilterArrayIndex { get; set; }
 }

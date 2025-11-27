@@ -1,56 +1,7 @@
 /**
  * SKU Item Linker - Makes SKU items clickable
  * Call this function via router when on outbound/packing page
- * 
- * Also includes trim error fix to prevent "thisUpc2.trim is not a function" errors
  */
-
-// ========== TRIM ERROR FIX ==========
-(function installTrimErrorFix() {
-    if (typeof window._trimErrorFixInstalled !== 'undefined') {
-        return; // Already installed
-    }
-
-    console.log('🛡️ Installing trim error fix...');
-
-    // Patch jQuery.each to catch trim errors
-    if (typeof $ !== 'undefined' && $.fn && $.fn.each) {
-        const originalEach = $.fn.each;
-        
-        $.fn.each = function(callback) {
-            const safeCallback = function(index, element) {
-                try {
-                    return callback.call(this, index, element);
-                } catch (error) {
-                    if (error.message && error.message.includes('trim is not a function')) {
-                        console.warn('⚠️ Caught trim error in jQuery.each, skipping element', {
-                            index: index,
-                            error: error.message
-                        });
-                        return undefined;
-                    }
-                    throw error;
-                }
-            };
-            
-            return originalEach.call(this, safeCallback);
-        };
-        
-        console.log('✅ jQuery.each patched for trim error protection');
-    }
-
-    // Global error handler
-    window.addEventListener('error', function(event) {
-        if (event.message && event.message.includes('trim is not a function')) {
-            console.warn('⚠️ Caught global trim error:', event.message);
-            event.preventDefault();
-            return true;
-        }
-    });
-
-    window._trimErrorFixInstalled = true;
-    console.log('✅ Trim error fix installed');
-})();
 
 // ========== SKU AND QTY CLICKABLE FUNCTIONS ==========
 

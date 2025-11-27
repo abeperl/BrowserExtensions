@@ -10,6 +10,7 @@ namespace ScheduledPrintService.Services;
 public interface IOrderApiService
 {
     Task<List<OrderRecord>> GetOrdersListAsync(CancellationToken ct = default);
+    Task<List<OrderRecord>> GetOrdersListAsync(ApiConfig apiConfig, CancellationToken ct = default);
 }
 
 public class OrderRecord
@@ -103,18 +104,19 @@ public class OrderApiService : IOrderApiService
                 if (resp.StatusCode == System.Net.HttpStatusCode.Unauthorized)
                 {
                     _logger.LogWarning("Received 401 Unauthorized - token may have expired");
-                    
+
                     // Only attempt token renewal once per retry cycle
                     if (!tokenRenewed)
                     {
-                        _logger.LogInformation("Attempting to renew authentication token");
-                        tokenRenewed = await _tokenRenewal.RenewTokenAsync(ct);
-                        
+                        _logger.LogInformation("Attempting to renew authentication token (forcing fresh token from server)");
+                        // Force refresh to bypass cached token since server rejected it with 401
+                        tokenRenewed = await _tokenRenewal.RenewTokenAsync(ct, forceRefresh: true);
+
                         if (tokenRenewed)
                         {
                             _logger.LogInformation("Token renewed successfully, updating HTTP client");
                             UpdateHttpClientAuth();
-                            
+
                             // Don't count this as an attempt, retry immediately with new token
                             resp.Dispose();
                             continue;
@@ -125,7 +127,7 @@ public class OrderApiService : IOrderApiService
                             throw new TokenRenewalException("Unable to renew authentication token after receiving 401 Unauthorized");
                         }
                     }
-                    
+
                     lastResponse = resp;
                 }
                 else if ((int)resp.StatusCode >= 200 && (int)resp.StatusCode < 300)
@@ -159,24 +161,53 @@ public class OrderApiService : IOrderApiService
         };
     }
 
-    public async Task<List<OrderRecord>> GetOrdersListAsync(CancellationToken ct = default)
+    public Task<List<OrderRecord>> GetOrdersListAsync(CancellationToken ct = default)
+    {
+        return GetOrdersListAsync(_config, ct);
+    }
+
+    public async Task<List<OrderRecord>> GetOrdersListAsync(ApiConfig apiConfig, CancellationToken ct = default)
     {
         try
         {
+            // Temporarily configure HttpClient for this API config
+            _httpClient.BaseAddress = new Uri(apiConfig.BaseUrl);
+            _httpClient.DefaultRequestHeaders.Clear();
+            _httpClient.Timeout = TimeSpan.FromSeconds(200);
+
+            // Update auth headers for this API
+            if (!string.IsNullOrWhiteSpace(apiConfig.BearerToken))
+            {
+                _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiConfig.BearerToken);
+            }
+
+            // Add warehouse ID header if present
+            if (apiConfig.WarehouseId > 0)
+            {
+                _httpClient.DefaultRequestHeaders.Add("WarehouseId", apiConfig.WarehouseId.ToString());
+            }
+
+            // Add cookies
+            if (apiConfig.Cookies.Count > 0)
+            {
+                var cookieString = string.Join("; ", apiConfig.Cookies.Select(kv => $"{kv.Key}={kv.Value}"));
+                _httpClient.DefaultRequestHeaders.Add("Cookie", cookieString);
+            }
+
             // Determine primary endpoint and method from configuration
-            var endpoint = string.IsNullOrWhiteSpace(_config.PrimaryEndpoint) ? "/api/order/GetOrdersList" : _config.PrimaryEndpoint;
-            var methodString = string.IsNullOrWhiteSpace(_config.PrimaryHttpMethod) ? "POST" : _config.PrimaryHttpMethod;
+            var endpoint = string.IsNullOrWhiteSpace(apiConfig.PrimaryEndpoint) ? "/api/order/GetOrdersList" : apiConfig.PrimaryEndpoint;
+            var methodString = string.IsNullOrWhiteSpace(apiConfig.PrimaryHttpMethod) ? "POST" : apiConfig.PrimaryHttpMethod;
             var httpMethod = new HttpMethod(methodString.ToUpperInvariant());
 
             // Build request payload: prefer raw PrimaryPayload if supplied; otherwise serialize DefaultRequest
             string? jsonContent = null;
-            if (!string.IsNullOrWhiteSpace(_config.PrimaryPayload) && _config.PrimaryPayload != "{}")
+            if (!string.IsNullOrWhiteSpace(apiConfig.PrimaryPayload) && apiConfig.PrimaryPayload != "{}")
             {
-                jsonContent = _config.PrimaryPayload;
+                jsonContent = apiConfig.PrimaryPayload;
             }
             else
             {
-                var requestPayload = BuildRequestPayload();
+                var requestPayload = BuildRequestPayload(apiConfig);
                 jsonContent = JsonSerializer.Serialize(requestPayload, new JsonSerializerOptions
                 {
                     PropertyNamingPolicy = null
@@ -210,7 +241,7 @@ public class OrderApiService : IOrderApiService
             // Parse JSON and extract order records
             var orders = ParseOrderRecords(responseBody);
             _logger.LogInformation("Extracted {Count} order records", orders.Count);
-            
+
             if (orders.Count > 0)
             {
                 _logger.LogInformation("First record ID: {Id}", orders[0].Id);
@@ -225,22 +256,27 @@ public class OrderApiService : IOrderApiService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Unexpected error calling primary endpoint {Endpoint}", _config.PrimaryEndpoint);
+            _logger.LogError(ex, "Unexpected error calling primary endpoint {Endpoint}", apiConfig.PrimaryEndpoint);
             throw;
         }
     }
 
     private object BuildRequestPayload()
     {
-        var req = _config.DefaultRequest;
+        return BuildRequestPayload(_config);
+    }
+
+    private object BuildRequestPayload(ApiConfig config)
+    {
+        var req = config.DefaultRequest;
         var dateFrom = string.IsNullOrWhiteSpace(req.DateFrom) ? "2018-01-07" : req.DateFrom;
         var dateTo = string.IsNullOrWhiteSpace(req.DateTo) ? DateTime.Today.ToString("yyyy-MM-dd") : req.DateTo;
 
         // Use configured columns if provided, else fallback to a minimal column set
         object columnsObject;
-        if (_config.OrdersListColumns.HasValue)
+        if (config.OrdersListColumns.HasValue)
         {
-            columnsObject = _config.OrdersListColumns.Value;
+            columnsObject = config.OrdersListColumns.Value;
         }
         else
         {

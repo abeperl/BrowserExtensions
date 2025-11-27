@@ -11,7 +11,9 @@ namespace ScheduledPrintService.Services;
 public interface ISubActionExecutor
 {
     Task ExecuteActionsForOrderAsync(string orderId, JsonElement orderData, CancellationToken ct = default);
+    Task ExecuteActionsForOrderAsync(string orderId, JsonElement orderData, ApiConfig apiConfig, CancellationToken ct = default);
     Task ExecuteBatchCreatePicklistAsync(SubAction action, IEnumerable<string> orderIds, CancellationToken ct = default);
+    Task ExecuteBatchCreatePicklistAsync(SubAction action, IEnumerable<string> orderIds, ApiConfig apiConfig, CancellationToken ct = default);
     Task ExecuteChainedActionsAsync(SubAction sourceAction, string responseBody, CancellationToken ct = default);
 }
 
@@ -24,6 +26,8 @@ public class SubActionExecutor : ISubActionExecutor
     private readonly PdfPrintService _printer;
     private readonly PdfBrowserManager _browserManager;
     private readonly ITokenRenewalService _tokenRenewal;
+        // Temporary config override for database-driven execution
+        private ApiConfig? _tempApiConfig = null;
         // Captured page from the most recent navigation-only action (kept alive for printing)
         private PuppeteerSharp.IPage? _capturedPage;
         private string _capturedPageContextId = string.Empty;
@@ -93,13 +97,55 @@ public class SubActionExecutor : ISubActionExecutor
         }
     }
 
+    /// <summary>
+    /// Gets the active API configuration (temporary override or default)
+    /// </summary>
+    private ApiConfig GetActiveConfig() => _tempApiConfig ?? _config;
+
+    /// <summary>
+    /// Updates HttpClient headers for a specific API configuration (without changing BaseAddress)
+    /// </summary>
+    private void UpdateHttpClientForApiConfig(ApiConfig config)
+    {
+        // NOTE: Cannot change BaseAddress after first request - HttpClient limitation
+        // All our APIs use the same BaseUrl anyway, so we just update headers
+
+        _httpClient.DefaultRequestHeaders.Clear();
+
+        // Update Bearer token
+        _httpClient.DefaultRequestHeaders.Authorization = null;
+        if (!string.IsNullOrWhiteSpace(config.BearerToken))
+        {
+            _httpClient.DefaultRequestHeaders.Authorization =
+                new AuthenticationHeaderValue("Bearer", config.BearerToken);
+        }
+
+        // Add standard headers
+        _httpClient.DefaultRequestHeaders.Add("Accept", "*/*");
+        _httpClient.DefaultRequestHeaders.Add("Accept-Language", "en-US,en;q=0.9");
+        _httpClient.DefaultRequestHeaders.Add("X-Requested-With", "XMLHttpRequest");
+        _httpClient.DefaultRequestHeaders.Add("WarehouseId", config.WarehouseId.ToString());
+        _httpClient.DefaultRequestHeaders.Add("Origin", config.BaseUrl);
+        _httpClient.DefaultRequestHeaders.Add("Referer", $"{config.BaseUrl}/");
+        _httpClient.DefaultRequestHeaders.Add("User-Agent",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36");
+
+        // Add cookies
+        if (config.Cookies.Count > 0)
+        {
+            var cookieString = string.Join("; ", config.Cookies.Select(kvp => $"{kvp.Key}={kvp.Value}"));
+            _httpClient.DefaultRequestHeaders.Add("Cookie", cookieString);
+        }
+    }
+
     public async Task ExecuteActionsForOrderAsync(string orderId, JsonElement orderData, CancellationToken ct = default)
     {
-        _logger.LogDebug("Executing {Count} sub-actions for order {OrderId}", _config.SubActions.Count, orderId);
+        var activeConfig = GetActiveConfig();
+        _logger.LogDebug("Executing {Count} sub-actions for order {OrderId}", activeConfig.SubActions.Count, orderId);
 
-        for (int i = 0; i < _config.SubActions.Count; i++)
+        for (int i = 0; i < activeConfig.SubActions.Count; i++)
         {
-            var action = _config.SubActions[i];
+            var action = activeConfig.SubActions[i];
             var actionNum = i + 1;
 
             try
@@ -117,19 +163,19 @@ public class SubActionExecutor : ISubActionExecutor
                 }
 
                 _logger.LogInformation("[{Num}/{Total}] {ActionName} for order {OrderId}",
-                    actionNum, _config.SubActions.Count, action.Name, orderId);
+                    actionNum, activeConfig.SubActions.Count, action.Name, orderId);
 
                 await ExecuteActionAsync(action, orderId, orderData, ct);
 
                 _logger.LogInformation("[{Num}/{Total}] {ActionName} completed successfully",
-                    actionNum, _config.SubActions.Count, action.Name);
+                    actionNum, activeConfig.SubActions.Count, action.Name);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "[{Num}/{Total}] {ActionName} failed: {Message}",
-                    actionNum, _config.SubActions.Count, action.Name, ex.Message);
+                    actionNum, activeConfig.SubActions.Count, action.Name, ex.Message);
 
-                if (!action.ContinueOnError)
+                if (!(action.ContinueOnError ?? true))
                 {
                     _logger.LogWarning("Stopping action chain due to error (ContinueOnError=false)");
                     throw;
@@ -140,6 +186,29 @@ public class SubActionExecutor : ISubActionExecutor
         }
 
         _logger.LogDebug("All sub-actions completed for order {OrderId}", orderId);
+    }
+
+    public async Task ExecuteActionsForOrderAsync(string orderId, JsonElement orderData, ApiConfig apiConfig, CancellationToken ct = default)
+    {
+        // Store previous temp config (for nested calls)
+        var previousTemp = _tempApiConfig;
+        try
+        {
+            // Set temporary config override
+            _tempApiConfig = apiConfig;
+
+            // Update HTTP client headers for this API config (but not BaseAddress - can't change after first use)
+            UpdateHttpClientForApiConfig(apiConfig);
+
+            // Execute actions (will use GetActiveConfig() which returns apiConfig)
+            await ExecuteActionsForOrderAsync(orderId, orderData, ct);
+        }
+        finally
+        {
+            // Restore previous state
+            _tempApiConfig = previousTemp;
+            UpdateHttpClientAuth(); // Just update auth, don't touch BaseAddress
+        }
     }
 
     private async Task ExecuteActionAsync(SubAction action, string orderId, JsonElement orderData, CancellationToken ct)
@@ -183,6 +252,8 @@ public class SubActionExecutor : ISubActionExecutor
 
     public async Task ExecuteBatchCreatePicklistAsync(SubAction action, IEnumerable<string> orderIds, CancellationToken ct = default)
     {
+        var activeConfig = GetActiveConfig();
+
         // Prepare endpoint
         var endpoint = action.Endpoint;
 
@@ -206,7 +277,7 @@ public class SubActionExecutor : ISubActionExecutor
             return;
         }
 
-        var batchSize = action.BatchSize > 0 ? action.BatchSize : 10;
+        var batchSize = action.BatchSize ?? 10;
         var batches = idList.Chunk(batchSize).ToList();
         _logger.LogInformation("Creating pending order picklists in {BatchCount} batch(es) of up to {BatchSize}.", batches.Count, batchSize);
 
@@ -218,8 +289,8 @@ public class SubActionExecutor : ISubActionExecutor
             var payload = new
             {
                 orderId = batch,
-                QuickShip = action.QuickShip,
-                ForceCreatePicklist = action.ForceCreatePicklist
+                QuickShip = action.QuickShip ?? false,
+                ForceCreatePicklist = action.ForceCreatePicklist ?? false
             };
 
             var json = JsonSerializer.Serialize(payload);
@@ -235,7 +306,7 @@ public class SubActionExecutor : ISubActionExecutor
             _logger.LogInformation("[Batch {Current}/{Total}] POST {Endpoint} with {Count} ids", i + 1, batches.Count, endpoint, batch.Length);
             _logger.LogDebug("Payload: {Payload}", json);
 
-            var httpCt = _config.ManualMode ? CancellationToken.None : ct;
+            var httpCt = activeConfig.ManualMode ? CancellationToken.None : ct;
             var response = await SendWithRetryAsync(factory, httpCt);
             var respBody = await response.Content.ReadAsStringAsync(httpCt);
             _logger.LogDebug("Batch API response: {Body}", respBody);
@@ -259,14 +330,38 @@ public class SubActionExecutor : ISubActionExecutor
         }
     }
 
+    public async Task ExecuteBatchCreatePicklistAsync(SubAction action, IEnumerable<string> orderIds, ApiConfig apiConfig, CancellationToken ct = default)
+    {
+        // Store previous temp config (for nested calls)
+        var previousTemp = _tempApiConfig;
+        try
+        {
+            // Set temporary config override
+            _tempApiConfig = apiConfig;
+
+            // Update HTTP client headers for this API config (but not BaseAddress - can't change after first use)
+            UpdateHttpClientForApiConfig(apiConfig);
+
+            // Execute batch action (will use GetActiveConfig() which returns apiConfig)
+            await ExecuteBatchCreatePicklistAsync(action, orderIds, ct);
+        }
+        finally
+        {
+            // Restore previous state
+            _tempApiConfig = previousTemp;
+            UpdateHttpClientAuth(); // Just update auth, don't touch BaseAddress
+        }
+    }
+
     private static string Truncate(string value, int max)
         => string.IsNullOrEmpty(value) || value.Length <= max ? value : value.Substring(0, max) + "...";
 
     private async Task<HttpResponseMessage> SendWithRetryAsync(Func<HttpRequestMessage> requestFactory, CancellationToken ct)
     {
-        var attempts = Math.Max(1, _config.RetryMaxAttempts);
-        var baseDelay = Math.Max(50, _config.RetryBaseDelayMs);
-        var maxDelay = Math.Max(baseDelay, _config.RetryMaxDelayMs);
+        var activeConfig = GetActiveConfig();
+        var attempts = Math.Max(1, activeConfig.RetryMaxAttempts);
+        var baseDelay = Math.Max(50, activeConfig.RetryBaseDelayMs);
+        var maxDelay = Math.Max(baseDelay, activeConfig.RetryMaxDelayMs);
         var rng = new Random();
         var tokenRenewed = false;
 
@@ -285,18 +380,19 @@ public class SubActionExecutor : ISubActionExecutor
                 if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
                 {
                     _logger.LogWarning("Received 401 Unauthorized - token may have expired");
-                    
+
                     // Only attempt token renewal once per retry cycle
                     if (!tokenRenewed)
                     {
-                        _logger.LogInformation("Attempting to renew authentication token");
-                        tokenRenewed = await _tokenRenewal.RenewTokenAsync(ct);
-                        
+                        _logger.LogInformation("Attempting to renew authentication token (forcing fresh token from server)");
+                        // Force refresh to bypass cached token since server rejected it with 401
+                        tokenRenewed = await _tokenRenewal.RenewTokenAsync(ct, forceRefresh: true);
+
                         if (tokenRenewed)
                         {
                             _logger.LogInformation("Token renewed successfully, updating HTTP client");
                             UpdateHttpClientAuth();
-                            
+
                             // Don't count this as an attempt, retry immediately
                             lastResponse = response;
                             continue;
@@ -307,7 +403,7 @@ public class SubActionExecutor : ISubActionExecutor
                             throw new TokenRenewalException("Unable to renew authentication token after receiving 401 Unauthorized");
                         }
                     }
-                    
+
                     lastResponse = response;
                 }
                 else if ((int)response.StatusCode < 200)
@@ -416,7 +512,7 @@ public class SubActionExecutor : ISubActionExecutor
         // Treat 404 (or other non-success) as non-fatal when ContinueOnError = true
         if (!response.IsSuccessStatusCode)
         {
-            if (response.StatusCode == System.Net.HttpStatusCode.NotFound && action.ContinueOnError)
+            if (response.StatusCode == System.Net.HttpStatusCode.NotFound && (action.ContinueOnError ?? true))
             {
                 var bodySnippet = await response.Content.ReadAsStringAsync(ct);
                 _logger.LogWarning("HTML endpoint returned 404 Not Found for {Endpoint}. Skipping print. Body: {BodySnippet}", endpoint, Truncate(bodySnippet, 500));
@@ -459,31 +555,34 @@ public class SubActionExecutor : ISubActionExecutor
 
         // Print the HTML
         var jobName = $"{action.Name}-{orderId}";
-        await _printer.PrintHtmlAsync(htmlContent, jobName: jobName, ct);
+        var printerName = GetActiveConfig().PrinterName;
+        await _printer.PrintHtmlAsync(htmlContent, jobName, printerName, ct);
 
-        _logger.LogInformation("Successfully printed {JobName}", jobName);
+        _logger.LogInformation("Successfully printed {JobName} to printer {Printer}", jobName, printerName ?? "default");
     }
 
     private async Task ExecuteDelayAsync(SubAction action, CancellationToken ct)
     {
-        var delayMs = action.DelayMilliseconds;
+        var delayMs = action.DelayMilliseconds ?? 1000;
         _logger.LogDebug("Delaying for {Ms}ms", delayMs);
         await Task.Delay(delayMs, ct);
     }
 
     public async Task ExecuteChainedActionsAsync(SubAction sourceAction, string responseBody, CancellationToken ct = default)
     {
+        var activeConfig = GetActiveConfig();
+
         // Find chained actions (actions with UseChainedInput that follow this action)
-        var sourceIndex = _config.SubActions.IndexOf(sourceAction);
+        var sourceIndex = activeConfig.SubActions.IndexOf(sourceAction);
         if (sourceIndex == -1)
         {
             _logger.LogDebug("Source action not found in config, skipping chained execution");
             return;
         }
 
-        var chainedActions = _config.SubActions
+        var chainedActions = activeConfig.SubActions
             .Skip(sourceIndex + 1)
-            .Where(a => a.Enabled && a.UseChainedInput)
+            .Where(a => a.Enabled && (a.UseChainedInput == true))
             .ToList();
 
         if (chainedActions.Count == 0)
@@ -521,7 +620,7 @@ public class SubActionExecutor : ISubActionExecutor
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Chained action '{ActionName}' failed: {Message}", chainedAction.Name, ex.Message);
-                    if (!chainedAction.ContinueOnError)
+                    if (!(chainedAction.ContinueOnError ?? true))
                     {
                         _logger.LogWarning("Stopping chained execution due to error (ContinueOnError=false)");
                         throw;
@@ -570,13 +669,51 @@ public class SubActionExecutor : ISubActionExecutor
             {
                 var itemData = new Dictionary<string, object>();
 
-                // Extract all properties from the item
-                foreach (var prop in item.EnumerateObject())
+                // Check if item is an array or object
+                if (item.ValueKind == JsonValueKind.Array)
                 {
-                    var value = ExtractJsonValue(prop.Value);
+                    // Item is an array - extract each element by index
+                    var arrayItems = item.EnumerateArray().ToList();
+                    for (int i = 0; i < arrayItems.Count; i++)
+                    {
+                        var value = ExtractJsonValue(arrayItems[i]);
+                        if (value != null)
+                        {
+                            itemData[i.ToString()] = value;
+                        }
+                    }
+                }
+                else if (item.ValueKind == JsonValueKind.Object)
+                {
+                    // Item is an object - extract all properties
+                    foreach (var prop in item.EnumerateObject())
+                    {
+                        var value = ExtractJsonValue(prop.Value);
+                        if (value != null)
+                        {
+                            itemData[prop.Name] = value;
+                        }
+                    }
+                }
+                else
+                {
+                    // Item is a primitive value - store as index 0
+                    var value = ExtractJsonValue(item);
                     if (value != null)
                     {
-                        itemData[prop.Name] = value;
+                        itemData["0"] = value;
+                    }
+                }
+
+                // Apply filter if configured
+                if (!string.IsNullOrEmpty(sourceAction.ChainedFilterType) &&
+                    (sourceAction.ChainedFilterArrayIndex.HasValue || !string.IsNullOrEmpty(sourceAction.ChainedFilterField)))
+                {
+                    if (!ApplyChainedFilter(itemData, sourceAction))
+                    {
+                        _logger.LogDebug("Item filtered out by {FilterType}",
+                            sourceAction.ChainedFilterType);
+                        continue; // Skip this item
                     }
                 }
 
@@ -606,6 +743,103 @@ public class SubActionExecutor : ISubActionExecutor
             JsonValueKind.False => false,
             JsonValueKind.Null => null,
             _ => element.ToString()
+        };
+    }
+
+    private bool ApplyChainedFilter(Dictionary<string, object> itemData, SubAction sourceAction)
+    {
+        var filterField = sourceAction.ChainedFilterField!;
+        var filterType = sourceAction.ChainedFilterType!.ToLowerInvariant();
+        var filterValue = sourceAction.ChainedFilterValue ?? string.Empty;
+
+        // Get field value - handle both direct fields and array indices
+        string fieldValue;
+
+        if (sourceAction.ChainedFilterArrayIndex.HasValue)
+        {
+            // Handle array index filtering (e.g., data[x][17])
+            // Item is an array, get value at specified index
+            var arrayIndex = sourceAction.ChainedFilterArrayIndex.Value;
+
+            // Check if itemData contains an array representation
+            // When ChainedItemFieldPath is like "[0]", the entire item is the array
+            if (itemData.Count == 1 && itemData.ContainsKey("__array__"))
+            {
+                // Special case: entire item is array
+                var arrayObj = itemData["__array__"];
+                if (arrayObj is JsonElement jsonArray && jsonArray.ValueKind == JsonValueKind.Array)
+                {
+                    var arrayElements = jsonArray.EnumerateArray().ToList();
+                    if (arrayIndex >= 0 && arrayIndex < arrayElements.Count)
+                    {
+                        fieldValue = ExtractJsonValue(arrayElements[arrayIndex])?.ToString() ?? string.Empty;
+                    }
+                    else
+                    {
+                        _logger.LogDebug("Array index {Index} out of bounds (length: {Length})", arrayIndex, arrayElements.Count);
+                        return false;
+                    }
+                }
+                else
+                {
+                    _logger.LogDebug("Expected array for index filtering, got {Type}", arrayObj?.GetType().Name ?? "null");
+                    return false;
+                }
+            }
+            else
+            {
+                // Try to get indexed value from item data
+                // Look for numeric keys (0, 1, 2, ..., 17, etc.)
+                var indexKey = arrayIndex.ToString();
+                if (itemData.TryGetValue(indexKey, out var indexedValue))
+                {
+                    fieldValue = indexedValue?.ToString() ?? string.Empty;
+                }
+                else
+                {
+                    _logger.LogDebug("Array index key '{Key}' not found in item data", indexKey);
+                    return false;
+                }
+            }
+        }
+        else if (!string.IsNullOrEmpty(filterField))
+        {
+            // Handle normal field filtering
+            if (!itemData.TryGetValue(filterField, out var fieldValueObj))
+            {
+                _logger.LogDebug("Filter field '{Field}' not found in item data", filterField);
+                return false; // Field not found, filter out
+            }
+            fieldValue = fieldValueObj?.ToString() ?? string.Empty;
+        }
+        else
+        {
+            _logger.LogWarning("Filter configuration missing both ChainedFilterField and ChainedFilterArrayIndex");
+            return true; // Allow through if misconfigured
+        }
+
+        return filterType switch
+        {
+            "notempty" => !string.IsNullOrWhiteSpace(fieldValue),
+
+            "contains" => fieldValue.Contains(filterValue, StringComparison.OrdinalIgnoreCase),
+
+            "notcontains" => !fieldValue.Contains(filterValue, StringComparison.OrdinalIgnoreCase),
+
+            "notstartswith" => !fieldValue.StartsWith(filterValue, StringComparison.OrdinalIgnoreCase),
+
+            "startswith" => fieldValue.StartsWith(filterValue, StringComparison.OrdinalIgnoreCase),
+
+            "equals" => fieldValue.Equals(filterValue, StringComparison.OrdinalIgnoreCase),
+
+            "notequals" => !fieldValue.Equals(filterValue, StringComparison.OrdinalIgnoreCase),
+
+            // Special filter: must be a file path (contains .html and doesn't start with {)
+            "isfilepath" => !string.IsNullOrWhiteSpace(fieldValue) &&
+                           fieldValue.Contains(".html", StringComparison.OrdinalIgnoreCase) &&
+                           !fieldValue.TrimStart().StartsWith("{"),
+
+            _ => true // Unknown filter type, allow item through
         };
     }
 
@@ -642,6 +876,8 @@ public class SubActionExecutor : ISubActionExecutor
 
     private async Task ExecuteGetUrlAndPrintAsync(SubAction action, string orderId, Dictionary<string, object> context, CancellationToken ct)
     {
+        var activeConfig = GetActiveConfig();
+
         // Build URL with context substitution
         var url = ReplaceTokensWithContext(action.Endpoint, orderId, context);
         _logger.LogInformation("Fetching URL with Puppeteer: {Url}", url);
@@ -651,12 +887,12 @@ public class SubActionExecutor : ISubActionExecutor
         var cookies = _tokenRenewal.GetCurrentCookies();
 
         await using var page = await _browserManager.NewPageAsync(ct, token, cookies);
-        
+
         // Navigate to the page
         _logger.LogDebug("Navigating to {Url}", url);
         // Strategy: First load root application shell, then set hash route via script.
         // This avoids referrerPolicy issues seen when directly navigating to hash URLs.
-        var rootUrl = _config.BaseUrl.TrimEnd('/') + "/";
+        var rootUrl = activeConfig.BaseUrl.TrimEnd('/') + "/";
         _logger.LogDebug("Loading application shell {RootUrl} before hash navigation", rootUrl);
         try
         {
@@ -679,14 +915,15 @@ public class SubActionExecutor : ISubActionExecutor
         await Task.Delay(1500, ct); // Give route detection time
 
         // Wait additional time for SPA to load data
-        if (action.WaitForNetworkIdleMs > 0)
+        var waitMs = action.WaitForNetworkIdleMs ?? 3000;
+        if (waitMs > 0)
         {
-            _logger.LogDebug("Waiting {Ms}ms for network idle", action.WaitForNetworkIdleMs);
-            await Task.Delay(action.WaitForNetworkIdleMs, ct);
+            _logger.LogDebug("Waiting {Ms}ms for network idle", waitMs);
+            await Task.Delay(waitMs, ct);
         }
 
         // Make hidden fields visible if requested
-        if (action.MakeHiddenVisible)
+        if (action.MakeHiddenVisible == true)
         {
             _logger.LogDebug("Making hidden fields visible");
             await page.EvaluateExpressionAsync(@"
@@ -697,23 +934,97 @@ public class SubActionExecutor : ISubActionExecutor
             ");
         }
 
+        // Force portrait orientation via CSS and hide "short items" table from PDF output
+        _logger.LogDebug("Injecting PDF print styles (portrait orientation + hiding short items)");
+        await page.EvaluateExpressionAsync(@"
+            // Inject CSS to force portrait mode for PDF printing
+            const style = document.createElement('style');
+            style.textContent = `
+                @page {
+                    size: portrait !important;
+                    margin: 0.4in;
+                }
+                @media print {
+                    body {
+                        width: 8.5in !important;
+                        max-width: 8.5in !important;
+                    }
+                }
+                .customer-highlight {
+                    background-color: #000 !important;
+                    color: #fff !important;
+                    font-weight: bold !important;
+                    font-size: 1.4em !important;
+                    padding: 8px 12px !important;
+                    display: inline-block !important;
+                    margin: 4px 0 !important;
+                    border-radius: 4px !important;
+                }
+            `;
+            document.head.appendChild(style);
+
+            // Find and style CUSTOMER field (label + value)
+            const allElements = Array.from(document.querySelectorAll('*'));
+            allElements.forEach(el => {
+                const text = el.textContent?.trim() || '';
+                // Look for element containing 'CUSTOMER:' label
+                if (text.startsWith('CUSTOMER:') && text.length < 100) {
+                    el.classList.add('customer-highlight');
+                    console.log('Styled customer label:', el.tagName);
+                }
+                // Also look for the value separately if it's in a different element
+                const prevText = el.previousElementSibling?.textContent?.trim() || '';
+                if (prevText === 'CUSTOMER:' && text.length > 2 && text.length < 100 && !text.includes(':')) {
+                    el.classList.add('customer-highlight');
+                    console.log('Styled customer value:', el.tagName);
+                }
+            });
+
+            // Find and hide any table or section containing 'short items' text
+            const elementsToHide = Array.from(document.querySelectorAll('*')).filter(el => {
+                const text = (el.textContent || '').toLowerCase();
+                const tag = el.tagName.toLowerCase();
+                // Look for tables, divs, or sections that contain 'short items' in their text content
+                if ((tag === 'table' || tag === 'div' || tag === 'section') &&
+                    (text.includes('short items') || text.includes('shortitems'))) {
+                    // Make sure we're not matching a parent that contains the actual short items table
+                    const hasShortItemsHeader = Array.from(el.querySelectorAll('*')).some(child => {
+                        const childText = (child.textContent || '').toLowerCase();
+                        return childText.trim() === 'short items' || childText.includes('short items');
+                    });
+                    return hasShortItemsHeader || text.match(/short\s*items/i);
+                }
+                return false;
+            });
+
+            elementsToHide.forEach(el => {
+                el.style.display = 'none';
+                console.log('Hidden element:', el.tagName, el.className);
+            });
+
+            console.log('PDF print styles injected');
+        ");
+
         // Generate PDF
-        _logger.LogInformation("Generating PDF from page");
+        _logger.LogInformation("Generating PDF from page (portrait mode)");
         var pdfBytes = await page.PdfDataAsync(new PuppeteerSharp.PdfOptions
         {
             PrintBackground = true,
-            Format = PuppeteerSharp.Media.PaperFormat.Letter
+            Format = PuppeteerSharp.Media.PaperFormat.Letter,
+            Landscape = false
         });
 
         // Directly send generated PDF bytes to printer (avoid re-rendering & losing dynamic XHR state)
         var jobName = $"{action.Name}-{ExtractJobNameFromContext(context)}";
-        _logger.LogInformation("Printing PDF: {JobName} ({Size} bytes)", jobName, pdfBytes.Length);
-        await _printer.PrintPdfBytesAsync(pdfBytes, jobName, ct);
+        var printerName = GetActiveConfig().PrinterName;
+        _logger.LogInformation("Printing PDF: {JobName} ({Size} bytes) to printer {Printer}", jobName, pdfBytes.Length, printerName ?? "default");
+        await _printer.PrintPdfBytesAsync(pdfBytes, jobName, printerName, ct);
     }
 
     // New: Navigate only, keep page alive for subsequent print action (supports chained context & enhanced diagnostics)
     private async Task ExecuteNavigateOnlyAsync(SubAction action, string orderId, Dictionary<string, object>? context, CancellationToken ct)
     {
+        var activeConfig = GetActiveConfig();
         var rawEndpoint = action.Endpoint;
         var url = context != null ? ReplaceTokensWithContext(rawEndpoint, orderId, context) : ReplaceTokens(rawEndpoint, orderId);
 
@@ -761,12 +1072,34 @@ public class SubActionExecutor : ISubActionExecutor
             _capturedBrowser = null; // ensure null when not isolated
         }
 
+        // Track JavaScript console errors that could prevent Knockout bindings
+        var jsErrors = new System.Collections.Concurrent.ConcurrentBag<string>();
+        page.Console += (_, args) =>
+        {
+            try
+            {
+                var type = args.Message.Type.ToString().ToUpperInvariant();
+                if (type == "ERROR")
+                {
+                    var msg = args.Message.Text;
+                    jsErrors.Add(msg);
+                    _logger.LogWarning("[JS ERROR] {Message}", msg.Length > 500 ? msg.Substring(0, 500) + "..." : msg);
+                }
+            }
+            catch { }
+        };
+
         // Attach response listener EARLY (before any navigation) to avoid missing initial picklist XHR
         var picklistIdForDetectionEarly = (context != null && context.TryGetValue("pickListId", out var earlyCtxId) ? earlyCtxId?.ToString() : orderId) ?? string.Empty;
         var apiDetailsUrlFragmentEarly = "/api/Picklist/GetPickListDetails";
         bool apiDataObservedEarly = false;
         string? interceptedJsonEarly = null;
         var apiDetectionTcsEarly = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        // Also detect the PicklistDetail.json config file (CRITICAL for Knockout bindings)
+        var configFileUrlFragment = "/configs/PicklistDetail.json";
+        bool configFileObserved = false;
+        var configDetectionTcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         page.Response += async (_, e) =>
         {
             try
@@ -774,6 +1107,8 @@ public class SubActionExecutor : ISubActionExecutor
                 var resp = e.Response;
                 var rUrl = resp.Url;
                 var method = resp.Request?.Method?.ToString() ?? string.Empty;
+
+                // Detect GetPickListDetails API
                 if (!apiDataObservedEarly && rUrl.Contains(apiDetailsUrlFragmentEarly, StringComparison.OrdinalIgnoreCase) && (string.IsNullOrEmpty(picklistIdForDetectionEarly) || rUrl.Contains($"picklistid={picklistIdForDetectionEarly}", StringComparison.OrdinalIgnoreCase)) && method.Equals("GET", StringComparison.OrdinalIgnoreCase))
                 {
                     if (resp.Status == System.Net.HttpStatusCode.OK)
@@ -795,6 +1130,22 @@ public class SubActionExecutor : ISubActionExecutor
                         }
                     }
                 }
+
+                // Detect PicklistDetail.json config file (CRITICAL - controls which Knockout bindings are active)
+                if (!configFileObserved && rUrl.Contains(configFileUrlFragment, StringComparison.OrdinalIgnoreCase))
+                {
+                    if (resp.Status == System.Net.HttpStatusCode.OK)
+                    {
+                        string configBody = string.Empty;
+                        try { configBody = await resp.TextAsync(); } catch { }
+                        if (!string.IsNullOrWhiteSpace(configBody))
+                        {
+                            configFileObserved = true;
+                            _logger.LogInformation("(Early) Observed PicklistDetail.json config file - length {Len}", configBody.Length);
+                            configDetectionTcs.TrySetResult(true);
+                        }
+                    }
+                }
             }
             catch (Exception ex)
             {
@@ -805,7 +1156,7 @@ public class SubActionExecutor : ISubActionExecutor
         // Production: removed verbose console diagnostic hooks.
 
         // Navigate to base URL first to establish domain context
-        var rootUrl = _config.BaseUrl.TrimEnd('/') + "/";
+        var rootUrl = activeConfig.BaseUrl.TrimEnd('/') + "/";
         _logger.LogDebug("Loading application shell {RootUrl} to establish domain context", rootUrl);
         try
         {
@@ -820,20 +1171,29 @@ public class SubActionExecutor : ISubActionExecutor
             _logger.LogWarning("Root page load timed out ({Message}), continuing anyway", ex.Message);
         }
 
-        // CRITICAL: Inject auth token into storage IMMEDIATELY after domain is loaded
-        // This ensures the token is available when we navigate to the hash route
+        // CRITICAL: Inject auth token and userData into storage IMMEDIATELY after domain is loaded
+        // This ensures the token and userData are available when we navigate to the hash route
         try
         {
             var storageToken = _tokenRenewal.GetCurrentToken();
+            var currentCookies = _tokenRenewal.GetCurrentCookies();
+
             if (!string.IsNullOrWhiteSpace(storageToken))
             {
                 await page.EvaluateFunctionAsync("t => { try { localStorage.setItem('token', t); sessionStorage.setItem('token', t); } catch(e) {} }", storageToken);
                 _logger.LogDebug("Injected token into localStorage/sessionStorage after domain load");
             }
+
+            // Also inject userData if available (Angular app needs this)
+            if (currentCookies.TryGetValue("userData", out var userData) && !string.IsNullOrWhiteSpace(userData))
+            {
+                await page.EvaluateFunctionAsync("u => { try { localStorage.setItem('userData', u); sessionStorage.setItem('userData', u); } catch(e) {} }", userData);
+                _logger.LogDebug("Injected userData into localStorage/sessionStorage after domain load");
+            }
         }
         catch (Exception ex)
         {
-            _logger.LogDebug(ex, "Failed to inject token into storage (non-fatal)");
+            _logger.LogDebug(ex, "Failed to inject auth data into storage (non-fatal)");
         }
 
         // Wait for SPA framework readiness before setting hash (prevents early hash assignment before route handlers register)
@@ -935,12 +1295,15 @@ public class SubActionExecutor : ISubActionExecutor
         // Optimized picklist data readiness detection (using early listener variables)
         var picklistIdForDetection = picklistIdForDetectionEarly; // reuse
         var detectionTimeoutMs = Math.Max(5000, _pdfConfig.DataLoadRetryMs > 0 ? _pdfConfig.DataLoadRetryMs : 10000);
-        _logger.LogDebug("Awaiting picklist API (timeout {Ms}ms, id {Id})", detectionTimeoutMs, picklistIdForDetection);
-        var detectionCompleted = await Task.WhenAny(apiDetectionTcsEarly.Task, Task.Delay(detectionTimeoutMs));
+        _logger.LogDebug("Awaiting BOTH picklist API AND config file (timeout {Ms}ms, id {Id})", detectionTimeoutMs, picklistIdForDetection);
 
-        if (detectionCompleted == apiDetectionTcsEarly.Task && apiDetectionTcsEarly.Task.IsCompletedSuccessfully)
+        // Wait for BOTH the API data AND the config file (both required for Knockout bindings)
+        var bothResourcesTask = Task.WhenAll(apiDetectionTcsEarly.Task, configDetectionTcs.Task);
+        var detectionCompleted = await Task.WhenAny(bothResourcesTask, Task.Delay(detectionTimeoutMs));
+
+        if (detectionCompleted == bothResourcesTask && bothResourcesTask.IsCompletedSuccessfully)
         {
-            _logger.LogInformation("Picklist data readiness confirmed early; skipping fallback waits");
+            _logger.LogInformation("BOTH picklist API data AND config file confirmed - Knockout bindings should work; skipping fallback waits");
             if (!string.IsNullOrWhiteSpace(interceptedJsonEarly))
             {
                 try
@@ -966,7 +1329,8 @@ public class SubActionExecutor : ISubActionExecutor
                         pickListNumber = idProp.ToString();
                     }
                     _logger.LogInformation("Picklist JSON validation summary: PickListNumberOrId={PickListNumber} ItemCount={ItemCount}", pickListNumber ?? "(n/a)", itemCount);
-                    _lastInterceptedPicklistJson = interceptedJsonEarly.Length > 5000 ? interceptedJsonEarly.Substring(0, 5000) + $"...(truncated {interceptedJsonEarly.Length} chars)" : interceptedJsonEarly;
+                    // Store FULL JSON for manual DOM population (don't truncate!)
+                    _lastInterceptedPicklistJson = interceptedJsonEarly;
                 }
                 catch (Exception ex)
                 {
@@ -976,15 +1340,27 @@ public class SubActionExecutor : ISubActionExecutor
         }
         else
         {
-            _logger.LogWarning("Picklist API not observed within {Ms}ms; using fallback timing", detectionTimeoutMs);
+            if (!apiDataObservedEarly && !configFileObserved)
+            {
+                _logger.LogWarning("NEITHER picklist API nor config file observed within {Ms}ms; using fallback timing", detectionTimeoutMs);
+            }
+            else if (!apiDataObservedEarly)
+            {
+                _logger.LogWarning("Picklist API not observed within {Ms}ms (config file OK); using fallback timing", detectionTimeoutMs);
+            }
+            else if (!configFileObserved)
+            {
+                _logger.LogWarning("Config file PicklistDetail.json not observed within {Ms}ms (API OK) - Knockout bindings may fail; using fallback timing", detectionTimeoutMs);
+            }
 
             _logger.LogDebug("Fallback: waiting 1500ms for hash route rendering");
             await Task.Delay(1500); // Don't pass ct – critical for route detection
 
-            if (action.WaitForNetworkIdleMs > 0)
+            var fallbackWaitMs = action.WaitForNetworkIdleMs ?? 3000;
+            if (fallbackWaitMs > 0)
             {
-                _logger.LogDebug("Fallback: waiting {Ms}ms for SPA data loading", action.WaitForNetworkIdleMs);
-                await Task.Delay(action.WaitForNetworkIdleMs); // Don't pass ct
+                _logger.LogDebug("Fallback: waiting {Ms}ms for SPA data loading", fallbackWaitMs);
+                await Task.Delay(fallbackWaitMs); // Don't pass ct
             }
 
             try
@@ -1011,25 +1387,158 @@ public class SubActionExecutor : ISubActionExecutor
                 try
                 {
                     _logger.LogDebug("Manual fetch fallback for picklist id {Id}", picklistIdForDetection);
-                    var manualJson = await page.EvaluateExpressionAsync<string>($"fetch('/api/Picklist/GetPickListDetails?picklistid={picklistIdForDetection}').then(r=>r.text()).catch(_=>'')");
+                    // Fetch with authentication token and WarehouseId from localStorage
+                    var manualJson = await page.EvaluateExpressionAsync<string>($@"
+                        (async () => {{
+                            try {{
+                                const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+                                const userDataStr = localStorage.getItem('userData') || sessionStorage.getItem('userData');
+                                let warehouseId = '1';
+
+                                if (userDataStr) {{
+                                    try {{
+                                        const userData = JSON.parse(userDataStr);
+                                        warehouseId = (userData.defaultWarehouseId || userData.warehouseId || 1).toString();
+                                    }} catch(e) {{ }}
+                                }}
+
+                                const resp = await fetch('/api/Picklist/GetPickListDetails?picklistid={picklistIdForDetection}', {{
+                                    headers: {{
+                                        'Authorization': token ? 'Bearer ' + token : '',
+                                        'Content-Type': 'application/json',
+                                        'WarehouseId': warehouseId
+                                    }}
+                                }});
+                                const text = await resp.text();
+                                return JSON.stringify({{ status: resp.status, statusText: resp.statusText, body: text }});
+                            }} catch(e) {{
+                                return JSON.stringify({{ error: e.toString() }});
+                            }}
+                        }})()
+                    ");
                     if (!string.IsNullOrWhiteSpace(manualJson))
                     {
-                        var lower = manualJson.ToLowerInvariant();
-                        bool looksSuccess = lower.Contains("\"responsecode\":0") || lower.Contains("\"responsetype\":\"success\"");
-                        bool hasKeys = lower.Contains("picklistnumber") || lower.Contains("picklistid") || lower.Contains("\"picklist\"");
-                        if (looksSuccess && hasKeys)
+                        // Parse the wrapper JSON that contains status and body
+                        try
                         {
-                            _logger.LogInformation("Manual fetch obtained picklist details (length {Len})", manualJson.Length);
-                            _lastInterceptedPicklistJson = manualJson.Length > 5000 ? manualJson.Substring(0,5000)+$"...(truncated {manualJson.Length} chars)" : manualJson;
+                            using var jsonDoc = JsonDocument.Parse(manualJson);
+                            var root = jsonDoc.RootElement;
+
+                            if (root.TryGetProperty("error", out var errorProp))
+                            {
+                                _logger.LogError("Manual fetch JavaScript error: {Error}", errorProp.GetString());
+                            }
+                            else if (root.TryGetProperty("status", out var statusProp) && root.TryGetProperty("body", out var bodyProp))
+                            {
+                                var httpStatus = statusProp.GetInt32();
+                                var statusText = root.TryGetProperty("statusText", out var stProp) ? stProp.GetString() : "";
+                                var responseBody = bodyProp.GetString() ?? "";
+
+                                _logger.LogInformation("Manual fetch HTTP {Status} {StatusText}, body length: {Len}", httpStatus, statusText, responseBody.Length);
+
+                                if (httpStatus >= 200 && httpStatus < 300 && !string.IsNullOrWhiteSpace(responseBody))
+                                {
+                                    var lower = responseBody.ToLowerInvariant();
+                                    bool looksSuccess = lower.Contains("\"responsecode\":0") || lower.Contains("\"responsetype\":\"success\"");
+                                    bool hasKeys = lower.Contains("picklistnumber") || lower.Contains("picklistid") || lower.Contains("\"picklist\"");
+
+                                    if (looksSuccess && hasKeys)
+                                    {
+                                        _logger.LogInformation("Manual fetch obtained valid picklist details");
+                                        // Store FULL JSON for manual DOM population (don't truncate!)
+                                        _lastInterceptedPicklistJson = responseBody;
+
+                                        // Populate the DOM using tf.binder.scatter() - same as the page's GetPickListDetail() function
+                                        try
+                                        {
+                                            _logger.LogInformation("Attempting to populate DOM using tf.binder.scatter()");
+                                            // Pass JSON as function parameter to avoid escaping issues
+                                            var populateResult = await page.EvaluateFunctionAsync<string>(@"(jsonString) => {
+                                                try {
+                                                    const data = JSON.parse(jsonString);
+
+                                                    if (data.responseCode == 0 && data.data && data.data.PickList) {
+                                                        // Process picklist items (same as GetPickListDetail)
+                                                        var TotalQty = 0;
+                                                        var TotalCtns = 0;
+                                                        var OrderNo = '';
+
+                                                        for (var i = 0; i < data.data.PickListItems.length; i++) {
+                                                            if (data.data.PickListItems[i].IsCase == 0) {
+                                                                data.data.PickListItems[i].IsCase = 'piece(s)';
+                                                            } else {
+                                                                data.data.PickListItems[i].IsCase = 'Case(s)';
+                                                            }
+                                                            if (data.data.PickListItems[i].TotalCtns == null) {
+                                                                data.data.PickListItems[i].TotalCtns = 1;
+                                                            }
+                                                            TotalQty += parseFloat(data.data.PickListItems[i].Quantity);
+                                                            TotalCtns += parseFloat(data.data.PickListItems[i].TotalCtns);
+                                                            if (OrderNo == '') {
+                                                                OrderNo += data.data.PickListItems[i].OrderNumber;
+                                                            }
+                                                        }
+
+                                                        Object.assign(data.data.PickList, { TotalQty: TotalQty });
+                                                        Object.assign(data.data.PickList, { TotalCtns: Math.ceil(TotalCtns) });
+                                                        Object.assign(data.data.PickList, { OrderNo: OrderNo });
+
+                                                        if (data.data.PickList.Priority == null || data.data.PickList.Priority == '') {
+                                                            data.data.PickList.Priority = 1;
+                                                        }
+
+                                                        // Scatter data to DOM using tf.binder
+                                                        if (typeof window.tf !== 'undefined' && window.tf.binder && window.tf.binder.scatter) {
+                                                            window.tf.binder.scatter(data.data, '.data-scatter');
+                                                            window.tf.binder.scatter(data.data.PickList, '.data-data-scatter');
+
+                                                            // Generate barcodes if function exists
+                                                            if (typeof GenerateOrderNoBarcode === 'function') {
+                                                                GenerateOrderNoBarcode();
+                                                            }
+
+                                                            return 'Success: Data scattered to DOM';
+                                                        } else {
+                                                            return 'Warning: tf.binder.scatter not available';
+                                                        }
+                                                    } else {
+                                                        return 'Error: Invalid data structure - responseCode=' + (data.responseCode || 'missing');
+                                                    }
+                                                } catch(e) {
+                                                    return 'Error: ' + e.toString();
+                                                }
+                                            }", responseBody);
+                                            _logger.LogInformation("DOM population result: {Result}", populateResult);
+                                        }
+                                        catch (Exception popEx)
+                                        {
+                                            _logger.LogWarning(popEx, "Failed to populate DOM with picklist data");
+                                        }
+                                    }
+                                    else
+                                    {
+                                        _logger.LogWarning("Manual fetch body failed validation; success={Success} hasKeys={HasKeys}", looksSuccess, hasKeys);
+                                    }
+                                }
+                                else
+                                {
+                                    _logger.LogWarning("Manual fetch returned HTTP {Status}, body may be error message", httpStatus);
+                                }
+                            }
+                            else
+                            {
+                                _logger.LogWarning("Manual fetch response has unexpected structure: {Preview}",
+                                    manualJson.Length > 200 ? manualJson.Substring(0, 200) + "..." : manualJson);
+                            }
                         }
-                        else
+                        catch (JsonException jex)
                         {
-                            _logger.LogWarning("Manual fetch content failed validation; success={Success} hasKeys={HasKeys} length={Len}", looksSuccess, hasKeys, manualJson.Length);
+                            _logger.LogError(jex, "Failed to parse manual fetch wrapper JSON");
                         }
                     }
                     else
                     {
-                        _logger.LogWarning("Manual fetch returned empty body for picklist id {Id}", picklistIdForDetection);
+                        _logger.LogWarning("Manual fetch returned empty response for picklist id {Id}", picklistIdForDetection);
                     }
                 }
                 catch (Exception ex)
@@ -1037,6 +1546,132 @@ public class SubActionExecutor : ISubActionExecutor
                     _logger.LogDebug(ex, "Manual fetch fallback failed (non-fatal)");
                 }
             }
+        }
+
+        // Knockout.js binding readiness checks (critical for data population)
+        try
+        {
+            _logger.LogDebug("Checking if Knockout.js is available on page");
+            var koExists = await page.EvaluateExpressionAsync<bool>("typeof window.ko !== 'undefined' && window.ko !== null");
+            if (koExists)
+            {
+                _logger.LogInformation("Knockout.js detected on page - waiting for bindings to be applied");
+
+                // Wait for Knockout.js to finish applying bindings (check that binding context exists)
+                if (!string.IsNullOrWhiteSpace(_pdfConfig.WaitForSelector))
+                {
+                    var escaped = _pdfConfig.WaitForSelector.Replace("'", "\\'");
+                    try
+                    {
+                        _logger.LogDebug("Waiting for Knockout binding context on selector '{Selector}'", _pdfConfig.WaitForSelector);
+                        await page.WaitForFunctionAsync($"() => {{ const el = document.querySelector('{escaped}'); return el && window.ko && window.ko.dataFor && window.ko.dataFor(el) !== undefined; }}",
+                            new PuppeteerSharp.WaitForFunctionOptions { Timeout = 10000 });
+                        _logger.LogInformation("Knockout binding context confirmed for selector '{Selector}'", _pdfConfig.WaitForSelector);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Knockout binding context wait timed out - bindings may not be applied yet");
+                    }
+                }
+
+                // Diagnostic: Check view model state
+                try
+                {
+                    var vmDiagnostic = await page.EvaluateFunctionAsync<string>(@"(sel) => {
+                        try {
+                            const el = document.querySelector(sel);
+                            if (!el || !window.ko || !window.ko.dataFor) return 'ko.dataFor not available';
+                            const vm = window.ko.dataFor(el);
+                            if (!vm) return 'No view model bound';
+                            const keys = Object.keys(vm).filter(k => !k.startsWith('_')).slice(0, 10);
+                            return 'VM keys: ' + keys.join(', ');
+                        } catch(e) {
+                            return 'Error: ' + e.message;
+                        }
+                    }", _pdfConfig.WaitForSelector);
+                    _logger.LogInformation("Knockout view model diagnostic: {Diagnostic}", vmDiagnostic);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogDebug(ex, "Failed to get Knockout view model diagnostic");
+                }
+            }
+            else
+            {
+                _logger.LogWarning("Knockout.js NOT detected on page - data binding may not work as expected");
+
+                // Check what JavaScript frameworks/libraries ARE available
+                try
+                {
+                    var availableLibs = await page.EvaluateExpressionAsync<string>(@"
+                        (() => {
+                            const libs = [];
+                            if (typeof jQuery !== 'undefined') libs.push('jQuery v' + jQuery.fn.jquery);
+                            if (typeof $ !== 'undefined') libs.push('$ (jQuery or similar)');
+                            if (typeof window.ko !== 'undefined') libs.push('Knockout');
+                            if (typeof window.tf !== 'undefined') libs.push('tf (SPA framework)');
+                            if (typeof Vue !== 'undefined') libs.push('Vue');
+                            if (typeof React !== 'undefined') libs.push('React');
+                            if (typeof Angular !== 'undefined') libs.push('Angular');
+                            if (typeof Backbone !== 'undefined') libs.push('Backbone');
+                            return libs.length > 0 ? libs.join(', ') : 'None detected';
+                        })()
+                    ");
+                    _logger.LogInformation("Available JavaScript libraries on page: {Libs}", availableLibs);
+                }
+                catch (Exception libEx)
+                {
+                    _logger.LogDebug(libEx, "Failed to detect available JavaScript libraries");
+                }
+
+                // Check if page data is accessible via tf.page or global variables
+                try
+                {
+                    var tfDataCheck = await page.EvaluateExpressionAsync<string>(@"
+                        (() => {
+                            if (typeof window.tf === 'undefined') return 'tf framework not available';
+                            if (typeof window.tf.page === 'undefined') return 'tf.page not available';
+                            if (typeof window.tf.page.viewModel !== 'undefined') return 'tf.page.viewModel exists (type: ' + typeof window.tf.page.viewModel + ')';
+                            if (typeof window.tf.page.data !== 'undefined') return 'tf.page.data exists (type: ' + typeof window.tf.page.data + ')';
+                            return 'tf available but no viewModel or data found';
+                        })()
+                    ");
+                    _logger.LogInformation("SPA framework data check: {Check}", tfDataCheck);
+
+                    // Try to access the picklist data from tf.page.viewModel if it exists
+                    var picklistDataCheck = await page.EvaluateExpressionAsync<string>(@"
+                        (() => {
+                            try {
+                                if (window.tf && window.tf.page && window.tf.page.viewModel) {
+                                    const vm = window.tf.page.viewModel;
+                                    const keys = Object.keys(vm).slice(0, 20);
+                                    let result = 'ViewModel keys: ' + keys.join(', ');
+                                    if (vm.PickListNumber) result += ' | PickListNumber=' + vm.PickListNumber;
+                                    if (vm.PicklistNumber) result += ' | PicklistNumber=' + vm.PicklistNumber;
+                                    if (vm.picklistNumber) result += ' | picklistNumber=' + vm.picklistNumber;
+                                    return result;
+                                }
+                                return 'No viewModel accessible';
+                            } catch(e) {
+                                return 'Error accessing viewModel: ' + e.message;
+                            }
+                        })()
+                    ");
+                    _logger.LogInformation("ViewModel picklist data check: {Check}", picklistDataCheck);
+                }
+                catch (Exception tfEx)
+                {
+                    _logger.LogDebug(tfEx, "Failed to check tf.page data");
+                }
+
+                // DISABLED: Manual DOM population - Let the page render naturally with its own JavaScript
+                // The page's tf framework will populate all fields, including barcodes
+                _logger.LogInformation("Trusting page to render naturally - wait times configured to allow full rendering");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Knockout.js detection failed");
         }
 
         // Optional selector readiness (from PdfConfig) before capturing page
@@ -1147,6 +1782,52 @@ public class SubActionExecutor : ISubActionExecutor
         {
             _logger.LogDebug("Post-selector stabilization delay {Ms}ms", _pdfConfig.PostSelectorStableMs);
             await Task.Delay(_pdfConfig.PostSelectorStableMs);
+        }
+
+        // Final page readiness diagnostic - check for critical content elements
+        try
+        {
+            var contentCheck = await page.EvaluateExpressionAsync<string>(@"
+                (() => {
+                    const checks = [];
+                    // Check for barcodes
+                    const svgs = document.querySelectorAll('svg');
+                    const canvases = document.querySelectorAll('canvas');
+                    const barcodeImgs = document.querySelectorAll('img[src*=""barcode""], img[alt*=""barcode""]');
+                    checks.push(`SVG elements: ${svgs.length}`);
+                    checks.push(`Canvas elements: ${canvases.length}`);
+                    checks.push(`Barcode images: ${barcodeImgs.length}`);
+
+                    // Check table rows
+                    const tableRows = document.querySelectorAll('table#KortHyvdds tbody tr');
+                    checks.push(`Table rows: ${tableRows.length}`);
+
+                    // Check if PicklistNumber has content
+                    const picklistNum = document.querySelector('#PicklistNumber, [data-bind*=""PickListNumber""]');
+                    checks.push(`PicklistNumber populated: ${picklistNum && picklistNum.textContent.trim().length > 0}`);
+
+                    return checks.join('; ');
+                })()
+            ");
+            _logger.LogInformation("Page content readiness check: {Check}", contentCheck);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Content readiness check failed");
+        }
+
+        // Report JavaScript errors summary
+        if (jsErrors.Count > 0)
+        {
+            _logger.LogWarning("Detected {Count} JavaScript error(s) during navigation - these may prevent data rendering:", jsErrors.Count);
+            foreach (var err in jsErrors.Take(5))
+            {
+                _logger.LogWarning("  - {Error}", err.Length > 200 ? err.Substring(0, 200) + "..." : err);
+            }
+        }
+        else
+        {
+            _logger.LogInformation("No JavaScript console errors detected during navigation");
         }
 
         // Diagnostic screenshot after navigation if enabled
@@ -1286,6 +1967,109 @@ public class SubActionExecutor : ISubActionExecutor
             }
         }
 
+        // Force portrait orientation via CSS and hide "Short Items" section
+        _logger.LogDebug("Injecting PDF print styles (portrait orientation + hiding Short Items)");
+        try
+        {
+            await _capturedPage.EvaluateExpressionAsync(@"
+                // Inject CSS to force portrait mode for PDF printing
+                const style = document.createElement('style');
+                style.textContent = `
+                    @page {
+                        size: portrait !important;
+                        margin: 0.4in;
+                    }
+                    @media print {
+                        body {
+                            width: 8.5in !important;
+                            max-width: 8.5in !important;
+                        }
+                    }
+                    .customer-highlight {
+                        background-color: #000 !important;
+                        color: #fff !important;
+                        font-weight: bold !important;
+                        font-size: 1.4em !important;
+                        padding: 8px 12px !important;
+                        display: inline-block !important;
+                        margin: 4px 0 !important;
+                        border-radius: 4px !important;
+                    }
+                `;
+                document.head.appendChild(style);
+
+                // Find and style CUSTOMER field (label + value)
+                const allElements = Array.from(document.querySelectorAll('*'));
+                allElements.forEach(el => {
+                    const text = el.textContent?.trim() || '';
+                    // Look for element containing 'CUSTOMER:' label
+                    if (text.startsWith('CUSTOMER:') && text.length < 100) {
+                        el.classList.add('customer-highlight');
+                        console.log('Styled customer label:', el.tagName);
+                    }
+                    // Also look for the value separately if it's in a different element
+                    const prevText = el.previousElementSibling?.textContent?.trim() || '';
+                    if (prevText === 'CUSTOMER:' && text.length > 2 && text.length < 100 && !text.includes(':')) {
+                        el.classList.add('customer-highlight');
+                        console.log('Styled customer value:', el.tagName);
+                    }
+                });
+
+                // Hide any element with heading or title containing 'Short Items' or 'ShortItems'
+                const shortItemsElements = [];
+
+                // Method 1: Find by heading text (h1-h6 tags)
+                document.querySelectorAll('h1, h2, h3, h4, h5, h6').forEach(heading => {
+                    const text = heading.textContent.trim().toLowerCase().replace(/\s+/g, '');
+                    if (text === 'shortitems' || text.includes('shortitems')) {
+                        // Hide the heading and its next sibling (likely the table)
+                        heading.style.display = 'none';
+                        if (heading.nextElementSibling) {
+                            heading.nextElementSibling.style.display = 'none';
+                        }
+                        // Also try to hide parent if it's a wrapper
+                        const parent = heading.closest('div, section, article');
+                        if (parent && parent.textContent.trim().toLowerCase().replace(/\s+/g, '').includes('shortitems')) {
+                            parent.style.display = 'none';
+                        }
+                        shortItemsElements.push(heading);
+                    }
+                });
+
+                // Method 2: Find tables that have empty body (Short Items table has headers but no data)
+                document.querySelectorAll('table').forEach(table => {
+                    const headers = Array.from(table.querySelectorAll('th, thead td')).map(h => h.textContent.trim().toLowerCase());
+                    const hasShortItemsHeaders = headers.some(h => h.includes('order') && h.includes('sku') && h.includes('product'));
+                    const tbody = table.querySelector('tbody');
+                    const hasNoDataRows = !tbody || tbody.querySelectorAll('tr').length === 0 ||
+                                          (tbody.querySelectorAll('tr').length === 1 && !tbody.textContent.trim());
+
+                    // If it looks like the Short Items table (has expected headers and no data)
+                    if (hasShortItemsHeaders && hasNoDataRows) {
+                        table.style.display = 'none';
+                        shortItemsElements.push(table);
+
+                        // Also hide any preceding heading
+                        let prev = table.previousElementSibling;
+                        while (prev && prev.tagName && prev.tagName.match(/^H[1-6]$/)) {
+                            const text = prev.textContent.trim().toLowerCase().replace(/\s+/g, '');
+                            if (text.includes('shortitems')) {
+                                prev.style.display = 'none';
+                            }
+                            break;
+                        }
+                    }
+                });
+
+                console.log('PDF print styles injected. Hidden Short Items elements:', shortItemsElements.length);
+            ");
+            _logger.LogInformation("Portrait orientation CSS + Short Items hiding applied");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to inject PDF print styles (continuing with PDF generation)");
+        }
+
         // Generate PDF directly from the live page (preserves CSS and JavaScript state)
         var pdfBytes = await CreatePdfFromPageAsync(_capturedPage, ct);
         
@@ -1298,8 +2082,9 @@ public class SubActionExecutor : ISubActionExecutor
         _logger.LogInformation("PDF saved to {Path}", filePath);
 
         // Send to printer if configured (MUST succeed - exception will trigger retry)
-        await _printer.PrintPdfBytesAsync(pdfBytes, jobName, ct);
-        _logger.LogInformation("PDF sent to printer: {JobName}", jobName);
+        var printerName = GetActiveConfig().PrinterName;
+        await _printer.PrintPdfBytesAsync(pdfBytes, jobName, printerName, ct);
+        _logger.LogInformation("PDF sent to printer {Printer}: {JobName}", printerName ?? "default", jobName);
 
         if (!string.IsNullOrWhiteSpace(_lastInterceptedPicklistJson))
         {
@@ -1349,13 +2134,33 @@ public class SubActionExecutor : ISubActionExecutor
             }
         };
 
-        if (_pdfConfig.PageWidthInches.HasValue && _pdfConfig.PageHeightInches.HasValue)
+        // When explicit Width/Height are set, Landscape property is ignored by PuppeteerSharp
+        // Only use explicit dimensions if Landscape=true, otherwise use standard Letter format
+        if (_pdfConfig.Landscape && _pdfConfig.PageWidthInches.HasValue && _pdfConfig.PageHeightInches.HasValue)
         {
+            // For landscape with custom dimensions, set width (larger) and height (smaller)
+            pdfOptions.Width = $"{_pdfConfig.PageHeightInches.Value}in";  // Swap for landscape
+            pdfOptions.Height = $"{_pdfConfig.PageWidthInches.Value}in";  // Swap for landscape
+        }
+        else if (!_pdfConfig.Landscape)
+        {
+            // For portrait, use standard Letter format instead of explicit dimensions
+            // This ensures the Landscape=false setting is respected
+            pdfOptions.Format = PuppeteerSharp.Media.PaperFormat.Letter;
+        }
+        else if (_pdfConfig.PageWidthInches.HasValue && _pdfConfig.PageHeightInches.HasValue)
+        {
+            // Fallback: custom dimensions without landscape
             pdfOptions.Width = $"{_pdfConfig.PageWidthInches.Value}in";
             pdfOptions.Height = $"{_pdfConfig.PageHeightInches.Value}in";
         }
 
-        _logger.LogInformation("Generating PDF (Landscape={Landscape}, Bg={Bg})", pdfOptions.Landscape, pdfOptions.PrintBackground);
+        _logger.LogInformation("Generating PDF (Landscape={Landscape}, Format={Format}, W={W}, H={H}, Bg={Bg})",
+            pdfOptions.Landscape,
+            pdfOptions.Format?.ToString() ?? "Custom",
+            pdfOptions.Width ?? "Auto",
+            pdfOptions.Height ?? "Auto",
+            pdfOptions.PrintBackground);
         var bytes = await page.PdfDataAsync(pdfOptions);
         _logger.LogInformation("Generated PDF with {Length} bytes", bytes.Length);
         return bytes;

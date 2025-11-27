@@ -8,6 +8,10 @@ namespace ScheduledPrintService.Services;
 public interface IDatabaseApiConfigService
 {
     ApiConfig LoadApiConfig(int apiNumber);
+    List<Schedule> LoadEnabledSchedules();
+    List<int> LoadScheduleApiNumbers(int scheduleId);
+    (string? username, string? password, string? token, DateTime? tokenExpiresAt) LoadAuthCredentials(string baseUrl);
+    void UpdateAuthToken(string baseUrl, string token, DateTime expiresAt);
 }
 
 public class DatabaseApiConfigService : IDatabaseApiConfigService
@@ -36,7 +40,7 @@ public class DatabaseApiConfigService : IDatabaseApiConfigService
         // Load primary API
         var cmd = connection.CreateCommand();
         cmd.CommandText = @"
-            SELECT ApiNumber, ApiName, BaseUrl, Endpoint, HttpMethod, Headers, Params, Payload, IsEnabled
+            SELECT ApiNumber, ApiName, BaseUrl, Endpoint, HttpMethod, Headers, Params, Payload, IsEnabled, PrinterName
             FROM PrimaryApi
             WHERE ApiNumber = @ApiNumber";
         cmd.Parameters.AddWithValue("@ApiNumber", apiNumber);
@@ -54,7 +58,8 @@ public class DatabaseApiConfigService : IDatabaseApiConfigService
             ManualMode = true, // Always true when loaded from database with specific API number
             ApiNumber = reader.GetInt32(reader.GetOrdinal("ApiNumber")),
             PrimaryEndpoint = reader.GetString(reader.GetOrdinal("Endpoint")),
-            PrimaryHttpMethod = reader.GetString(reader.GetOrdinal("HttpMethod"))
+            PrimaryHttpMethod = reader.GetString(reader.GetOrdinal("HttpMethod")),
+            PrinterName = !reader.IsDBNull(reader.GetOrdinal("PrinterName")) ? reader.GetString(reader.GetOrdinal("PrinterName")) : null
         };
 
         // Parse headers JSON
@@ -153,5 +158,138 @@ public class DatabaseApiConfigService : IDatabaseApiConfigService
             config.SubActions.Count(a => a.Enabled));
 
         return config;
+    }
+
+    public List<Schedule> LoadEnabledSchedules()
+    {
+        _logger.LogInformation("Loading enabled schedules from database");
+
+        var schedules = new List<Schedule>();
+
+        using var connection = new SqliteConnection($"Data Source={_dbPath}");
+        connection.Open();
+
+        var cmd = connection.CreateCommand();
+        cmd.CommandText = @"
+            SELECT Id, ScheduleName, CronExpression, IsEnabled, CreatedAt, UpdatedAt
+            FROM Schedule
+            WHERE IsEnabled = 1
+            ORDER BY Id";
+
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
+        {
+            var schedule = new Schedule
+            {
+                Id = reader.GetInt32(reader.GetOrdinal("Id")),
+                ScheduleName = reader.GetString(reader.GetOrdinal("ScheduleName")),
+                CronExpression = reader.GetString(reader.GetOrdinal("CronExpression")),
+                IsEnabled = reader.GetBoolean(reader.GetOrdinal("IsEnabled")),
+                CreatedAt = DateTime.Parse(reader.GetString(reader.GetOrdinal("CreatedAt"))),
+                UpdatedAt = DateTime.Parse(reader.GetString(reader.GetOrdinal("UpdatedAt")))
+            };
+
+            schedules.Add(schedule);
+        }
+
+        _logger.LogInformation("Loaded {Count} enabled schedule(s)", schedules.Count);
+        return schedules;
+    }
+
+    public List<int> LoadScheduleApiNumbers(int scheduleId)
+    {
+        _logger.LogDebug("Loading API numbers for Schedule #{ScheduleId}", scheduleId);
+
+        var apiNumbers = new List<int>();
+
+        using var connection = new SqliteConnection($"Data Source={_dbPath}");
+        connection.Open();
+
+        var cmd = connection.CreateCommand();
+        cmd.CommandText = @"
+            SELECT ApiNumber
+            FROM ScheduleApi
+            WHERE ScheduleId = @ScheduleId
+            ORDER BY ExecutionOrder";
+        cmd.Parameters.AddWithValue("@ScheduleId", scheduleId);
+
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
+        {
+            apiNumbers.Add(reader.GetInt32(0));
+        }
+
+        _logger.LogDebug("Schedule #{ScheduleId} has {Count} API(s) assigned", scheduleId, apiNumbers.Count);
+        return apiNumbers;
+    }
+
+    public (string? username, string? password, string? token, DateTime? tokenExpiresAt) LoadAuthCredentials(string baseUrl)
+    {
+        _logger.LogDebug("Loading auth credentials for BaseUrl={BaseUrl}", baseUrl);
+
+        using var connection = new SqliteConnection($"Data Source={_dbPath}");
+        connection.Open();
+
+        var cmd = connection.CreateCommand();
+        cmd.CommandText = @"
+            SELECT Username, Password, BearerToken, TokenExpiresAt
+            FROM ApiAuth
+            WHERE BaseUrl = @BaseUrl";
+        cmd.Parameters.AddWithValue("@BaseUrl", baseUrl);
+
+        using var reader = cmd.ExecuteReader();
+        if (!reader.Read())
+        {
+            _logger.LogWarning("No auth credentials found for BaseUrl={BaseUrl}", baseUrl);
+            return (null, null, null, null);
+        }
+
+        var username = reader.GetString(reader.GetOrdinal("Username"));
+        var password = reader.GetString(reader.GetOrdinal("Password"));
+
+        string? token = null;
+        DateTime? tokenExpiresAt = null;
+
+        if (!reader.IsDBNull(reader.GetOrdinal("BearerToken")))
+        {
+            token = reader.GetString(reader.GetOrdinal("BearerToken"));
+        }
+
+        if (!reader.IsDBNull(reader.GetOrdinal("TokenExpiresAt")))
+        {
+            tokenExpiresAt = DateTime.Parse(reader.GetString(reader.GetOrdinal("TokenExpiresAt")));
+        }
+
+        return (username, password, token, tokenExpiresAt);
+    }
+
+    public void UpdateAuthToken(string baseUrl, string token, DateTime expiresAt)
+    {
+        _logger.LogDebug("Updating auth token for BaseUrl={BaseUrl}, expires at {ExpiresAt}", baseUrl, expiresAt);
+
+        using var connection = new SqliteConnection($"Data Source={_dbPath}");
+        connection.Open();
+
+        var cmd = connection.CreateCommand();
+        cmd.CommandText = @"
+            UPDATE ApiAuth
+            SET BearerToken = @Token,
+                TokenExpiresAt = @ExpiresAt,
+                UpdatedAt = CURRENT_TIMESTAMP
+            WHERE BaseUrl = @BaseUrl";
+        cmd.Parameters.AddWithValue("@Token", token);
+        cmd.Parameters.AddWithValue("@ExpiresAt", expiresAt.ToString("O"));
+        cmd.Parameters.AddWithValue("@BaseUrl", baseUrl);
+
+        var rowsAffected = cmd.ExecuteNonQuery();
+
+        if (rowsAffected == 0)
+        {
+            _logger.LogWarning("No auth record found to update for BaseUrl={BaseUrl}", baseUrl);
+        }
+        else
+        {
+            _logger.LogInformation("Updated auth token for BaseUrl={BaseUrl}", baseUrl);
+        }
     }
 }

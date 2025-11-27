@@ -91,36 +91,14 @@ public class PdfBrowserManager : IAsyncDisposable
         var page = await browser.NewPageAsync();
         page.DefaultNavigationTimeout = (int)TimeSpan.FromSeconds(_config.NavigationTimeoutSeconds).TotalMilliseconds;
 
-        // Inject authentication if provided
-        if (!string.IsNullOrEmpty(bearerToken))
+        // DO NOT inject Authorization header - it breaks CORS for fonts/images
+        // Token is injected into localStorage by SubActionExecutor, page uses it from there
+        // Only set User-Agent to appear as normal browser
+        await page.SetExtraHttpHeadersAsync(new Dictionary<string, string>
         {
-            await page.SetExtraHttpHeadersAsync(new Dictionary<string, string>
-            {
-                ["Authorization"] = $"Bearer {bearerToken}",
-                ["Accept"] = "*/*",
-                ["Accept-Language"] = "en-US,en;q=0.9",
-                ["X-Requested-With"] = "XMLHttpRequest",
-                ["WarehouseId"] = _apiConfig.WarehouseId.ToString(),
-                ["Origin"] = _apiConfig.BaseUrl.TrimEnd('/'),
-                ["Referer"] = _apiConfig.BaseUrl.TrimEnd('/') + "/",
-                ["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
-            });
-            _logger.LogDebug("Injected Bearer token into page headers");
-        }
-        else
-        {
-            // Set standard headers even without bearer token
-            await page.SetExtraHttpHeadersAsync(new Dictionary<string, string>
-            {
-                ["Accept"] = "*/*",
-                ["Accept-Language"] = "en-US,en;q=0.9",
-                ["X-Requested-With"] = "XMLHttpRequest",
-                ["WarehouseId"] = _apiConfig.WarehouseId.ToString(),
-                ["Origin"] = _apiConfig.BaseUrl.TrimEnd('/'),
-                ["Referer"] = _apiConfig.BaseUrl.TrimEnd('/') + "/",
-                ["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
-            });
-        }
+            ["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+        });
+        _logger.LogDebug("Configured page headers (token will be used from localStorage by page's JavaScript)");
 
         if (cookies != null && cookies.Count > 0)
         {
@@ -194,7 +172,8 @@ public class PdfBrowserManager : IAsyncDisposable
                             }
                             catch { /* ignore body read issues */ }
                         }
-                        _logger.LogDebug("[NET] {Status} {Url} {Body}", statusCode, Truncate(url, 200), string.IsNullOrEmpty(bodySnippet) ? "" : Truncate(bodySnippet, 350));
+                        // Trace level to reduce log verbosity - only shown if explicitly enabled
+                        _logger.LogTrace("[NET] {Status} {Url}", statusCode, Truncate(url, 200));
                     }
                 }
                 catch (Exception ex)
@@ -241,23 +220,14 @@ public class PdfBrowserManager : IAsyncDisposable
         var page = await isolatedBrowser.NewPageAsync();
         page.DefaultNavigationTimeout = (int)TimeSpan.FromSeconds(_config.NavigationTimeoutSeconds).TotalMilliseconds;
 
-        // Inject authentication if provided (duplicate logic for isolation)
+        // DO NOT inject Authorization header - it breaks CORS for fonts/images
+        // Token should be injected into localStorage by caller, page uses it from there
         var headers = new Dictionary<string,string>
         {
-            ["Accept"] = "*/*",
-            ["Accept-Language"] = "en-US,en;q=0.9",
-            ["X-Requested-With"] = "XMLHttpRequest",
-            ["WarehouseId"] = _apiConfig.WarehouseId.ToString(),
-            ["Origin"] = _apiConfig.BaseUrl.TrimEnd('/') ,
-            ["Referer"] = _apiConfig.BaseUrl.TrimEnd('/') + "/",
             ["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
         };
-        if (!string.IsNullOrEmpty(bearerToken))
-        {
-            headers["Authorization"] = $"Bearer {bearerToken}";
-        }
         await page.SetExtraHttpHeadersAsync(headers);
-        if (!string.IsNullOrEmpty(bearerToken)) _logger.LogDebug("(Isolated) Injected Bearer token into page headers");
+        _logger.LogDebug("(Isolated) Configured page headers (token will be used from localStorage by page's JavaScript)");
 
         if (cookies != null && cookies.Count > 0)
         {
@@ -327,7 +297,8 @@ public class PdfBrowserManager : IAsyncDisposable
                             }
                             catch { }
                         }
-                        _logger.LogDebug("(Isolated)[NET] {Status} {Url} {Body}", statusCode, Truncate(url,200), string.IsNullOrEmpty(bodySnippet)?"":Truncate(bodySnippet,350));
+                        // Trace level to reduce log verbosity - only shown if explicitly enabled
+                        _logger.LogTrace("(Isolated)[NET] {Status} {Url}", statusCode, Truncate(url,200));
                     }
                 }
                 catch (Exception ex)

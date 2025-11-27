@@ -21,8 +21,11 @@ public class WindowsPdfPrinter : IPdfPrinter
     }
 
     public Task PrintAsync(byte[] pdfBytes, string jobName, CancellationToken ct)
+        => PrintAsync(pdfBytes, jobName, null, ct);
+
+    public Task PrintAsync(byte[] pdfBytes, string jobName, string? printerName, CancellationToken ct)
     {
-        var printer = _config.PrinterName ?? _config.FallbackPrinterName;
+        var printer = printerName ?? _config.PrinterName ?? _config.FallbackPrinterName;
         if (string.IsNullOrWhiteSpace(printer))
         {
             throw new InvalidOperationException("PrinterName is not configured.");

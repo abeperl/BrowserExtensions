@@ -31,10 +31,22 @@ public class PdfPrintService
         await _printer.PrintAsync(pdfBytes, jobName, ct);
     }
 
+    public async Task PrintUrlAsync(string url, string jobName, string? printerName, CancellationToken ct)
+    {
+        var pdfBytes = await RenderUrlToPdfAsync(url, ct);
+        await _printer.PrintAsync(pdfBytes, jobName, printerName, ct);
+    }
+
     public async Task PrintHtmlAsync(string html, string jobName, CancellationToken ct)
     {
         var pdfBytes = await RenderHtmlToPdfAsync(html, ct);
         await _printer.PrintAsync(pdfBytes, jobName, ct);
+    }
+
+    public async Task PrintHtmlAsync(string html, string jobName, string? printerName, CancellationToken ct)
+    {
+        var pdfBytes = await RenderHtmlToPdfAsync(html, ct);
+        await _printer.PrintAsync(pdfBytes, jobName, printerName, ct);
     }
 
     /// <summary>
@@ -43,6 +55,12 @@ public class PdfPrintService
     /// </summary>
     public Task PrintPdfBytesAsync(byte[] pdfBytes, string jobName, CancellationToken ct)
         => _printer.PrintAsync(pdfBytes, jobName, ct);
+
+    /// <summary>
+    /// Directly print already-generated PDF bytes to a specific printer.
+    /// </summary>
+    public Task PrintPdfBytesAsync(byte[] pdfBytes, string jobName, string? printerName, CancellationToken ct)
+        => _printer.PrintAsync(pdfBytes, jobName, printerName, ct);
 
     public async Task<byte[]> RenderUrlToPdfAsync(string url, CancellationToken ct)
     {
@@ -131,13 +149,33 @@ public class PdfPrintService
             }
         };
 
-        if (_pdfConfig.PageWidthInches.HasValue && _pdfConfig.PageHeightInches.HasValue)
+        // When explicit Width/Height are set, Landscape property is ignored by PuppeteerSharp
+        // Only use explicit dimensions if Landscape=true, otherwise use standard Letter format
+        if (_pdfConfig.Landscape && _pdfConfig.PageWidthInches.HasValue && _pdfConfig.PageHeightInches.HasValue)
         {
+            // For landscape with custom dimensions, set width (larger) and height (smaller)
+            pdfOptions.Width = $"{_pdfConfig.PageHeightInches.Value}in";  // Swap for landscape
+            pdfOptions.Height = $"{_pdfConfig.PageWidthInches.Value}in";  // Swap for landscape
+        }
+        else if (!_pdfConfig.Landscape)
+        {
+            // For portrait, use standard Letter format instead of explicit dimensions
+            // This ensures the Landscape=false setting is respected
+            pdfOptions.Format = PaperFormat.Letter;
+        }
+        else if (_pdfConfig.PageWidthInches.HasValue && _pdfConfig.PageHeightInches.HasValue)
+        {
+            // Fallback: custom dimensions without landscape
             pdfOptions.Width = $"{_pdfConfig.PageWidthInches.Value}in";
             pdfOptions.Height = $"{_pdfConfig.PageHeightInches.Value}in";
         }
 
-        _logger.LogInformation("Generating PDF (Landscape={Landscape}, Bg={Bg})", pdfOptions.Landscape, pdfOptions.PrintBackground);
+        _logger.LogInformation("Generating PDF (Landscape={Landscape}, Format={Format}, W={W}, H={H}, Bg={Bg})",
+            pdfOptions.Landscape,
+            pdfOptions.Format?.ToString() ?? "Custom",
+            pdfOptions.Width ?? "Auto",
+            pdfOptions.Height ?? "Auto",
+            pdfOptions.PrintBackground);
         var bytes = await page.PdfDataAsync(pdfOptions);
         _logger.LogInformation("Generated PDF with {Length} bytes", bytes.Length);
         return bytes;
