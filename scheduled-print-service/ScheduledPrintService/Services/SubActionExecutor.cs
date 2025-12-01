@@ -2314,36 +2314,77 @@ public class SubActionExecutor : ISubActionExecutor
                             print-color-adjust: exact;
                         }
                     }
+                    .customer-highlight {
+                        background-color: #000 !important;
+                        color: #fff !important;
+                        font-weight: bold !important;
+                        font-size: 1.4em !important;
+                        padding: 8px 12px !important;
+                        display: inline-block !important;
+                        margin: 4px 0 !important;
+                        border-radius: 4px !important;
+                        border: 2px solid #000 !important;
+                    }
                 `;
                 document.head.appendChild(style);
 
-                // Customer highlighting (highlight customer name in bold/red for better visibility)
+                // Find and style CUSTOMER field (label + value)
                 let customerStyledCount = 0;
-                const customerNameElement = document.querySelector('.customer-name, [class*=""customer""]');
-                if (customerNameElement) {
-                    const text = customerNameElement.textContent.trim();
-                    if (text && text.length > 0) {
-                        // Find all elements containing this customer name and style them
-                        document.querySelectorAll('*').forEach(el => {
-                            if (el.textContent.includes(text) && el.children.length === 0) {
-                                el.style.fontWeight = 'bold';
-                                el.style.color = '#d32f2f';
-                                customerStyledCount++;
-                            } else {
-                                // Check parent's full text for 'CUSTOMER: [name]' pattern
-                                const parent = el.closest('div, td, th, p, span');
-                                if (parent) {
-                                    const parentText = parent.textContent.trim();
-                                    const allText = parentText.replace(/\s+/g, ' ');
-                                    if (allText.match(/CUSTOMER:\s*/ + text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))) {
-                                        el.classList.add('customer-highlight');
-                                        customerStyledCount++;
-                                    }
-                                }
-                            }
-                        });
-                    }
+
+                // Method 1: Target the exact structure - span with data-bind='Customers'
+                const customerValueSpan = document.querySelector('span[data-bind=""Customers""]');
+                if (customerValueSpan) {
+                    customerValueSpan.classList.add('customer-highlight');
+                    customerStyledCount++;
+                    console.log('Applied customer-highlight to span[data-bind=""Customers""]:', customerValueSpan.textContent);
                 }
+
+                // Method 2: Find label containing 'Customer' text and get next sibling span
+                const allLabels = Array.from(document.querySelectorAll('label'));
+                allLabels.forEach(label => {
+                    const labelText = label.textContent?.trim() || '';
+                    if (labelText.toLowerCase().includes('customer') && labelText.includes(':')) {
+                        const nextSibling = label.nextElementSibling;
+                        if (nextSibling && nextSibling.tagName === 'SPAN' && nextSibling.classList.contains('form-control')) {
+                            nextSibling.classList.add('customer-highlight');
+                            customerStyledCount++;
+                            console.log('Applied customer-highlight to label sibling span:', nextSibling.textContent);
+                        }
+                    }
+                });
+
+                // Method 3: Fallback - search all elements for the patterns (case-insensitive)
+                const allElements = Array.from(document.querySelectorAll('*'));
+                allElements.forEach(el => {
+                    const text = el.textContent?.trim() || '';
+
+                    // Look for element containing 'CUSTOMER:' or 'Customer:' label combined with value
+                    if ((text.toUpperCase().startsWith('CUSTOMER:') || text.match(/^Customer\s*:/i)) && text.length < 100) {
+                        el.classList.add('customer-highlight');
+                        customerStyledCount++;
+                    }
+                    // Look for the value separately if it's in a different element (previous sibling check)
+                    else if (el.previousElementSibling) {
+                        const prevText = el.previousElementSibling.textContent?.trim() || '';
+                        if ((prevText.toUpperCase() === 'CUSTOMER:' || prevText.match(/^Customer\s*:$/i)) && text.length > 2 && text.length < 100 && !text.includes(':')) {
+                            el.classList.add('customer-highlight');
+                            customerStyledCount++;
+                        }
+                    }
+                    // Look for parent element that contains CUSTOMER: label
+                    else if (el.parentElement) {
+                        const parentText = el.parentElement.textContent?.trim() || '';
+                        if ((parentText.toUpperCase().includes('CUSTOMER:') || parentText.match(/Customer\s*:/i)) && text.length > 2 && text.length < 100 && !text.includes(':') && !text.match(/^Customer\s*:?$/i)) {
+                            // Check if this is the customer value (not another label)
+                            const allText = parentText.replace(/\s+/g, ' ');
+                            const escapedText = text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                            if (allText.match(new RegExp('Customer\\s*:\\s*' + escapedText, 'i'))) {
+                                el.classList.add('customer-highlight');
+                                customerStyledCount++;
+                            }
+                        }
+                    }
+                });
 
                 // Hide any element with heading or title containing 'Short Items' or 'ShortItems'
                 const shortItemsElements = [];

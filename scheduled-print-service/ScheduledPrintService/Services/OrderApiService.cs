@@ -374,7 +374,7 @@ public class OrderApiService : IOrderApiService
                         if (!ApplyPrimaryFilter(item, config))
                         {
                             filteredOutItems++;
-                            _logger.LogDebug("Item filtered out by primary API filter: {FilterType}", config.PrimaryFilterType);
+                            // Removed debug log to reduce log clutter
                             continue; // Skip this item
                         }
                     }
