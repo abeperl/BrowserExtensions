@@ -5,6 +5,12 @@
 --              and printing custom forms (HTML to PDF)
 -- =====================================================
 
+-- Delete existing data for idempotency
+DELETE FROM ScheduleApi WHERE ApiNumber = 3;
+DELETE FROM Schedule WHERE ScheduleName = 'Personalized Orders Print Schedule';
+DELETE FROM SubAction WHERE PrimaryApiId IN (SELECT Id FROM PrimaryApi WHERE ApiNumber = 3);
+DELETE FROM PrimaryApi WHERE ApiNumber = 3;
+
 -- 1. Insert Primary API configuration for GetPersonalizedOrderItems
 INSERT INTO PrimaryApi (
     ApiNumber,
@@ -43,7 +49,7 @@ INSERT INTO SubAction (
     ExecutionOrder,
     IsEnabled
 ) VALUES (
-    3,  -- Links to PrimaryApi.Id where ApiNumber=3
+    (SELECT Id FROM PrimaryApi WHERE ApiNumber = 3),  -- Links to PrimaryApi.Id where ApiNumber=3
     1,  -- First sub-action
     'Print Custom Forms',
     'GetUrlAndPrint',  -- Uses Puppeteer to fetch URL and print to PDF
@@ -56,19 +62,15 @@ INSERT INTO SubAction (
 -- 3. Create corresponding Schedule entry (optional - can be enabled/disabled as needed)
 INSERT INTO Schedule (
     ScheduleName,
-    ScheduleType,
     CronExpression,
-    IntervalSeconds,
     IsEnabled,
-    Description,
-    CreatedAt
+    CreatedAt,
+    UpdatedAt
 ) VALUES (
     'Personalized Orders Print Schedule',
-    'Interval',  -- or 'Cron' if you want cron-based scheduling
-    NULL,  -- CronExpression (null for interval-based)
-    3600,  -- Run every hour (3600 seconds)
-    0,     -- Disabled by default - enable manually when ready
-    'Fetches personalized order items and prints custom forms for items with non-empty itemNotes containing file paths',
+    '0 * * * *',  -- Run every hour (cron format)
+    0,            -- Disabled by default - enable manually when ready
+    CURRENT_TIMESTAMP,
     CURRENT_TIMESTAMP
 );
 
@@ -92,14 +94,18 @@ INSERT INTO ScheduleApi (
 -- 3. The endpoint will be constructed as:
 --    https://mj.3plnext.com/Store/CustomForms/SW4425/SW4425_63725.html
 -- 4. The service will automatically filter for non-empty itemNotes
--- 5. Adjust the IntervalSeconds in Schedule table as needed
+-- 5. Default schedule is '0 * * * *' (every hour). Adjust CronExpression as needed:
+--    - Every 30 min: '*/30 * * * *'
+--    - Every 15 min: '*/15 * * * *'
+--    - Every 5 min:  '*/5 * * * *'
 -- 6. Enable the schedule by setting IsEnabled=1 when ready to activate
 --
 -- To enable the schedule:
--- UPDATE Schedule SET IsEnabled = 1 WHERE ScheduleName = 'Personalized Orders Print Schedule';
+-- UPDATE Schedule SET IsEnabled = 1, UpdatedAt = CURRENT_TIMESTAMP
+-- WHERE ScheduleName = 'Personalized Orders Print Schedule';
 --
 -- To check current configuration:
 -- SELECT * FROM PrimaryApi WHERE ApiNumber = 3;
--- SELECT * FROM SubAction WHERE PrimaryApiId = 3;
+-- SELECT s.* FROM SubAction s JOIN PrimaryApi p ON s.PrimaryApiId = p.Id WHERE p.ApiNumber = 3;
 -- SELECT * FROM Schedule WHERE ScheduleName = 'Personalized Orders Print Schedule';
 -- =====================================================

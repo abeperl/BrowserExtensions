@@ -1,129 +1,138 @@
-# Scheduled Print Service (Prototype)
+# Scheduled Print Service
 
-Prototype Windows service for unattended HTML → PDF rendering and output. Uses PuppeteerSharp to render either a URL or raw HTML, then:
-- File mode: writes PDFs to an output directory (default)
-- Windows mode: spools raw PDF bytes to a named Windows printer (requires PDF-capable printer)
+Automated print service that polls APIs, processes orders, and generates PDFs for printing.
 
-Includes a simple scheduler that fetches HTML from configured URLs periodically, avoids duplicates, and can email on failures.
+## 📁 Project Structure
 
-## Features
-* Headless Chromium auto-download (cache configurable)
-* Render URL or HTML to PDF (background + landscape configurable)
-* File-based PDF output for easy validation
-* Single-run demo mode (prints configured Demo.Url then exits)
-* Serilog logging to console + rolling file
-
-## Configuration (`appsettings.json`)
-```jsonc
-{
-  "Pdf": { "ChromiumDownloadMode": "Auto", "CacheDirectory": "chromium-cache" },
-  "Printer": { "Mode": "File", "OutputDirectory": "out" },
-  "Demo": { "Enabled": true, "Url": "https://example.com", "OutputFilePrefix": "demo" }
-}
+```
+scheduled-print-service/
+├── ScheduledPrintService/     # Main C# project
+│   ├── Services/              # Service implementations
+│   ├── Models/                # Data models
+│   ├── appsettings.json       # Configuration
+│   └── Program.cs             # Entry point
+├── docs/                      # Documentation
+│   ├── README.md              # Main documentation
+│   ├── INSTALL.md             # Installation guide
+│   ├── API-POLLING-GUIDE.md   # API configuration
+│   ├── CHAINING-GUIDE.md      # Action chaining
+│   ├── MONITORING-GUIDE.md    # Monitoring & logs
+│   └── TOKEN-RENEWAL.md       # Authentication
+├── scripts/                   # PowerShell & SQL scripts
+│   ├── install-service.ps1    # Service installation
+│   ├── deploy-*.ps1           # Deployment scripts
+│   ├── configure-*.ps1        # Setup scripts
+│   └── *.sql                  # Database migrations
+├── data/                      # Runtime data (not in git)
+│   ├── api_config.db          # SQLite database
+│   └── *.txt                  # Output files
+├── logs/                      # Application logs
+├── out/                       # Generated PDFs
+└── screenshots/               # Diagnostic screenshots
 ```
 
-### Dynamic / SPA Content Rendering
-If your HTML contains client-side JavaScript that performs XHR/`fetch()` calls (e.g. React / Vue SPA fragments) the DOM may not be fully populated when the initial HTML is set. Two optional settings were added to the `Pdf` section to improve capture reliability:
+## 🚀 Quick Start
 
-```jsonc
-"Pdf": {
-  "WaitForNetworkIdleMs": 3000,        // Extra delay after load for late rendering (0 = disabled)
-  "WaitForSelector": "#data-loaded"   // Wait for a specific element to appear (empty = disabled)
-}
-```
-The print workflow now attempts:
-1. `SetContentAsync` of provided HTML
-2. Optional `WaitForSelector`
-3. Attempt a non-fatal network idle wait
-4. Optional fixed delay (`WaitForNetworkIdleMs`)
-
-Adjust these values if printed PDFs are missing data loaded asynchronously. Prefer a specific selector over long fixed delays for faster, more deterministic output.
-
-## Run (Development)
-```powershell
-dotnet restore .\scheduled-print-service\ScheduledPrintService\ScheduledPrintService.csproj
-dotnet run --project .\scheduled-print-service\ScheduledPrintService\ScheduledPrintService.csproj
-```
-
-By default, artifacts (out/logs/chromium-cache/printed-urls.txt) are placed under `%ProgramData%/ScheduledPrintService`.
-
-To keep development artifacts inside this repo under `scheduled-print-service/`, set an environment override before running:
+### 1. Installation
+See [docs/INSTALL.md](docs/INSTALL.md) for complete installation instructions.
 
 ```powershell
-# for current session
-$env:SCHEDULED_PRINT_DATA_ROOT = (Resolve-Path ".\scheduled-print-service").Path
-"Data root set to $env:SCHEDULED_PRINT_DATA_ROOT"
-
-# reset to default ProgramData behavior
-Remove-Item Env:\SCHEDULED_PRINT_DATA_ROOT -ErrorAction SilentlyContinue
+# Run as Administrator
+cd ScheduledPrintService
+.\install-service.ps1
 ```
 
-PDFs appear under `<DataRoot>/out`, logs under `<DataRoot>/logs`, Chromium cache under `<DataRoot>/<CacheDirectory>`.
+### 2. Configuration
+Configure API endpoints and credentials:
 
-## Configuration
-Settings live in `ScheduledPrintService\appsettings.json` and are copied to the output folder at build.
-
-Key sections:
-- Pdf: Chromium download/cache and PDF page options.
-  - `WaitForNetworkIdleMs`: Extra post-load delay (milliseconds) to allow async data binding to finish.
-  - `WaitForSelector`: CSS selector whose presence signals readiness; skips if blank or not found before timeout.
-- Printer:
-  - `Mode`: `File` or `Windows`
-  - `OutputDirectory`: used in File mode
-  - `PrinterName`/`FallbackPrinterName`: used in Windows mode
-- Scheduler:
-  - `Enabled`: set true to run periodic jobs
-  - `IntervalSeconds`: poll interval
-  - `Urls`: array of URLs to fetch and print
-  - `PrintedStorePath`: file storing printed keys to avoid duplicates
-- Email: SMTP settings; send once per cycle on failures when `Enabled=true`.
-
-Example toggles:
-```jsonc
-{
-  "Printer": { "Mode": "File", "OutputDirectory": "out" },
-  "Scheduler": { "Enabled": true, "IntervalSeconds": 120, "Urls": ["https://example.com"] },
-  "Demo": { "Enabled": false }
-}
+```powershell
+cd scripts
+.\configure-database.ps1
 ```
 
-## Windows Printing (optional)
-Set `Printer:Mode` to `Windows` and specify `PrinterName`. This sends raw PDF bytes to the Windows spooler. Your printer must natively support PDF (many modern network printers do). If not, keep `Mode=File` or introduce a PDF-to-XPS/PS converter.
-
-## Planned Next Steps
-1. API polling & ID tracking (SQLite) for production job queue.
-2. Real printer integration (Windows spooler / IP-based).
-3. Failure notification (SMTP / webhook).
-4. Health endpoint and service installer script.
-
-## Notes
-* This prototype intentionally avoids solution file modification for minimal impact.
-* Ensure adequate disk space for Chromium download (~150MB).
-* If config changes don't seem to take effect, confirm `appsettings.json` is present in the output folder and that logs show: `Config Flags => Demo.Enabled=... Scheduler.Enabled=...`.
-* For dev cleanup, you can run `scheduled-print-service/dev-move-artifacts.ps1` to move any stray `logs/`, `out/`, `chromium-cache/`, `printed-urls.txt`, `output.txt`, `error.txt` from repo root into `scheduled-print-service/`.
-* IMPORTANT: When using the helper scripts, invoke them from the existing shell (e.g. `powershell -ExecutionPolicy Bypass -File .\scheduled-print-service\dev-use-local-data.ps1` OR simply `./scheduled-print-service/dev-use-local-data.ps1`). Avoid starting a new pwsh instance that then exits, or the environment variable will not persist for the subsequent run.
-
-## API polling and batch picklist sub-action
-When `Api.Enabled=true`, the service polls `GetOrdersList` and executes configured `SubActions`.
-
-To create pending order picklists in batches of ~10 IDs, add this sub-action to `Api.SubActions` in `appsettings.json`:
-
-```jsonc
-{
-  "Type": "CreatePicklistBatch",
-  "Name": "Create Pending Order Picklist Batch",
-  "Endpoint": "/api/PickList/CreatePendingOrderPicklist",
-  "Method": "POST",
-  "BatchSize": 10,
-  "QuickShip": false,
-  "ContinueOnError": true
-}
+### 3. Start Service
+```powershell
+Start-Service ScheduledPrintService
 ```
 
-This runs once per poll cycle, batching the current list of order IDs and POSTing a payload like:
+## 📚 Documentation
 
-```json
-{ "orderId": [2470,2482,2479,2478,2477,2476,2473,2472,2471,2468], "QuickShip": false }
+- **[Main Documentation](docs/README.md)** - Complete feature documentation
+- **[Installation Guide](docs/INSTALL.md)** - Step-by-step setup
+- **[API Configuration](docs/API-POLLING-GUIDE.md)** - Configure API endpoints
+- **[Monitoring Guide](docs/MONITORING-GUIDE.md)** - Logs and troubleshooting
+- **[Token Renewal](docs/TOKEN-RENEWAL.md)** - Authentication setup
+
+## 🛠️ Development
+
+### Build
+```bash
+dotnet build --configuration Release
 ```
 
-Authentication headers, WarehouseId, and cookies are taken from `Api` settings.
+### Publish
+```bash
+dotnet publish --configuration Release --output publish
+```
+
+### Deploy to Server
+```powershell
+cd scripts
+.\deploy-to-server.ps1
+```
+
+## 📋 Features
+
+- **API Polling**: Automated polling of multiple REST APIs
+- **PDF Generation**: Convert web pages to PDFs using Puppeteer
+- **Automatic Printing**: Send PDFs to network printers
+- **Token Renewal**: Automatic authentication token management
+- **Action Chaining**: Complex workflows with multiple steps
+- **Database Tracking**: SQLite for processed order tracking
+- **Configurable Schedules**: Cron-based API polling
+- **Error Handling**: Retry logic and comprehensive logging
+
+## 🔧 Key Scripts
+
+| Script | Purpose |
+|--------|---------|
+| `install-service.ps1` | Install Windows service |
+| `deploy-to-server.ps1` | Deploy to production |
+| `configure-database.ps1` | Set up database |
+| `check-database.ps1` | Verify database schema |
+| `diagnose-logs.ps1` | Analyze service logs |
+
+## 📊 APIs Configured
+
+1. **API #1** - Picklists (Polling)
+2. **API #2** - Pending Orders (Polling)
+3. **API #3** - Personalized Orders (Polling)
+4. **API #4** - On-Demand Picklists (Manual trigger)
+
+## 🐛 Troubleshooting
+
+### View Logs
+```powershell
+Get-Content "logs\log-$(Get-Date -Format 'yyyyMMdd').txt" -Wait -Tail 50
+```
+
+### Check Service Status
+```powershell
+Get-Service ScheduledPrintService
+```
+
+### Database Issues
+```powershell
+cd scripts
+.\check-database.ps1
+```
+
+See [Monitoring Guide](docs/MONITORING-GUIDE.md) for detailed troubleshooting.
+
+## 📝 License
+
+Internal use only.
+
+## 🔗 Related Projects
+
+Part of the BrowserExtensions repository - automated workflows for 3PL operations.

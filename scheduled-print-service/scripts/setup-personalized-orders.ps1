@@ -33,9 +33,13 @@ param(
 $ErrorActionPreference = "Stop"
 
 # Check if sqlite3 is available
-$sqlite3Path = Get-Command sqlite3 -ErrorAction SilentlyContinue
-if (-not $sqlite3Path) {
-    Write-Error "sqlite3 not found. Please install SQLite3 command-line tools."
+$sqlite3Path = $null
+if (Test-Path ".\sqlite3.exe") {
+    $sqlite3Path = ".\sqlite3.exe"
+} elseif (Get-Command sqlite3 -ErrorAction SilentlyContinue) {
+    $sqlite3Path = "sqlite3"
+} else {
+    Write-Error "sqlite3 not found. Please install SQLite3 command-line tools or place sqlite3.exe in the current directory."
     exit 1
 }
 
@@ -59,7 +63,7 @@ function Invoke-Sqlite {
         [switch]$ShowResults
     )
 
-    $output = & sqlite3 $DatabasePath $Query 2>&1
+    $output = & $sqlite3Path $DatabasePath $Query 2>&1
 
     if ($LASTEXITCODE -ne 0) {
         Write-Error "SQL execution failed: $output"
@@ -87,10 +91,10 @@ if ($ApplyMigration) {
 
     # Execute migration
     Write-Host "Executing SQL migration..." -ForegroundColor Yellow
-    & sqlite3 $DatabasePath < ".\add-personalized-orders-api.sql"
+    Get-Content ".\add-personalized-orders-api.sql" -Raw | & $sqlite3Path $DatabasePath
 
     if ($LASTEXITCODE -eq 0) {
-        Write-Host "✓ Migration applied successfully!" -ForegroundColor Green
+        Write-Host "[OK] Migration applied successfully!" -ForegroundColor Green
     } else {
         Write-Error "Migration failed!"
         exit 1
@@ -118,7 +122,7 @@ WHERE ApiNumber = 3;
 "@
 
         if (Invoke-Sqlite -Query $sql) {
-            Write-Host "✓ Bearer token updated" -ForegroundColor Green
+            Write-Host "[OK] Bearer token updated" -ForegroundColor Green
         }
     }
 
@@ -140,7 +144,7 @@ WHERE ApiNumber = 3;
 "@
 
         if (Invoke-Sqlite -Query $sql) {
-            Write-Host "✓ Cookie updated" -ForegroundColor Green
+            Write-Host "[OK] Cookie updated" -ForegroundColor Green
         }
     }
     Write-Host ""
@@ -170,11 +174,11 @@ WHERE p.ApiNumber = 3;
 
     # Check Schedule
     Write-Host "Schedule Configuration:" -ForegroundColor Cyan
-    $sql = "SELECT ScheduleName, IntervalSeconds, IsEnabled FROM Schedule WHERE ScheduleName = 'Personalized Orders Print Schedule';"
+    $sql = "SELECT ScheduleName, CronExpression, IsEnabled FROM Schedule WHERE ScheduleName = 'Personalized Orders Print Schedule';"
     Invoke-Sqlite -Query $sql -ShowResults
     Write-Host ""
 
-    Write-Host "✓ Verification complete" -ForegroundColor Green
+    Write-Host "[OK] Verification complete" -ForegroundColor Green
     Write-Host ""
 }
 
@@ -182,14 +186,24 @@ WHERE p.ApiNumber = 3;
 if ($EnableSchedule) {
     Write-Host "Enabling schedule..." -ForegroundColor Yellow
 
+    # Convert interval seconds to cron expression (simplified)
+    $cronExpression = "0 * * * *"  # Default: every hour
+    if ($IntervalSeconds -eq 1800) {
+        $cronExpression = "*/30 * * * *"  # Every 30 minutes
+    } elseif ($IntervalSeconds -eq 900) {
+        $cronExpression = "*/15 * * * *"  # Every 15 minutes
+    } elseif ($IntervalSeconds -eq 300) {
+        $cronExpression = "*/5 * * * *"   # Every 5 minutes
+    }
+
     $sql = @"
 UPDATE Schedule
-SET IsEnabled = 1, IntervalSeconds = $IntervalSeconds
+SET IsEnabled = 1, CronExpression = '$cronExpression', UpdatedAt = CURRENT_TIMESTAMP
 WHERE ScheduleName = 'Personalized Orders Print Schedule';
 "@
 
     if (Invoke-Sqlite -Query $sql) {
-        Write-Host "✓ Schedule enabled (interval: $IntervalSeconds seconds)" -ForegroundColor Green
+        Write-Host "[OK] Schedule enabled (cron: $cronExpression)" -ForegroundColor Green
         Write-Host ""
         Write-Host "IMPORTANT: Restart the ScheduledPrintService Windows service for changes to take effect." -ForegroundColor Yellow
         Write-Host "  Stop-Service -Name 'ScheduledPrintService'" -ForegroundColor Gray

@@ -40,6 +40,13 @@ public class ApiConfig
     // Printer name for this API (optional, uses default if not specified)
     public string? PrinterName { get; set; }
 
+    // Primary API response filtering (applied before calling sub-actions)
+    public string? PrimaryFilterArrayJsonPath { get; set; }
+    public int? PrimaryFilterArrayIndex { get; set; }
+    public string? PrimaryFilterType { get; set; }
+    public string? PrimaryFilterValue { get; set; }
+    public string? PrimaryFilterField { get; set; }
+
     // Sub-actions to perform for each order
     public List<SubAction> SubActions { get; set; } = new();
 }

@@ -2,16 +2,28 @@
 -- Migration: Update API 2 with filtering and create API 4
 -- Date: 2025-11-27
 -- Description:
---   1. Add PrinterName column to PrimaryApi table
+--   1. Add PrinterName column to PrimaryApi table (if not exists)
 --   2. Update API 2 SubActions with filter for index 17 starts with "SS"
 --   3. Create API 4 as copy of API 2 with inverse filter (NOT "SS")
 --   4. Set printer "4301" for API 4
 -- =====================================================
 
--- Step 1: Add PrinterName column to PrimaryApi table
-ALTER TABLE PrimaryApi ADD COLUMN PrinterName TEXT;
+-- Step 1: Add PrinterName column to PrimaryApi table (only if it doesn't exist)
+-- Note: SQLite doesn't support IF NOT EXISTS for ALTER TABLE ADD COLUMN
+-- We'll handle this with a conditional check in the application
+-- For now, we'll try to add it and ignore the error if it exists
+-- ALTER TABLE PrimaryApi ADD COLUMN PrinterName TEXT;
 
--- Step 2: Update API 2 Sub-Actions with filter
+-- Instead, we'll check if the column exists first
+-- If this fails, it means the column already exists, which is fine
+
+-- Step 2: Delete existing API 4 data if it exists (for idempotency)
+DELETE FROM ScheduleApi WHERE ApiNumber = 4;
+DELETE FROM Schedule WHERE ScheduleName = 'Picklist Non-SS Print Schedule';
+DELETE FROM SubAction WHERE PrimaryApiId IN (SELECT Id FROM PrimaryApi WHERE ApiNumber = 4);
+DELETE FROM PrimaryApi WHERE ApiNumber = 4;
+
+-- Step 3: Update API 2 Sub-Actions with filter
 -- First, get the current configuration
 -- We'll need to add filter properties to NavigateOnly action
 
@@ -26,7 +38,7 @@ WHERE PrimaryApiId = (SELECT Id FROM PrimaryApi WHERE ApiNumber = 2)
   AND ActionType = 'NavigateOnly'
   AND ActionNumber = 1;
 
--- Step 3: Create API 4 as a copy of API 2
+-- Step 4: Create API 4 as a copy of API 2
 -- Insert Primary API for API 4
 INSERT INTO PrimaryApi (
     ApiNumber,
@@ -54,7 +66,7 @@ SELECT
 FROM PrimaryApi
 WHERE ApiNumber = 2;
 
--- Step 4: Copy Sub-Actions from API 2 to API 4 with inverse filter
+-- Step 5: Copy Sub-Actions from API 2 to API 4 with inverse filter
 -- NavigateOnly action with NOT equals "SS" filter
 INSERT INTO SubAction (
     PrimaryApiId,
@@ -109,27 +121,23 @@ FROM SubAction
 WHERE PrimaryApiId = (SELECT Id FROM PrimaryApi WHERE ApiNumber = 2)
   AND ActionType = 'PrintCapturedHtml';
 
--- Step 5: Create Schedule for API 4 (optional - disabled by default)
+-- Step 6: Create Schedule for API 4 (optional - disabled by default)
 INSERT INTO Schedule (
     ScheduleName,
-    ScheduleType,
     CronExpression,
-    IntervalSeconds,
     IsEnabled,
-    Description,
-    CreatedAt
+    CreatedAt,
+    UpdatedAt
 )
 VALUES (
     'Picklist Non-SS Print Schedule',
-    'Interval',
-    NULL,
-    3600,  -- Every hour
-    0,     -- Disabled by default
-    'Processes picklist items where reference (index 17) does NOT start with "SS" and prints to printer 4301',
+    '0 * * * *',  -- Every hour (cron format)
+    0,            -- Disabled by default
+    CURRENT_TIMESTAMP,
     CURRENT_TIMESTAMP
 );
 
--- Step 6: Link Schedule to API 4
+-- Step 7: Link Schedule to API 4
 INSERT INTO ScheduleApi (
     ScheduleId,
     ApiNumber,
@@ -180,7 +188,7 @@ VALUES (
 -- WHERE p.ApiNumber = 4;
 
 -- 6. Check Schedule configuration
--- SELECT ScheduleName, IntervalSeconds, IsEnabled FROM Schedule
+-- SELECT ScheduleName, CronExpression, IsEnabled FROM Schedule
 -- WHERE ScheduleName LIKE '%Non-SS%';
 
 -- =====================================================

@@ -34,6 +34,8 @@ public class SubActionExecutor : ISubActionExecutor
         private PuppeteerSharp.IBrowser? _capturedBrowser; // for isolated mode cleanup
         // Last intercepted picklist JSON body (for diagnostics / potential later validation)
         private string? _lastInterceptedPicklistJson;
+        // Last saved PDF path from SaveCapturedHtml action (for PrintSavedPdf action)
+        private string? _lastSavedPdfPath;
 
     public SubActionExecutor(
         ILogger<SubActionExecutor> logger,
@@ -162,6 +164,18 @@ public class SubActionExecutor : ISubActionExecutor
                     continue;
                 }
 
+                // Apply filter if configured (skip action if filter doesn't match)
+                if (!string.IsNullOrEmpty(action.ChainedFilterType) && !string.IsNullOrEmpty(action.ChainedFilterField))
+                {
+                    var orderDict = JsonElementToDictionary(orderData);
+                    if (!ApplyChainedFilter(orderDict, action))
+                    {
+                        _logger.LogDebug("[{Num}/{Total}] {ActionName} skipped for order {OrderId} due to filter: {FilterType} on field {Field}",
+                            actionNum, activeConfig.SubActions.Count, action.Name, orderId, action.ChainedFilterType, action.ChainedFilterField);
+                        continue; // Skip this action for this order
+                    }
+                }
+
                 _logger.LogInformation("[{Num}/{Total}] {ActionName} for order {OrderId}",
                     actionNum, activeConfig.SubActions.Count, action.Name, orderId);
 
@@ -224,15 +238,25 @@ public class SubActionExecutor : ISubActionExecutor
                 break;
 
             case "geturlandprint":
-                await ExecuteGetUrlAndPrintAsync(action, orderId, new Dictionary<string, object>(), ct);
+                var context = JsonElementToDictionary(orderData);
+                await ExecuteGetUrlAndPrintAsync(action, orderId, context, ct);
                 break;
 
             case "navigateonly":
-                await ExecuteNavigateOnlyAsync(action, orderId, null, ct);
+                var navContext = JsonElementToDictionary(orderData);
+                await ExecuteNavigateOnlyAsync(action, orderId, navContext, ct);
                 break;
 
             case "printcapturedhtml":
                 await ExecutePrintCapturedHtmlAsync(action, orderId, ct);
+                break;
+
+            case "savecapturedhtml":
+                await ExecuteSaveCapturedHtmlAsync(action, orderId, ct);
+                break;
+
+            case "printsavedpdf":
+                await ExecutePrintSavedPdfAsync(action, orderId, ct);
                 break;
 
             case "delay":
@@ -860,6 +884,14 @@ public class SubActionExecutor : ISubActionExecutor
                 await ExecutePrintCapturedHtmlAsync(action, string.Empty, ct);
                 break;
 
+            case "savecapturedhtml":
+                await ExecuteSaveCapturedHtmlAsync(action, string.Empty, ct);
+                break;
+
+            case "printsavedpdf":
+                await ExecutePrintSavedPdfAsync(action, string.Empty, ct);
+                break;
+
             case "callapi":
                 await ExecuteCallApiWithContextAsync(action, context, ct);
                 break;
@@ -890,29 +922,56 @@ public class SubActionExecutor : ISubActionExecutor
 
         // Navigate to the page
         _logger.LogDebug("Navigating to {Url}", url);
-        // Strategy: First load root application shell, then set hash route via script.
-        // This avoids referrerPolicy issues seen when directly navigating to hash URLs.
-        var rootUrl = activeConfig.BaseUrl.TrimEnd('/') + "/";
-        _logger.LogDebug("Loading application shell {RootUrl} before hash navigation", rootUrl);
-        try
-        {
-            await page.GoToAsync(rootUrl, new PuppeteerSharp.NavigationOptions
-            {
-                WaitUntil = new[] { PuppeteerSharp.WaitUntilNavigation.Load },
-                Timeout = 60000
-            });
-        }
-        catch (TimeoutException ex)
-        {
-            _logger.LogWarning("Root page load timed out ({Message}), proceeding with hash navigation anyway", ex.Message);
-        }
-        _logger.LogDebug("Setting SPA hash route via script to {Url}", url);
-        await page.EvaluateExpressionAsync($"window.location.href='{url.Replace("'","%27")}'");
 
-        // Critical: Wait for hash navigation to complete and route to render
-        // Hash changes are asynchronous in SPAs - give framework time to detect and render new route
-        _logger.LogDebug("Waiting for SPA framework to detect hash change and start rendering");
-        await Task.Delay(1500, ct); // Give route detection time
+        // Detect if this is a direct file path (e.g., /Store/CustomForms/file.html) vs SPA hash route
+        var isDirectFile = url.Contains(".html", StringComparison.OrdinalIgnoreCase) &&
+                          !url.Contains("#") &&
+                          (url.Contains("/") || url.Contains("\\"));
+
+        if (isDirectFile)
+        {
+            // Direct navigation to static HTML file - no SPA shell loading needed
+            _logger.LogDebug("Direct file navigation detected (contains .html), navigating directly to {Url}", url);
+            try
+            {
+                await page.GoToAsync(url, new PuppeteerSharp.NavigationOptions
+                {
+                    WaitUntil = new[] { PuppeteerSharp.WaitUntilNavigation.Load },
+                    Timeout = 60000
+                });
+            }
+            catch (TimeoutException ex)
+            {
+                _logger.LogWarning("Direct page load timed out ({Message})", ex.Message);
+            }
+        }
+        else
+        {
+            // SPA hash navigation - load shell first, then navigate via hash
+            // Strategy: First load root application shell, then set hash route via script.
+            // This avoids referrerPolicy issues seen when directly navigating to hash URLs.
+            var rootUrl = activeConfig.BaseUrl.TrimEnd('/') + "/";
+            _logger.LogDebug("SPA navigation detected, loading application shell {RootUrl} before hash navigation", rootUrl);
+            try
+            {
+                await page.GoToAsync(rootUrl, new PuppeteerSharp.NavigationOptions
+                {
+                    WaitUntil = new[] { PuppeteerSharp.WaitUntilNavigation.Load },
+                    Timeout = 60000
+                });
+            }
+            catch (TimeoutException ex)
+            {
+                _logger.LogWarning("Root page load timed out ({Message}), proceeding with hash navigation anyway", ex.Message);
+            }
+            _logger.LogDebug("Setting SPA hash route via script to {Url}", url);
+            await page.EvaluateExpressionAsync($"window.location.href='{url.Replace("'","%27")}'");
+
+            // Critical: Wait for hash navigation to complete and route to render
+            // Hash changes are asynchronous in SPAs - give framework time to detect and render new route
+            _logger.LogDebug("Waiting for SPA framework to detect hash change and start rendering");
+            await Task.Delay(1500, ct); // Give route detection time
+        }
 
         // Wait additional time for SPA to load data
         var waitMs = action.WaitForNetworkIdleMs ?? 3000;
@@ -964,19 +1023,35 @@ public class SubActionExecutor : ISubActionExecutor
             document.head.appendChild(style);
 
             // Find and style CUSTOMER field (label + value)
+            let customerStyledCount = 0;
             const allElements = Array.from(document.querySelectorAll('*'));
             allElements.forEach(el => {
                 const text = el.textContent?.trim() || '';
-                // Look for element containing 'CUSTOMER:' label
+
+                // Method 1: Look for element containing 'CUSTOMER:' label combined with value
                 if (text.startsWith('CUSTOMER:') && text.length < 100) {
                     el.classList.add('customer-highlight');
-                    console.log('Styled customer label:', el.tagName);
+                    customerStyledCount++;
                 }
-                // Also look for the value separately if it's in a different element
-                const prevText = el.previousElementSibling?.textContent?.trim() || '';
-                if (prevText === 'CUSTOMER:' && text.length > 2 && text.length < 100 && !text.includes(':')) {
-                    el.classList.add('customer-highlight');
-                    console.log('Styled customer value:', el.tagName);
+                // Method 2: Look for the value separately if it's in a different element (previous sibling check)
+                else if (el.previousElementSibling) {
+                    const prevText = el.previousElementSibling.textContent?.trim() || '';
+                    if (prevText === 'CUSTOMER:' && text.length > 2 && text.length < 100 && !text.includes(':')) {
+                        el.classList.add('customer-highlight');
+                        customerStyledCount++;
+                    }
+                }
+                // Method 3: Look for parent element that contains CUSTOMER: label
+                else if (el.parentElement) {
+                    const parentText = el.parentElement.textContent?.trim() || '';
+                    if (parentText.includes('CUSTOMER:') && text.length > 2 && text.length < 100 && !text.includes(':') && text !== 'CUSTOMER:') {
+                        // Check if this is the customer value (not another label)
+                        const allText = parentText.replace(/\s+/g, ' ');
+                        if (allText.match(/CUSTOMER:\s*/ + text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))) {
+                            el.classList.add('customer-highlight');
+                            customerStyledCount++;
+                        }
+                    }
                 }
             });
 
@@ -999,10 +1074,9 @@ public class SubActionExecutor : ISubActionExecutor
 
             elementsToHide.forEach(el => {
                 el.style.display = 'none';
-                console.log('Hidden element:', el.tagName, el.className);
             });
 
-            console.log('PDF print styles injected');
+            console.log('PDF print styles injected. Hidden Short Items elements: ' + elementsToHide.length + ', Styled customer elements: ' + customerStyledCount);
         ");
 
         // Generate PDF
@@ -1155,721 +1229,758 @@ public class SubActionExecutor : ISubActionExecutor
 
         // Production: removed verbose console diagnostic hooks.
 
-        // Navigate to base URL first to establish domain context
-        var rootUrl = activeConfig.BaseUrl.TrimEnd('/') + "/";
-        _logger.LogDebug("Loading application shell {RootUrl} to establish domain context", rootUrl);
-        try
-        {
-            await page.GoToAsync(rootUrl, new PuppeteerSharp.NavigationOptions
-            {
-                WaitUntil = new[] { PuppeteerSharp.WaitUntilNavigation.DOMContentLoaded },
-                Timeout = 30000
-            });
-        }
-        catch (TimeoutException ex)
-        {
-            _logger.LogWarning("Root page load timed out ({Message}), continuing anyway", ex.Message);
-        }
+        // Detect if this is a direct file path (e.g., /Store/CustomForms/file.html) vs SPA hash route
+        var isDirectFile = url.Contains(".html", StringComparison.OrdinalIgnoreCase) &&
+                          !url.Contains("#") &&
+                          (url.Contains("/") || url.Contains("\\"));
 
-        // CRITICAL: Inject auth token and userData into storage IMMEDIATELY after domain is loaded
-        // This ensures the token and userData are available when we navigate to the hash route
-        try
+        if (isDirectFile)
         {
-            var storageToken = _tokenRenewal.GetCurrentToken();
-            var currentCookies = _tokenRenewal.GetCurrentCookies();
-
-            if (!string.IsNullOrWhiteSpace(storageToken))
-            {
-                await page.EvaluateFunctionAsync("t => { try { localStorage.setItem('token', t); sessionStorage.setItem('token', t); } catch(e) {} }", storageToken);
-                _logger.LogDebug("Injected token into localStorage/sessionStorage after domain load");
-            }
-
-            // Also inject userData if available (Angular app needs this)
-            if (currentCookies.TryGetValue("userData", out var userData) && !string.IsNullOrWhiteSpace(userData))
-            {
-                await page.EvaluateFunctionAsync("u => { try { localStorage.setItem('userData', u); sessionStorage.setItem('userData', u); } catch(e) {} }", userData);
-                _logger.LogDebug("Injected userData into localStorage/sessionStorage after domain load");
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogDebug(ex, "Failed to inject auth data into storage (non-fatal)");
-        }
-
-        // Wait for SPA framework readiness before setting hash (prevents early hash assignment before route handlers register)
-        try
-        {
-            _logger.LogDebug("Waiting for SPA framework (tf.page) readiness before hash route");
-            await page.WaitForFunctionAsync("() => window.tf && window.tf.page && typeof window.tf.page === 'object'", new PuppeteerSharp.WaitForFunctionOptions { Timeout = 15000 });
-            _logger.LogDebug("SPA framework ready (tf.page detected)");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning("SPA framework not detected within pre-route timeout ({Message}); proceeding with hash navigation anyway", ex.Message);
-        }
-
-        // Pre-seed global variable before and after hash navigation to ensure SPA JavaScript can access it
-        try
-        {
-            var seedId = (context != null && context.TryGetValue("pickListId", out var ctxId) ? ctxId?.ToString() : orderId) ?? string.Empty;
-            if (!string.IsNullOrWhiteSpace(seedId))
-            {
-                // Seed before navigation
-                await page.EvaluateExpressionAsync($"try{{ window.picklist_id='{seedId}'; }}catch(e){{}} ");
-            }
-        }
-        catch { /* non-fatal */ }
-
-        // Set the hash to trigger SPA routing
-        await page.EvaluateExpressionAsync($"window.location.href='{url.Replace("'","%27")}'");
-
-        // Re-seed after hash change with small delay to ensure SPA reads the variable
-        try
-        {
-            var reSeedId = (context != null && context.TryGetValue("pickListId", out var ctxId2) ? ctxId2?.ToString() : orderId) ?? string.Empty;
-            if (!string.IsNullOrWhiteSpace(reSeedId))
-            {
-                await Task.Delay(100); // Small delay for hash change to register
-                await page.EvaluateExpressionAsync($"try{{ window.picklist_id='{reSeedId}'; }}catch(e){{}} ");
-                await Task.Delay(200); // Allow SPA time to read variable before making API calls
-            }
-        }
-        catch { /* non-fatal */ }
-
-        // If configured, attempt auto-click of a row matching the id to trigger details XHR
-        if (!string.IsNullOrWhiteSpace(_pdfConfig.AutoClickRowSelector))
-        {
+            // Direct navigation to static HTML file - no SPA shell loading needed
+            _logger.LogInformation("Direct file navigation detected (contains .html), navigating directly to {Url}", url);
             try
             {
-                _logger.LogDebug("Attempting auto-click using selector {Selector} for id {Id}", _pdfConfig.AutoClickRowSelector, orderId);
-                // Wait briefly for rows to render (not cancellation token – critical SPA step)
-                await Task.Delay(500);
-                bool clickResult = await page.EvaluateFunctionAsync<bool>("(sel,id) => { try { const rows = Array.from(document.querySelectorAll(sel)); for(const r of rows){ const txt = (r.innerText||'').trim(); if(txt.includes(id)){ r.click(); return true; } } } catch(e){} return false; }", _pdfConfig.AutoClickRowSelector, orderId);
-                if (clickResult)
+                await page.GoToAsync(url, new PuppeteerSharp.NavigationOptions
                 {
-                    _logger.LogInformation("Auto-click dispatched for row containing id {Id}", orderId);
-                }
-                else
-                {
-                    _logger.LogWarning("Auto-click failed to find row containing id {Id} with selector {Selector}", orderId, _pdfConfig.AutoClickRowSelector);
-                }
+                    WaitUntil = new[] { PuppeteerSharp.WaitUntilNavigation.Load },
+                    Timeout = 60000
+                });
+                _logger.LogInformation("Direct navigation completed successfully");
             }
-            catch (Exception ex)
+            catch (TimeoutException ex)
             {
-                _logger.LogDebug(ex, "Auto-click logic error (non-fatal)");
+                _logger.LogWarning("Direct page load timed out ({Message})", ex.Message);
             }
-        }
 
-        // Verify effective href after assignment (diagnostic for home page issue)
-        try
-        {
-            var effectiveHref = await page.EvaluateExpressionAsync<string>("window.location.href");
-            if (!string.Equals(effectiveHref, url, StringComparison.OrdinalIgnoreCase))
+            // Wait for network idle if configured
+            var waitMs = action.WaitForNetworkIdleMs ?? 3000;
+            if (waitMs > 0)
             {
-                _logger.LogWarning("Effective window.location.href ({Effective}) does not match expected URL ({Expected}) - SPA may have redirected to home or token substitution failed", effectiveHref, url);
-                // Second attempt after short delay if mismatch persists (route race mitigation)
-                await Task.Delay(1500); // Increased delay for production stability
-                await page.EvaluateExpressionAsync($"window.location.href='{url.Replace("'","%27")}'");
-                var retryHref = await page.EvaluateExpressionAsync<string>("window.location.href");
-                if (!string.Equals(retryHref, url, StringComparison.OrdinalIgnoreCase))
-                {
-                    _logger.LogWarning("Retry href assignment still mismatched ({RetryHref}); giving up and continuing with diagnostics", retryHref);
-                }
-                else
-                {
-                    _logger.LogInformation("Retry href assignment succeeded; effective href now matches target URL");
-                }
-            }
-            else
-            {
-                _logger.LogDebug("Effective window.location.href matches expected URL");
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogDebug(ex, "Failed to read effective window.location.href (non-fatal)");
-        }
-
-        // Production: removed hashchange listener instrumentation.
-
-        // Optimized picklist data readiness detection (using early listener variables)
-        var picklistIdForDetection = picklistIdForDetectionEarly; // reuse
-        var detectionTimeoutMs = Math.Max(5000, _pdfConfig.DataLoadRetryMs > 0 ? _pdfConfig.DataLoadRetryMs : 10000);
-        _logger.LogDebug("Awaiting BOTH picklist API AND config file (timeout {Ms}ms, id {Id})", detectionTimeoutMs, picklistIdForDetection);
-
-        // Wait for BOTH the API data AND the config file (both required for Knockout bindings)
-        var bothResourcesTask = Task.WhenAll(apiDetectionTcsEarly.Task, configDetectionTcs.Task);
-        var detectionCompleted = await Task.WhenAny(bothResourcesTask, Task.Delay(detectionTimeoutMs));
-
-        if (detectionCompleted == bothResourcesTask && bothResourcesTask.IsCompletedSuccessfully)
-        {
-            _logger.LogInformation("BOTH picklist API data AND config file confirmed - Knockout bindings should work; skipping fallback waits");
-            if (!string.IsNullOrWhiteSpace(interceptedJsonEarly))
-            {
-                try
-                {
-                    using var doc = JsonDocument.Parse(interceptedJsonEarly);
-                    var root = doc.RootElement;
-                    int itemCount = 0;
-                    foreach (var candidate in new[] {"data", "items", "pickListDetails"})
-                    {
-                        if (root.TryGetProperty(candidate, out var arr) && arr.ValueKind == JsonValueKind.Array)
-                        {
-                            itemCount = arr.GetArrayLength();
-                            break;
-                        }
-                    }
-                    string? pickListNumber = null;
-                    if (root.TryGetProperty("pickListNumber", out var numProp) && numProp.ValueKind == JsonValueKind.String)
-                    {
-                        pickListNumber = numProp.GetString();
-                    }
-                    if (string.IsNullOrWhiteSpace(pickListNumber) && root.TryGetProperty("pickListId", out var idProp))
-                    {
-                        pickListNumber = idProp.ToString();
-                    }
-                    _logger.LogInformation("Picklist JSON validation summary: PickListNumberOrId={PickListNumber} ItemCount={ItemCount}", pickListNumber ?? "(n/a)", itemCount);
-                    // Store FULL JSON for manual DOM population (don't truncate!)
-                    _lastInterceptedPicklistJson = interceptedJsonEarly;
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Failed parsing intercepted picklist JSON (non-fatal)");
-                }
+                _logger.LogDebug("Waiting {Ms}ms for network idle after direct navigation", waitMs);
+                await Task.Delay(waitMs, ct);
             }
         }
         else
         {
-            if (!apiDataObservedEarly && !configFileObserved)
-            {
-                _logger.LogWarning("NEITHER picklist API nor config file observed within {Ms}ms; using fallback timing", detectionTimeoutMs);
-            }
-            else if (!apiDataObservedEarly)
-            {
-                _logger.LogWarning("Picklist API not observed within {Ms}ms (config file OK); using fallback timing", detectionTimeoutMs);
-            }
-            else if (!configFileObserved)
-            {
-                _logger.LogWarning("Config file PicklistDetail.json not observed within {Ms}ms (API OK) - Knockout bindings may fail; using fallback timing", detectionTimeoutMs);
-            }
+            // SPA hash navigation - load shell first, then navigate via hash
+            _logger.LogDebug("SPA navigation detected, loading application shell before hash navigation");
 
-            _logger.LogDebug("Fallback: waiting 1500ms for hash route rendering");
-            await Task.Delay(1500); // Don't pass ct – critical for route detection
-
-            var fallbackWaitMs = action.WaitForNetworkIdleMs ?? 3000;
-            if (fallbackWaitMs > 0)
-            {
-                _logger.LogDebug("Fallback: waiting {Ms}ms for SPA data loading", fallbackWaitMs);
-                await Task.Delay(fallbackWaitMs); // Don't pass ct
-            }
-
+            // Navigate to base URL first to establish domain context
+            var rootUrl = activeConfig.BaseUrl.TrimEnd('/') + "/";
+            _logger.LogDebug("Loading application shell {RootUrl} to establish domain context", rootUrl);
             try
             {
-                _logger.LogDebug("Fallback: waiting for network idle");
-                await page.WaitForNetworkIdleAsync(new PuppeteerSharp.WaitForNetworkIdleOptions
+                await page.GoToAsync(rootUrl, new PuppeteerSharp.NavigationOptions
                 {
-                    IdleTime = 1000,
+                    WaitUntil = new[] { PuppeteerSharp.WaitUntilNavigation.DOMContentLoaded },
                     Timeout = 30000
                 });
-                _logger.LogDebug("Fallback: network became idle successfully");
             }
-            catch (Exception ex) when (ex is PuppeteerSharp.WaitTaskTimeoutException or TaskCanceledException)
+            catch (TimeoutException ex)
             {
-                _logger.LogWarning("Fallback: network idle wait interrupted ({Type}) - continuing: {Message}", ex.GetType().Name, ex.Message);
+                _logger.LogWarning("Root page load timed out ({Message}), continuing anyway", ex.Message);
             }
 
-            _logger.LogDebug("Fallback: final 1000ms stabilization delay");
-            await Task.Delay(1000); // shorter final delay
+            // CRITICAL: Inject auth token and userData into storage IMMEDIATELY after domain is loaded
+            // This ensures the token and userData are available when we navigate to the hash route
+            try
+            {
+                var storageToken = _tokenRenewal.GetCurrentToken();
+                var currentCookies = _tokenRenewal.GetCurrentCookies();
 
-            // Manual fetch fallback if still no data observed
-            if (!apiDataObservedEarly && !string.IsNullOrWhiteSpace(picklistIdForDetection))
+                if (!string.IsNullOrWhiteSpace(storageToken))
+                {
+                    await page.EvaluateFunctionAsync("t => { try { localStorage.setItem('token', t); sessionStorage.setItem('token', t); } catch(e) {} }", storageToken);
+                    _logger.LogDebug("Injected token into localStorage/sessionStorage after domain load");
+                }
+
+                // Also inject userData if available (Angular app needs this)
+                if (currentCookies.TryGetValue("userData", out var userData) && !string.IsNullOrWhiteSpace(userData))
+                {
+                    await page.EvaluateFunctionAsync("u => { try { localStorage.setItem('userData', u); sessionStorage.setItem('userData', u); } catch(e) {} }", userData);
+                    _logger.LogDebug("Injected userData into localStorage/sessionStorage after domain load");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "Failed to inject auth data into storage (non-fatal)");
+            }
+
+            // Wait for SPA framework readiness before setting hash (prevents early hash assignment before route handlers register)
+            try
+            {
+                _logger.LogDebug("Waiting for SPA framework (tf.page) readiness before hash route");
+                await page.WaitForFunctionAsync("() => window.tf && window.tf.page && typeof window.tf.page === 'object'", new PuppeteerSharp.WaitForFunctionOptions { Timeout = 15000 });
+                _logger.LogDebug("SPA framework ready (tf.page detected)");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning("SPA framework not detected within pre-route timeout ({Message}); proceeding with hash navigation anyway", ex.Message);
+            }
+
+            // Pre-seed global variable before and after hash navigation to ensure SPA JavaScript can access it
+            try
+            {
+                var seedId = (context != null && context.TryGetValue("pickListId", out var ctxId) ? ctxId?.ToString() : orderId) ?? string.Empty;
+                if (!string.IsNullOrWhiteSpace(seedId))
+                {
+                    // Seed before navigation
+                    await page.EvaluateExpressionAsync($"try{{ window.picklist_id='{seedId}'; }}catch(e){{}} ");
+                }
+            }
+            catch { /* non-fatal */ }
+
+            // Set the hash to trigger SPA routing
+            await page.EvaluateExpressionAsync($"window.location.href='{url.Replace("'","%27")}'");
+
+            // Re-seed after hash change with small delay to ensure SPA reads the variable
+            try
+            {
+                var reSeedId = (context != null && context.TryGetValue("pickListId", out var ctxId2) ? ctxId2?.ToString() : orderId) ?? string.Empty;
+                if (!string.IsNullOrWhiteSpace(reSeedId))
+                {
+                    await Task.Delay(100); // Small delay for hash change to register
+                    await page.EvaluateExpressionAsync($"try{{ window.picklist_id='{reSeedId}'; }}catch(e){{}} ");
+                    await Task.Delay(200); // Allow SPA time to read variable before making API calls
+                }
+            }
+            catch { /* non-fatal */ }
+
+            // If configured, attempt auto-click of a row matching the id to trigger details XHR
+            if (!string.IsNullOrWhiteSpace(_pdfConfig.AutoClickRowSelector))
             {
                 try
                 {
-                    _logger.LogDebug("Manual fetch fallback for picklist id {Id}", picklistIdForDetection);
-                    // Fetch with authentication token and WarehouseId from localStorage
-                    var manualJson = await page.EvaluateExpressionAsync<string>($@"
-                        (async () => {{
-                            try {{
-                                const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-                                const userDataStr = localStorage.getItem('userData') || sessionStorage.getItem('userData');
-                                let warehouseId = '1';
-
-                                if (userDataStr) {{
-                                    try {{
-                                        const userData = JSON.parse(userDataStr);
-                                        warehouseId = (userData.defaultWarehouseId || userData.warehouseId || 1).toString();
-                                    }} catch(e) {{ }}
-                                }}
-
-                                const resp = await fetch('/api/Picklist/GetPickListDetails?picklistid={picklistIdForDetection}', {{
-                                    headers: {{
-                                        'Authorization': token ? 'Bearer ' + token : '',
-                                        'Content-Type': 'application/json',
-                                        'WarehouseId': warehouseId
-                                    }}
-                                }});
-                                const text = await resp.text();
-                                return JSON.stringify({{ status: resp.status, statusText: resp.statusText, body: text }});
-                            }} catch(e) {{
-                                return JSON.stringify({{ error: e.toString() }});
-                            }}
-                        }})()
-                    ");
-                    if (!string.IsNullOrWhiteSpace(manualJson))
+                    _logger.LogDebug("Attempting auto-click using selector {Selector} for id {Id}", _pdfConfig.AutoClickRowSelector, orderId);
+                    // Wait briefly for rows to render (not cancellation token – critical SPA step)
+                    await Task.Delay(500);
+                    bool clickResult = await page.EvaluateFunctionAsync<bool>("(sel,id) => { try { const rows = Array.from(document.querySelectorAll(sel)); for(const r of rows){ const txt = (r.innerText||'').trim(); if(txt.includes(id)){ r.click(); return true; } } } catch(e){} return false; }", _pdfConfig.AutoClickRowSelector, orderId);
+                    if (clickResult)
                     {
-                        // Parse the wrapper JSON that contains status and body
-                        try
-                        {
-                            using var jsonDoc = JsonDocument.Parse(manualJson);
-                            var root = jsonDoc.RootElement;
-
-                            if (root.TryGetProperty("error", out var errorProp))
-                            {
-                                _logger.LogError("Manual fetch JavaScript error: {Error}", errorProp.GetString());
-                            }
-                            else if (root.TryGetProperty("status", out var statusProp) && root.TryGetProperty("body", out var bodyProp))
-                            {
-                                var httpStatus = statusProp.GetInt32();
-                                var statusText = root.TryGetProperty("statusText", out var stProp) ? stProp.GetString() : "";
-                                var responseBody = bodyProp.GetString() ?? "";
-
-                                _logger.LogInformation("Manual fetch HTTP {Status} {StatusText}, body length: {Len}", httpStatus, statusText, responseBody.Length);
-
-                                if (httpStatus >= 200 && httpStatus < 300 && !string.IsNullOrWhiteSpace(responseBody))
-                                {
-                                    var lower = responseBody.ToLowerInvariant();
-                                    bool looksSuccess = lower.Contains("\"responsecode\":0") || lower.Contains("\"responsetype\":\"success\"");
-                                    bool hasKeys = lower.Contains("picklistnumber") || lower.Contains("picklistid") || lower.Contains("\"picklist\"");
-
-                                    if (looksSuccess && hasKeys)
-                                    {
-                                        _logger.LogInformation("Manual fetch obtained valid picklist details");
-                                        // Store FULL JSON for manual DOM population (don't truncate!)
-                                        _lastInterceptedPicklistJson = responseBody;
-
-                                        // Populate the DOM using tf.binder.scatter() - same as the page's GetPickListDetail() function
-                                        try
-                                        {
-                                            _logger.LogInformation("Attempting to populate DOM using tf.binder.scatter()");
-                                            // Pass JSON as function parameter to avoid escaping issues
-                                            var populateResult = await page.EvaluateFunctionAsync<string>(@"(jsonString) => {
-                                                try {
-                                                    const data = JSON.parse(jsonString);
-
-                                                    if (data.responseCode == 0 && data.data && data.data.PickList) {
-                                                        // Process picklist items (same as GetPickListDetail)
-                                                        var TotalQty = 0;
-                                                        var TotalCtns = 0;
-                                                        var OrderNo = '';
-
-                                                        for (var i = 0; i < data.data.PickListItems.length; i++) {
-                                                            if (data.data.PickListItems[i].IsCase == 0) {
-                                                                data.data.PickListItems[i].IsCase = 'piece(s)';
-                                                            } else {
-                                                                data.data.PickListItems[i].IsCase = 'Case(s)';
-                                                            }
-                                                            if (data.data.PickListItems[i].TotalCtns == null) {
-                                                                data.data.PickListItems[i].TotalCtns = 1;
-                                                            }
-                                                            TotalQty += parseFloat(data.data.PickListItems[i].Quantity);
-                                                            TotalCtns += parseFloat(data.data.PickListItems[i].TotalCtns);
-                                                            if (OrderNo == '') {
-                                                                OrderNo += data.data.PickListItems[i].OrderNumber;
-                                                            }
-                                                        }
-
-                                                        Object.assign(data.data.PickList, { TotalQty: TotalQty });
-                                                        Object.assign(data.data.PickList, { TotalCtns: Math.ceil(TotalCtns) });
-                                                        Object.assign(data.data.PickList, { OrderNo: OrderNo });
-
-                                                        if (data.data.PickList.Priority == null || data.data.PickList.Priority == '') {
-                                                            data.data.PickList.Priority = 1;
-                                                        }
-
-                                                        // Scatter data to DOM using tf.binder
-                                                        if (typeof window.tf !== 'undefined' && window.tf.binder && window.tf.binder.scatter) {
-                                                            window.tf.binder.scatter(data.data, '.data-scatter');
-                                                            window.tf.binder.scatter(data.data.PickList, '.data-data-scatter');
-
-                                                            // Generate barcodes if function exists
-                                                            if (typeof GenerateOrderNoBarcode === 'function') {
-                                                                GenerateOrderNoBarcode();
-                                                            }
-
-                                                            return 'Success: Data scattered to DOM';
-                                                        } else {
-                                                            return 'Warning: tf.binder.scatter not available';
-                                                        }
-                                                    } else {
-                                                        return 'Error: Invalid data structure - responseCode=' + (data.responseCode || 'missing');
-                                                    }
-                                                } catch(e) {
-                                                    return 'Error: ' + e.toString();
-                                                }
-                                            }", responseBody);
-                                            _logger.LogInformation("DOM population result: {Result}", populateResult);
-                                        }
-                                        catch (Exception popEx)
-                                        {
-                                            _logger.LogWarning(popEx, "Failed to populate DOM with picklist data");
-                                        }
-                                    }
-                                    else
-                                    {
-                                        _logger.LogWarning("Manual fetch body failed validation; success={Success} hasKeys={HasKeys}", looksSuccess, hasKeys);
-                                    }
-                                }
-                                else
-                                {
-                                    _logger.LogWarning("Manual fetch returned HTTP {Status}, body may be error message", httpStatus);
-                                }
-                            }
-                            else
-                            {
-                                _logger.LogWarning("Manual fetch response has unexpected structure: {Preview}",
-                                    manualJson.Length > 200 ? manualJson.Substring(0, 200) + "..." : manualJson);
-                            }
-                        }
-                        catch (JsonException jex)
-                        {
-                            _logger.LogError(jex, "Failed to parse manual fetch wrapper JSON");
-                        }
+                        _logger.LogInformation("Auto-click dispatched for row containing id {Id}", orderId);
                     }
                     else
                     {
-                        _logger.LogWarning("Manual fetch returned empty response for picklist id {Id}", picklistIdForDetection);
+                        _logger.LogWarning("Auto-click failed to find row containing id {Id} with selector {Selector}", orderId, _pdfConfig.AutoClickRowSelector);
                     }
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogDebug(ex, "Manual fetch fallback failed (non-fatal)");
+                    _logger.LogDebug(ex, "Auto-click logic error (non-fatal)");
                 }
             }
-        }
-
-        // Knockout.js binding readiness checks (critical for data population)
-        try
-        {
-            _logger.LogDebug("Checking if Knockout.js is available on page");
-            var koExists = await page.EvaluateExpressionAsync<bool>("typeof window.ko !== 'undefined' && window.ko !== null");
-            if (koExists)
+    
+            // Verify effective href after assignment (diagnostic for home page issue)
+            try
             {
-                _logger.LogInformation("Knockout.js detected on page - waiting for bindings to be applied");
-
-                // Wait for Knockout.js to finish applying bindings (check that binding context exists)
-                if (!string.IsNullOrWhiteSpace(_pdfConfig.WaitForSelector))
+                var effectiveHref = await page.EvaluateExpressionAsync<string>("window.location.href");
+                if (!string.Equals(effectiveHref, url, StringComparison.OrdinalIgnoreCase))
                 {
-                    var escaped = _pdfConfig.WaitForSelector.Replace("'", "\\'");
+                    _logger.LogWarning("Effective window.location.href ({Effective}) does not match expected URL ({Expected}) - SPA may have redirected to home or token substitution failed", effectiveHref, url);
+                    // Second attempt after short delay if mismatch persists (route race mitigation)
+                    await Task.Delay(1500); // Increased delay for production stability
+                    await page.EvaluateExpressionAsync($"window.location.href='{url.Replace("'","%27")}'");
+                    var retryHref = await page.EvaluateExpressionAsync<string>("window.location.href");
+                    if (!string.Equals(retryHref, url, StringComparison.OrdinalIgnoreCase))
+                    {
+                        _logger.LogWarning("Retry href assignment still mismatched ({RetryHref}); giving up and continuing with diagnostics", retryHref);
+                    }
+                    else
+                    {
+                        _logger.LogInformation("Retry href assignment succeeded; effective href now matches target URL");
+                    }
+                }
+                else
+                {
+                    _logger.LogDebug("Effective window.location.href matches expected URL");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "Failed to read effective window.location.href (non-fatal)");
+            }
+    
+            // Production: removed hashchange listener instrumentation.
+    
+            // Optimized picklist data readiness detection (using early listener variables)
+            var picklistIdForDetection = picklistIdForDetectionEarly; // reuse
+            var detectionTimeoutMs = Math.Max(5000, _pdfConfig.DataLoadRetryMs > 0 ? _pdfConfig.DataLoadRetryMs : 10000);
+            _logger.LogDebug("Awaiting BOTH picklist API AND config file (timeout {Ms}ms, id {Id})", detectionTimeoutMs, picklistIdForDetection);
+    
+            // Wait for BOTH the API data AND the config file (both required for Knockout bindings)
+            var bothResourcesTask = Task.WhenAll(apiDetectionTcsEarly.Task, configDetectionTcs.Task);
+            var detectionCompleted = await Task.WhenAny(bothResourcesTask, Task.Delay(detectionTimeoutMs));
+    
+            if (detectionCompleted == bothResourcesTask && bothResourcesTask.IsCompletedSuccessfully)
+            {
+                _logger.LogInformation("BOTH picklist API data AND config file confirmed - Knockout bindings should work; skipping fallback waits");
+                if (!string.IsNullOrWhiteSpace(interceptedJsonEarly))
+                {
                     try
                     {
-                        _logger.LogDebug("Waiting for Knockout binding context on selector '{Selector}'", _pdfConfig.WaitForSelector);
-                        await page.WaitForFunctionAsync($"() => {{ const el = document.querySelector('{escaped}'); return el && window.ko && window.ko.dataFor && window.ko.dataFor(el) !== undefined; }}",
-                            new PuppeteerSharp.WaitForFunctionOptions { Timeout = 10000 });
-                        _logger.LogInformation("Knockout binding context confirmed for selector '{Selector}'", _pdfConfig.WaitForSelector);
+                        using var doc = JsonDocument.Parse(interceptedJsonEarly);
+                        var root = doc.RootElement;
+                        int itemCount = 0;
+                        foreach (var candidate in new[] {"data", "items", "pickListDetails"})
+                        {
+                            if (root.TryGetProperty(candidate, out var arr) && arr.ValueKind == JsonValueKind.Array)
+                            {
+                                itemCount = arr.GetArrayLength();
+                                break;
+                            }
+                        }
+                        string? pickListNumber = null;
+                        if (root.TryGetProperty("pickListNumber", out var numProp) && numProp.ValueKind == JsonValueKind.String)
+                        {
+                            pickListNumber = numProp.GetString();
+                        }
+                        if (string.IsNullOrWhiteSpace(pickListNumber) && root.TryGetProperty("pickListId", out var idProp))
+                        {
+                            pickListNumber = idProp.ToString();
+                        }
+                        _logger.LogInformation("Picklist JSON validation summary: PickListNumberOrId={PickListNumber} ItemCount={ItemCount}", pickListNumber ?? "(n/a)", itemCount);
+                        // Store FULL JSON for manual DOM population (don't truncate!)
+                        _lastInterceptedPicklistJson = interceptedJsonEarly;
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogWarning(ex, "Knockout binding context wait timed out - bindings may not be applied yet");
+                        _logger.LogWarning(ex, "Failed parsing intercepted picklist JSON (non-fatal)");
                     }
-                }
-
-                // Diagnostic: Check view model state
-                try
-                {
-                    var vmDiagnostic = await page.EvaluateFunctionAsync<string>(@"(sel) => {
-                        try {
-                            const el = document.querySelector(sel);
-                            if (!el || !window.ko || !window.ko.dataFor) return 'ko.dataFor not available';
-                            const vm = window.ko.dataFor(el);
-                            if (!vm) return 'No view model bound';
-                            const keys = Object.keys(vm).filter(k => !k.startsWith('_')).slice(0, 10);
-                            return 'VM keys: ' + keys.join(', ');
-                        } catch(e) {
-                            return 'Error: ' + e.message;
-                        }
-                    }", _pdfConfig.WaitForSelector);
-                    _logger.LogInformation("Knockout view model diagnostic: {Diagnostic}", vmDiagnostic);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogDebug(ex, "Failed to get Knockout view model diagnostic");
                 }
             }
             else
             {
-                _logger.LogWarning("Knockout.js NOT detected on page - data binding may not work as expected");
-
-                // Check what JavaScript frameworks/libraries ARE available
+                if (!apiDataObservedEarly && !configFileObserved)
+                {
+                    _logger.LogWarning("NEITHER picklist API nor config file observed within {Ms}ms; using fallback timing", detectionTimeoutMs);
+                }
+                else if (!apiDataObservedEarly)
+                {
+                    _logger.LogWarning("Picklist API not observed within {Ms}ms (config file OK); using fallback timing", detectionTimeoutMs);
+                }
+                else if (!configFileObserved)
+                {
+                    _logger.LogWarning("Config file PicklistDetail.json not observed within {Ms}ms (API OK) - Knockout bindings may fail; using fallback timing", detectionTimeoutMs);
+                }
+    
+                _logger.LogDebug("Fallback: waiting 1500ms for hash route rendering");
+                await Task.Delay(1500); // Don't pass ct – critical for route detection
+    
+                var fallbackWaitMs = action.WaitForNetworkIdleMs ?? 3000;
+                if (fallbackWaitMs > 0)
+                {
+                    _logger.LogDebug("Fallback: waiting {Ms}ms for SPA data loading", fallbackWaitMs);
+                    await Task.Delay(fallbackWaitMs); // Don't pass ct
+                }
+    
                 try
                 {
-                    var availableLibs = await page.EvaluateExpressionAsync<string>(@"
-                        (() => {
-                            const libs = [];
-                            if (typeof jQuery !== 'undefined') libs.push('jQuery v' + jQuery.fn.jquery);
-                            if (typeof $ !== 'undefined') libs.push('$ (jQuery or similar)');
-                            if (typeof window.ko !== 'undefined') libs.push('Knockout');
-                            if (typeof window.tf !== 'undefined') libs.push('tf (SPA framework)');
-                            if (typeof Vue !== 'undefined') libs.push('Vue');
-                            if (typeof React !== 'undefined') libs.push('React');
-                            if (typeof Angular !== 'undefined') libs.push('Angular');
-                            if (typeof Backbone !== 'undefined') libs.push('Backbone');
-                            return libs.length > 0 ? libs.join(', ') : 'None detected';
-                        })()
-                    ");
-                    _logger.LogInformation("Available JavaScript libraries on page: {Libs}", availableLibs);
+                    _logger.LogDebug("Fallback: waiting for network idle");
+                    await page.WaitForNetworkIdleAsync(new PuppeteerSharp.WaitForNetworkIdleOptions
+                    {
+                        IdleTime = 1000,
+                        Timeout = 30000
+                    });
+                    _logger.LogDebug("Fallback: network became idle successfully");
                 }
-                catch (Exception libEx)
+                catch (Exception ex) when (ex is PuppeteerSharp.WaitTaskTimeoutException or TaskCanceledException)
                 {
-                    _logger.LogDebug(libEx, "Failed to detect available JavaScript libraries");
+                    _logger.LogWarning("Fallback: network idle wait interrupted ({Type}) - continuing: {Message}", ex.GetType().Name, ex.Message);
                 }
-
-                // Check if page data is accessible via tf.page or global variables
-                try
+    
+                _logger.LogDebug("Fallback: final 1000ms stabilization delay");
+                await Task.Delay(1000); // shorter final delay
+    
+                // Manual fetch fallback if still no data observed
+                if (!apiDataObservedEarly && !string.IsNullOrWhiteSpace(picklistIdForDetection))
                 {
-                    var tfDataCheck = await page.EvaluateExpressionAsync<string>(@"
-                        (() => {
-                            if (typeof window.tf === 'undefined') return 'tf framework not available';
-                            if (typeof window.tf.page === 'undefined') return 'tf.page not available';
-                            if (typeof window.tf.page.viewModel !== 'undefined') return 'tf.page.viewModel exists (type: ' + typeof window.tf.page.viewModel + ')';
-                            if (typeof window.tf.page.data !== 'undefined') return 'tf.page.data exists (type: ' + typeof window.tf.page.data + ')';
-                            return 'tf available but no viewModel or data found';
-                        })()
-                    ");
-                    _logger.LogInformation("SPA framework data check: {Check}", tfDataCheck);
-
-                    // Try to access the picklist data from tf.page.viewModel if it exists
-                    var picklistDataCheck = await page.EvaluateExpressionAsync<string>(@"
-                        (() => {
-                            try {
-                                if (window.tf && window.tf.page && window.tf.page.viewModel) {
-                                    const vm = window.tf.page.viewModel;
-                                    const keys = Object.keys(vm).slice(0, 20);
-                                    let result = 'ViewModel keys: ' + keys.join(', ');
-                                    if (vm.PickListNumber) result += ' | PickListNumber=' + vm.PickListNumber;
-                                    if (vm.PicklistNumber) result += ' | PicklistNumber=' + vm.PicklistNumber;
-                                    if (vm.picklistNumber) result += ' | picklistNumber=' + vm.picklistNumber;
-                                    return result;
+                    try
+                    {
+                        _logger.LogDebug("Manual fetch fallback for picklist id {Id}", picklistIdForDetection);
+                        // Fetch with authentication token and WarehouseId from localStorage
+                        var manualJson = await page.EvaluateExpressionAsync<string>($@"
+                            (async () => {{
+                                try {{
+                                    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+                                    const userDataStr = localStorage.getItem('userData') || sessionStorage.getItem('userData');
+                                    let warehouseId = '1';
+    
+                                    if (userDataStr) {{
+                                        try {{
+                                            const userData = JSON.parse(userDataStr);
+                                            warehouseId = (userData.defaultWarehouseId || userData.warehouseId || 1).toString();
+                                        }} catch(e) {{ }}
+                                    }}
+    
+                                    const resp = await fetch('/api/Picklist/GetPickListDetails?picklistid={picklistIdForDetection}', {{
+                                        headers: {{
+                                            'Authorization': token ? 'Bearer ' + token : '',
+                                            'Content-Type': 'application/json',
+                                            'WarehouseId': warehouseId
+                                        }}
+                                    }});
+                                    const text = await resp.text();
+                                    return JSON.stringify({{ status: resp.status, statusText: resp.statusText, body: text }});
+                                }} catch(e) {{
+                                    return JSON.stringify({{ error: e.toString() }});
+                                }}
+                            }})()
+                        ");
+                        if (!string.IsNullOrWhiteSpace(manualJson))
+                        {
+                            // Parse the wrapper JSON that contains status and body
+                            try
+                            {
+                                using var jsonDoc = JsonDocument.Parse(manualJson);
+                                var root = jsonDoc.RootElement;
+    
+                                if (root.TryGetProperty("error", out var errorProp))
+                                {
+                                    _logger.LogError("Manual fetch JavaScript error: {Error}", errorProp.GetString());
                                 }
-                                return 'No viewModel accessible';
-                            } catch(e) {
-                                return 'Error accessing viewModel: ' + e.message;
+                                else if (root.TryGetProperty("status", out var statusProp) && root.TryGetProperty("body", out var bodyProp))
+                                {
+                                    var httpStatus = statusProp.GetInt32();
+                                    var statusText = root.TryGetProperty("statusText", out var stProp) ? stProp.GetString() : "";
+                                    var responseBody = bodyProp.GetString() ?? "";
+    
+                                    _logger.LogInformation("Manual fetch HTTP {Status} {StatusText}, body length: {Len}", httpStatus, statusText, responseBody.Length);
+    
+                                    if (httpStatus >= 200 && httpStatus < 300 && !string.IsNullOrWhiteSpace(responseBody))
+                                    {
+                                        var lower = responseBody.ToLowerInvariant();
+                                        bool looksSuccess = lower.Contains("\"responsecode\":0") || lower.Contains("\"responsetype\":\"success\"");
+                                        bool hasKeys = lower.Contains("picklistnumber") || lower.Contains("picklistid") || lower.Contains("\"picklist\"");
+    
+                                        if (looksSuccess && hasKeys)
+                                        {
+                                            _logger.LogInformation("Manual fetch obtained valid picklist details");
+                                            // Store FULL JSON for manual DOM population (don't truncate!)
+                                            _lastInterceptedPicklistJson = responseBody;
+    
+                                            // Populate the DOM using tf.binder.scatter() - same as the page's GetPickListDetail() function
+                                            try
+                                            {
+                                                _logger.LogInformation("Attempting to populate DOM using tf.binder.scatter()");
+                                                // Pass JSON as function parameter to avoid escaping issues
+                                                var populateResult = await page.EvaluateFunctionAsync<string>(@"(jsonString) => {
+                                                    try {
+                                                        const data = JSON.parse(jsonString);
+    
+                                                        if (data.responseCode == 0 && data.data && data.data.PickList) {
+                                                            // Process picklist items (same as GetPickListDetail)
+                                                            var TotalQty = 0;
+                                                            var TotalCtns = 0;
+                                                            var OrderNo = '';
+    
+                                                            for (var i = 0; i < data.data.PickListItems.length; i++) {
+                                                                if (data.data.PickListItems[i].IsCase == 0) {
+                                                                    data.data.PickListItems[i].IsCase = 'piece(s)';
+                                                                } else {
+                                                                    data.data.PickListItems[i].IsCase = 'Case(s)';
+                                                                }
+                                                                if (data.data.PickListItems[i].TotalCtns == null) {
+                                                                    data.data.PickListItems[i].TotalCtns = 1;
+                                                                }
+                                                                TotalQty += parseFloat(data.data.PickListItems[i].Quantity);
+                                                                TotalCtns += parseFloat(data.data.PickListItems[i].TotalCtns);
+                                                                if (OrderNo == '') {
+                                                                    OrderNo += data.data.PickListItems[i].OrderNumber;
+                                                                }
+                                                            }
+    
+                                                            Object.assign(data.data.PickList, { TotalQty: TotalQty });
+                                                            Object.assign(data.data.PickList, { TotalCtns: Math.ceil(TotalCtns) });
+                                                            Object.assign(data.data.PickList, { OrderNo: OrderNo });
+    
+                                                            if (data.data.PickList.Priority == null || data.data.PickList.Priority == '') {
+                                                                data.data.PickList.Priority = 1;
+                                                            }
+    
+                                                            // Scatter data to DOM using tf.binder
+                                                            if (typeof window.tf !== 'undefined' && window.tf.binder && window.tf.binder.scatter) {
+                                                                window.tf.binder.scatter(data.data, '.data-scatter');
+                                                                window.tf.binder.scatter(data.data.PickList, '.data-data-scatter');
+    
+                                                                // Generate barcodes if function exists
+                                                                if (typeof GenerateOrderNoBarcode === 'function') {
+                                                                    GenerateOrderNoBarcode();
+                                                                }
+    
+                                                                return 'Success: Data scattered to DOM';
+                                                            } else {
+                                                                return 'Warning: tf.binder.scatter not available';
+                                                            }
+                                                        } else {
+                                                            return 'Error: Invalid data structure - responseCode=' + (data.responseCode || 'missing');
+                                                        }
+                                                    } catch(e) {
+                                                        return 'Error: ' + e.toString();
+                                                    }
+                                                }", responseBody);
+                                                _logger.LogInformation("DOM population result: {Result}", populateResult);
+                                            }
+                                            catch (Exception popEx)
+                                            {
+                                                _logger.LogWarning(popEx, "Failed to populate DOM with picklist data");
+                                            }
+                                        }
+                                        else
+                                        {
+                                            _logger.LogWarning("Manual fetch body failed validation; success={Success} hasKeys={HasKeys}", looksSuccess, hasKeys);
+                                        }
+                                    }
+                                    else
+                                    {
+                                        _logger.LogWarning("Manual fetch returned HTTP {Status}, body may be error message", httpStatus);
+                                    }
+                                }
+                                else
+                                {
+                                    _logger.LogWarning("Manual fetch response has unexpected structure: {Preview}",
+                                        manualJson.Length > 200 ? manualJson.Substring(0, 200) + "..." : manualJson);
+                                }
                             }
-                        })()
-                    ");
-                    _logger.LogInformation("ViewModel picklist data check: {Check}", picklistDataCheck);
+                            catch (JsonException jex)
+                            {
+                                _logger.LogError(jex, "Failed to parse manual fetch wrapper JSON");
+                            }
+                        }
+                        else
+                        {
+                            _logger.LogWarning("Manual fetch returned empty response for picklist id {Id}", picklistIdForDetection);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogDebug(ex, "Manual fetch fallback failed (non-fatal)");
+                    }
                 }
-                catch (Exception tfEx)
-                {
-                    _logger.LogDebug(tfEx, "Failed to check tf.page data");
-                }
-
-                // DISABLED: Manual DOM population - Let the page render naturally with its own JavaScript
-                // The page's tf framework will populate all fields, including barcodes
-                _logger.LogInformation("Trusting page to render naturally - wait times configured to allow full rendering");
             }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Knockout.js detection failed");
-        }
-
-        // Optional selector readiness (from PdfConfig) before capturing page
-        if (!string.IsNullOrWhiteSpace(_pdfConfig.WaitForSelector))
-        {
+    
+            // Knockout.js binding readiness checks (critical for data population)
             try
             {
-                _logger.LogDebug("Waiting for selector '{Selector}' before capturing page", _pdfConfig.WaitForSelector);
-                await page.WaitForSelectorAsync(_pdfConfig.WaitForSelector, new PuppeteerSharp.WaitForSelectorOptions
+                _logger.LogDebug("Checking if Knockout.js is available on page");
+                var koExists = await page.EvaluateExpressionAsync<bool>("typeof window.ko !== 'undefined' && window.ko !== null");
+                if (koExists)
                 {
-                    Timeout = _pdfConfig.NavigationTimeoutSeconds * 1000
-                });
-                var escaped = _pdfConfig.WaitForSelector.Replace("'", "\\'");
-                _logger.LogDebug("Ensuring selector '{Selector}' has populated text", _pdfConfig.WaitForSelector);
-                await page.WaitForFunctionAsync($"() => (document.querySelector('{escaped}')?.textContent || '').trim().length > 0", new PuppeteerSharp.WaitForFunctionOptions
+                    _logger.LogInformation("Knockout.js detected on page - waiting for bindings to be applied");
+    
+                    // Wait for Knockout.js to finish applying bindings (check that binding context exists)
+                    if (!string.IsNullOrWhiteSpace(_pdfConfig.WaitForSelector))
+                    {
+                        var escaped = _pdfConfig.WaitForSelector.Replace("'", "\\'");
+                        try
+                        {
+                            _logger.LogDebug("Waiting for Knockout binding context on selector '{Selector}'", _pdfConfig.WaitForSelector);
+                            await page.WaitForFunctionAsync($"() => {{ const el = document.querySelector('{escaped}'); return el && window.ko && window.ko.dataFor && window.ko.dataFor(el) !== undefined; }}",
+                                new PuppeteerSharp.WaitForFunctionOptions { Timeout = 10000 });
+                            _logger.LogInformation("Knockout binding context confirmed for selector '{Selector}'", _pdfConfig.WaitForSelector);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning(ex, "Knockout binding context wait timed out - bindings may not be applied yet");
+                        }
+                    }
+    
+                    // Diagnostic: Check view model state
+                    try
+                    {
+                        var vmDiagnostic = await page.EvaluateFunctionAsync<string>(@"(sel) => {
+                            try {
+                                const el = document.querySelector(sel);
+                                if (!el || !window.ko || !window.ko.dataFor) return 'ko.dataFor not available';
+                                const vm = window.ko.dataFor(el);
+                                if (!vm) return 'No view model bound';
+                                const keys = Object.keys(vm).filter(k => !k.startsWith('_')).slice(0, 10);
+                                return 'VM keys: ' + keys.join(', ');
+                            } catch(e) {
+                                return 'Error: ' + e.message;
+                            }
+                        }", _pdfConfig.WaitForSelector);
+                        _logger.LogInformation("Knockout view model diagnostic: {Diagnostic}", vmDiagnostic);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogDebug(ex, "Failed to get Knockout view model diagnostic");
+                    }
+                }
+                else
                 {
-                    Timeout = _pdfConfig.NavigationTimeoutSeconds * 1000
-                });
+                    _logger.LogWarning("Knockout.js NOT detected on page - data binding may not work as expected");
+    
+                    // Check what JavaScript frameworks/libraries ARE available
+                    try
+                    {
+                        var availableLibs = await page.EvaluateExpressionAsync<string>(@"
+                            (() => {
+                                const libs = [];
+                                if (typeof jQuery !== 'undefined') libs.push('jQuery v' + jQuery.fn.jquery);
+                                if (typeof $ !== 'undefined') libs.push('$ (jQuery or similar)');
+                                if (typeof window.ko !== 'undefined') libs.push('Knockout');
+                                if (typeof window.tf !== 'undefined') libs.push('tf (SPA framework)');
+                                if (typeof Vue !== 'undefined') libs.push('Vue');
+                                if (typeof React !== 'undefined') libs.push('React');
+                                if (typeof Angular !== 'undefined') libs.push('Angular');
+                                if (typeof Backbone !== 'undefined') libs.push('Backbone');
+                                return libs.length > 0 ? libs.join(', ') : 'None detected';
+                            })()
+                        ");
+                        _logger.LogInformation("Available JavaScript libraries on page: {Libs}", availableLibs);
+                    }
+                    catch (Exception libEx)
+                    {
+                        _logger.LogDebug(libEx, "Failed to detect available JavaScript libraries");
+                    }
+    
+                    // Check if page data is accessible via tf.page or global variables
+                    try
+                    {
+                        var tfDataCheck = await page.EvaluateExpressionAsync<string>(@"
+                            (() => {
+                                if (typeof window.tf === 'undefined') return 'tf framework not available';
+                                if (typeof window.tf.page === 'undefined') return 'tf.page not available';
+                                if (typeof window.tf.page.viewModel !== 'undefined') return 'tf.page.viewModel exists (type: ' + typeof window.tf.page.viewModel + ')';
+                                if (typeof window.tf.page.data !== 'undefined') return 'tf.page.data exists (type: ' + typeof window.tf.page.data + ')';
+                                return 'tf available but no viewModel or data found';
+                            })()
+                        ");
+                        _logger.LogInformation("SPA framework data check: {Check}", tfDataCheck);
+    
+                        // Try to access the picklist data from tf.page.viewModel if it exists
+                        var picklistDataCheck = await page.EvaluateExpressionAsync<string>(@"
+                            (() => {
+                                try {
+                                    if (window.tf && window.tf.page && window.tf.page.viewModel) {
+                                        const vm = window.tf.page.viewModel;
+                                        const keys = Object.keys(vm).slice(0, 20);
+                                        let result = 'ViewModel keys: ' + keys.join(', ');
+                                        if (vm.PickListNumber) result += ' | PickListNumber=' + vm.PickListNumber;
+                                        if (vm.PicklistNumber) result += ' | PicklistNumber=' + vm.PicklistNumber;
+                                        if (vm.picklistNumber) result += ' | picklistNumber=' + vm.picklistNumber;
+                                        return result;
+                                    }
+                                    return 'No viewModel accessible';
+                                } catch(e) {
+                                    return 'Error accessing viewModel: ' + e.message;
+                                }
+                            })()
+                        ");
+                        _logger.LogInformation("ViewModel picklist data check: {Check}", picklistDataCheck);
+                    }
+                    catch (Exception tfEx)
+                    {
+                        _logger.LogDebug(tfEx, "Failed to check tf.page data");
+                    }
+    
+                    // DISABLED: Manual DOM population - Let the page render naturally with its own JavaScript
+                    // The page's tf framework will populate all fields, including barcodes
+                    _logger.LogInformation("Trusting page to render naturally - wait times configured to allow full rendering");
+                }
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Selector readiness check failed; continuing anyway");
+                _logger.LogWarning(ex, "Knockout.js detection failed");
             }
-        }
-
-        // Additional selector presence waits (presence only, not content)
-        if (_pdfConfig.AdditionalWaitSelectors?.Count > 0)
-        {
-            foreach (var sel in _pdfConfig.AdditionalWaitSelectors.Where(s => !string.IsNullOrWhiteSpace(s)))
+    
+            // Optional selector readiness (from PdfConfig) before capturing page
+            if (!string.IsNullOrWhiteSpace(_pdfConfig.WaitForSelector))
             {
                 try
                 {
-                    _logger.LogDebug("Waiting for additional selector '{Selector}'", sel);
-                    await page.WaitForSelectorAsync(sel, new PuppeteerSharp.WaitForSelectorOptions
+                    _logger.LogDebug("Waiting for selector '{Selector}' before capturing page", _pdfConfig.WaitForSelector);
+                    await page.WaitForSelectorAsync(_pdfConfig.WaitForSelector, new PuppeteerSharp.WaitForSelectorOptions
+                    {
+                        Timeout = _pdfConfig.NavigationTimeoutSeconds * 1000
+                    });
+                    var escaped = _pdfConfig.WaitForSelector.Replace("'", "\\'");
+                    _logger.LogDebug("Ensuring selector '{Selector}' has populated text", _pdfConfig.WaitForSelector);
+                    await page.WaitForFunctionAsync($"() => (document.querySelector('{escaped}')?.textContent || '').trim().length > 0", new PuppeteerSharp.WaitForFunctionOptions
                     {
                         Timeout = _pdfConfig.NavigationTimeoutSeconds * 1000
                     });
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex, "Additional selector '{Selector}' not found within timeout; continuing", sel);
+                    _logger.LogWarning(ex, "Selector readiness check failed; continuing anyway");
                 }
             }
-        }
-
-        // Data rows readiness (indicates XHR-rendered data present)
-        if (_pdfConfig.MinimumDataRows > 0 && !string.IsNullOrWhiteSpace(_pdfConfig.DataReadyRowSelector))
-        {
-            try
+    
+            // Additional selector presence waits (presence only, not content)
+            if (_pdfConfig.AdditionalWaitSelectors?.Count > 0)
             {
-                var elapsed = 0;
-                var interval = 500;
-                var target = _pdfConfig.MinimumDataRows;
-                var selector = _pdfConfig.DataReadyRowSelector;
-                var escapedRowSel = selector.Replace("'", "\\'");
-                int currentCount = await page.EvaluateFunctionAsync<int>("sel => document.querySelectorAll(sel).length", selector);
-                if (currentCount < target)
+                foreach (var sel in _pdfConfig.AdditionalWaitSelectors.Where(s => !string.IsNullOrWhiteSpace(s)))
                 {
-                    _logger.LogDebug("Initial row count {Current} below minimum {Min}; entering polling loop", currentCount, target);
-                    while (elapsed < _pdfConfig.DataLoadRetryMs && currentCount < target)
+                    try
                     {
-                        try
+                        _logger.LogDebug("Waiting for additional selector '{Selector}'", sel);
+                        await page.WaitForSelectorAsync(sel, new PuppeteerSharp.WaitForSelectorOptions
                         {
-                            await page.WaitForFunctionAsync($"() => document.querySelectorAll('{escapedRowSel}').length >= {target}", new PuppeteerSharp.WaitForFunctionOptions { Timeout = interval });
-                        }
-                        catch { /* swallow timeout for short interval */ }
-                        currentCount = await page.EvaluateFunctionAsync<int>("sel => document.querySelectorAll(sel).length", selector);
-                        _logger.LogDebug("Row polling: t={Elapsed}ms count={Count}", elapsed, currentCount);
-                        if (currentCount >= target) break;
-                        elapsed += interval;
+                            Timeout = _pdfConfig.NavigationTimeoutSeconds * 1000
+                        });
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Additional selector '{Selector}' not found within timeout; continuing", sel);
                     }
                 }
-                _logger.LogInformation("Data row diagnostic: Selector={Selector} FinalCount={Count} PolledMs={Elapsed}", selector, currentCount, elapsed);
             }
-            catch (Exception ex)
+    
+            // Data rows readiness (indicates XHR-rendered data present)
+            if (_pdfConfig.MinimumDataRows > 0 && !string.IsNullOrWhiteSpace(_pdfConfig.DataReadyRowSelector))
             {
-                _logger.LogWarning(ex, "Failed to evaluate data row readiness selector '{Selector}'", _pdfConfig.DataReadyRowSelector);
-            }
-        }
-
-        // Selector & data container outerHTML diagnostics (truncated)
-        try
-        {
-            if (!string.IsNullOrWhiteSpace(_pdfConfig.WaitForSelector))
-            {
-                var selHtml = await page.EvaluateFunctionAsync<string>("sel => { const el=document.querySelector(sel); if(!el) return ''; const html=el.outerHTML; return html.length>500? html.substring(0,500)+'...('+html.length+' chars)': html; }", _pdfConfig.WaitForSelector);
-                if (!string.IsNullOrEmpty(selHtml))
+                try
                 {
-                    _logger.LogDebug("OuterHTML snippet for WaitForSelector '{Selector}': {HtmlSnippet}", _pdfConfig.WaitForSelector, selHtml);
+                    var elapsed = 0;
+                    var interval = 500;
+                    var target = _pdfConfig.MinimumDataRows;
+                    var selector = _pdfConfig.DataReadyRowSelector;
+                    var escapedRowSel = selector.Replace("'", "\\'");
+                    int currentCount = await page.EvaluateFunctionAsync<int>("sel => document.querySelectorAll(sel).length", selector);
+                    if (currentCount < target)
+                    {
+                        _logger.LogDebug("Initial row count {Current} below minimum {Min}; entering polling loop", currentCount, target);
+                        while (elapsed < _pdfConfig.DataLoadRetryMs && currentCount < target)
+                        {
+                            try
+                            {
+                                await page.WaitForFunctionAsync($"() => document.querySelectorAll('{escapedRowSel}').length >= {target}", new PuppeteerSharp.WaitForFunctionOptions { Timeout = interval });
+                            }
+                            catch { /* swallow timeout for short interval */ }
+                            currentCount = await page.EvaluateFunctionAsync<int>("sel => document.querySelectorAll(sel).length", selector);
+                            _logger.LogDebug("Row polling: t={Elapsed}ms count={Count}", elapsed, currentCount);
+                            if (currentCount >= target) break;
+                            elapsed += interval;
+                        }
+                    }
+                    _logger.LogInformation("Data row diagnostic: Selector={Selector} FinalCount={Count} PolledMs={Elapsed}", selector, currentCount, elapsed);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to evaluate data row readiness selector '{Selector}'", _pdfConfig.DataReadyRowSelector);
                 }
             }
-            if (!string.IsNullOrWhiteSpace(_pdfConfig.DataReadyRowSelector))
-            {
-                var rowParentHtml = await page.EvaluateFunctionAsync<string>("rowSel => { const row=document.querySelector(rowSel); if(!row) return ''; const parent=row.closest('table')||row.parentElement; if(!parent) return ''; const html=parent.outerHTML; return html.length>500? html.substring(0,500)+'...('+html.length+' chars)': html; }", _pdfConfig.DataReadyRowSelector);
-                if (!string.IsNullOrEmpty(rowParentHtml))
-                {
-                    _logger.LogDebug("OuterHTML snippet for data container (from row selector '{Selector}'): {HtmlSnippet}", _pdfConfig.DataReadyRowSelector, rowParentHtml);
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Failed capturing outerHTML diagnostics");
-        }
-
-        // Optional stabilization delay after everything is present
-        if (_pdfConfig.PostSelectorStableMs > 0)
-        {
-            _logger.LogDebug("Post-selector stabilization delay {Ms}ms", _pdfConfig.PostSelectorStableMs);
-            await Task.Delay(_pdfConfig.PostSelectorStableMs);
-        }
-
-        // Final page readiness diagnostic - check for critical content elements
-        try
-        {
-            var contentCheck = await page.EvaluateExpressionAsync<string>(@"
-                (() => {
-                    const checks = [];
-                    // Check for barcodes
-                    const svgs = document.querySelectorAll('svg');
-                    const canvases = document.querySelectorAll('canvas');
-                    const barcodeImgs = document.querySelectorAll('img[src*=""barcode""], img[alt*=""barcode""]');
-                    checks.push(`SVG elements: ${svgs.length}`);
-                    checks.push(`Canvas elements: ${canvases.length}`);
-                    checks.push(`Barcode images: ${barcodeImgs.length}`);
-
-                    // Check table rows
-                    const tableRows = document.querySelectorAll('table#KortHyvdds tbody tr');
-                    checks.push(`Table rows: ${tableRows.length}`);
-
-                    // Check if PicklistNumber has content
-                    const picklistNum = document.querySelector('#PicklistNumber, [data-bind*=""PickListNumber""]');
-                    checks.push(`PicklistNumber populated: ${picklistNum && picklistNum.textContent.trim().length > 0}`);
-
-                    return checks.join('; ');
-                })()
-            ");
-            _logger.LogInformation("Page content readiness check: {Check}", contentCheck);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogDebug(ex, "Content readiness check failed");
-        }
-
-        // Report JavaScript errors summary
-        if (jsErrors.Count > 0)
-        {
-            _logger.LogWarning("Detected {Count} JavaScript error(s) during navigation - these may prevent data rendering:", jsErrors.Count);
-            foreach (var err in jsErrors.Take(5))
-            {
-                _logger.LogWarning("  - {Error}", err.Length > 200 ? err.Substring(0, 200) + "..." : err);
-            }
-        }
-        else
-        {
-            _logger.LogInformation("No JavaScript console errors detected during navigation");
-        }
-
-        // Diagnostic screenshot after navigation if enabled
-        if (_pdfConfig.CaptureDiagnosticScreenshot)
-        {
+    
+            // Selector & data container outerHTML diagnostics (truncated)
             try
             {
-                var shotsDir = DataPaths.EnsureDir("screenshots");
-                var shotPath = Path.Combine(shotsDir, $"nav_{DateTime.Now:yyyyMMdd_HHmmssfff}_{(string.IsNullOrWhiteSpace(orderId) ? picklistIdForDetection : orderId)}.png");
-                await page.ScreenshotAsync(shotPath, new PuppeteerSharp.ScreenshotOptions { FullPage = true });
-                _logger.LogInformation("Captured navigation diagnostic screenshot: {Path}", shotPath);
+                if (!string.IsNullOrWhiteSpace(_pdfConfig.WaitForSelector))
+                {
+                    var selHtml = await page.EvaluateFunctionAsync<string>("sel => { const el=document.querySelector(sel); if(!el) return ''; const html=el.outerHTML; return html.length>500? html.substring(0,500)+'...('+html.length+' chars)': html; }", _pdfConfig.WaitForSelector);
+                    if (!string.IsNullOrEmpty(selHtml))
+                    {
+                        _logger.LogDebug("OuterHTML snippet for WaitForSelector '{Selector}': {HtmlSnippet}", _pdfConfig.WaitForSelector, selHtml);
+                    }
+                }
+                if (!string.IsNullOrWhiteSpace(_pdfConfig.DataReadyRowSelector))
+                {
+                    var rowParentHtml = await page.EvaluateFunctionAsync<string>("rowSel => { const row=document.querySelector(rowSel); if(!row) return ''; const parent=row.closest('table')||row.parentElement; if(!parent) return ''; const html=parent.outerHTML; return html.length>500? html.substring(0,500)+'...('+html.length+' chars)': html; }", _pdfConfig.DataReadyRowSelector);
+                    if (!string.IsNullOrEmpty(rowParentHtml))
+                    {
+                        _logger.LogDebug("OuterHTML snippet for data container (from row selector '{Selector}'): {HtmlSnippet}", _pdfConfig.DataReadyRowSelector, rowParentHtml);
+                    }
+                }
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Failed to capture navigation diagnostic screenshot");
+                _logger.LogWarning(ex, "Failed capturing outerHTML diagnostics");
             }
-        }
-
-        // Diagnostic: log HTML length & presence of selector
-        try
-        {
-            var html = await page.GetContentAsync();
-            var length = html.Length;
-            bool selectorPresent = false;
-            if (!string.IsNullOrWhiteSpace(_pdfConfig.WaitForSelector))
+    
+            // Optional stabilization delay after everything is present
+            if (_pdfConfig.PostSelectorStableMs > 0)
             {
-                selectorPresent = await page.EvaluateFunctionAsync<bool>("sel => !!document.querySelector(sel)", _pdfConfig.WaitForSelector);
+                _logger.LogDebug("Post-selector stabilization delay {Ms}ms", _pdfConfig.PostSelectorStableMs);
+                await Task.Delay(_pdfConfig.PostSelectorStableMs);
             }
-            _logger.LogInformation("Navigation diagnostic: HTML length={Length} SelectorPresent={SelectorPresent}", length, selectorPresent);
-            if (!string.IsNullOrWhiteSpace(_lastInterceptedPicklistJson))
+    
+            // Final page readiness diagnostic - check for critical content elements
+            try
             {
-                _logger.LogDebug("Navigation diagnostic: Stored intercepted picklist JSON snippet length={Len}", _lastInterceptedPicklistJson.Length);
+                var contentCheck = await page.EvaluateExpressionAsync<string>(@"
+                    (() => {
+                        const checks = [];
+                        // Check for barcodes
+                        const svgs = document.querySelectorAll('svg');
+                        const canvases = document.querySelectorAll('canvas');
+                        const barcodeImgs = document.querySelectorAll('img[src*=""barcode""], img[alt*=""barcode""]');
+                        checks.push(`SVG elements: ${svgs.length}`);
+                        checks.push(`Canvas elements: ${canvases.length}`);
+                        checks.push(`Barcode images: ${barcodeImgs.length}`);
+    
+                        // Check table rows
+                        const tableRows = document.querySelectorAll('table#KortHyvdds tbody tr');
+                        checks.push(`Table rows: ${tableRows.length}`);
+    
+                        // Check if PicklistNumber has content
+                        const picklistNum = document.querySelector('#PicklistNumber, [data-bind*=""PickListNumber""]');
+                        checks.push(`PicklistNumber populated: ${picklistNum && picklistNum.textContent.trim().length > 0}`);
+    
+                        return checks.join('; ');
+                    })()
+                ");
+                _logger.LogInformation("Page content readiness check: {Check}", contentCheck);
             }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Failed to capture navigation diagnostic HTML");
-        }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "Content readiness check failed");
+            }
+    
+            // Report JavaScript errors summary
+            if (jsErrors.Count > 0)
+            {
+                _logger.LogWarning("Detected {Count} JavaScript error(s) during navigation - these may prevent data rendering:", jsErrors.Count);
+                foreach (var err in jsErrors.Take(5))
+                {
+                    _logger.LogWarning("  - {Error}", err.Length > 200 ? err.Substring(0, 200) + "..." : err);
+                }
+            }
+            else
+            {
+                _logger.LogInformation("No JavaScript console errors detected during navigation");
+            }
+    
+            // Diagnostic screenshot after navigation if enabled
+            if (_pdfConfig.CaptureDiagnosticScreenshot)
+            {
+                try
+                {
+                    var shotsDir = DataPaths.EnsureDir("screenshots");
+                    var shotPath = Path.Combine(shotsDir, $"nav_{DateTime.Now:yyyyMMdd_HHmmssfff}_{(string.IsNullOrWhiteSpace(orderId) ? picklistIdForDetection : orderId)}.png");
+                    await page.ScreenshotAsync(shotPath, new PuppeteerSharp.ScreenshotOptions { FullPage = true });
+                    _logger.LogInformation("Captured navigation diagnostic screenshot: {Path}", shotPath);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to capture navigation diagnostic screenshot");
+                }
+            }
+    
+            // Diagnostic: log HTML length & presence of selector
+            try
+            {
+                var html = await page.GetContentAsync();
+                var length = html.Length;
+                bool selectorPresent = false;
+                if (!string.IsNullOrWhiteSpace(_pdfConfig.WaitForSelector))
+                {
+                    selectorPresent = await page.EvaluateFunctionAsync<bool>("sel => !!document.querySelector(sel)", _pdfConfig.WaitForSelector);
+                }
+                _logger.LogInformation("Navigation diagnostic: HTML length={Length} SelectorPresent={SelectorPresent}", length, selectorPresent);
+                if (!string.IsNullOrWhiteSpace(_lastInterceptedPicklistJson))
+                {
+                    _logger.LogDebug("Navigation diagnostic: Stored intercepted picklist JSON snippet length={Len}", _lastInterceptedPicklistJson.Length);
+                }
+            }
+            catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to capture navigation diagnostic HTML");
+                }
+        } // End of SPA navigation path
 
-        // Store the live page for subsequent print action (don't dispose it)
+        // Store the live page for subsequent print action (don't dispose it) - common to both paths
         _capturedPage = page;
-        _capturedPageContextId = string.IsNullOrWhiteSpace(picklistIdForDetection) ? orderId : picklistIdForDetection;
+        _capturedPageContextId = context != null && context.TryGetValue("pickListId", out var ctxPicklistId) ? ctxPicklistId?.ToString() ?? orderId : orderId;
         _logger.LogInformation("Page fully loaded and ready for printing (keeping browser page alive)");
     }
 
@@ -1999,19 +2110,35 @@ public class SubActionExecutor : ISubActionExecutor
                 document.head.appendChild(style);
 
                 // Find and style CUSTOMER field (label + value)
+                let customerStyledCount = 0;
                 const allElements = Array.from(document.querySelectorAll('*'));
                 allElements.forEach(el => {
                     const text = el.textContent?.trim() || '';
-                    // Look for element containing 'CUSTOMER:' label
+
+                    // Method 1: Look for element containing 'CUSTOMER:' label combined with value
                     if (text.startsWith('CUSTOMER:') && text.length < 100) {
                         el.classList.add('customer-highlight');
-                        console.log('Styled customer label:', el.tagName);
+                        customerStyledCount++;
                     }
-                    // Also look for the value separately if it's in a different element
-                    const prevText = el.previousElementSibling?.textContent?.trim() || '';
-                    if (prevText === 'CUSTOMER:' && text.length > 2 && text.length < 100 && !text.includes(':')) {
-                        el.classList.add('customer-highlight');
-                        console.log('Styled customer value:', el.tagName);
+                    // Method 2: Look for the value separately if it's in a different element (previous sibling check)
+                    else if (el.previousElementSibling) {
+                        const prevText = el.previousElementSibling.textContent?.trim() || '';
+                        if (prevText === 'CUSTOMER:' && text.length > 2 && text.length < 100 && !text.includes(':')) {
+                            el.classList.add('customer-highlight');
+                            customerStyledCount++;
+                        }
+                    }
+                    // Method 3: Look for parent element that contains CUSTOMER: label
+                    else if (el.parentElement) {
+                        const parentText = el.parentElement.textContent?.trim() || '';
+                        if (parentText.includes('CUSTOMER:') && text.length > 2 && text.length < 100 && !text.includes(':') && text !== 'CUSTOMER:') {
+                            // Check if this is the customer value (not another label)
+                            const allText = parentText.replace(/\s+/g, ' ');
+                            if (allText.match(/CUSTOMER:\s*/ + text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))) {
+                                el.classList.add('customer-highlight');
+                                customerStyledCount++;
+                            }
+                        }
                     }
                 });
 
@@ -2061,7 +2188,7 @@ public class SubActionExecutor : ISubActionExecutor
                     }
                 });
 
-                console.log('PDF print styles injected. Hidden Short Items elements:', shortItemsElements.length);
+                console.log('PDF print styles injected. Hidden Short Items elements: ' + shortItemsElements.length + ', Styled customer elements: ' + customerStyledCount);
             ");
             _logger.LogInformation("Portrait orientation CSS + Short Items hiding applied");
         }
@@ -2115,6 +2242,237 @@ public class SubActionExecutor : ISubActionExecutor
         }
         _capturedPageContextId = string.Empty;
         _lastInterceptedPicklistJson = null;
+    }
+
+    private async Task ExecuteSaveCapturedHtmlAsync(SubAction action, string orderId, CancellationToken ct)
+    {
+        if (_capturedPage == null)
+        {
+            _logger.LogWarning("No captured page available to save. Skipping save action.");
+            return;
+        }
+
+        var jobName = string.IsNullOrWhiteSpace(_capturedPageContextId)
+            ? action.Name
+            : $"{action.Name}-{_capturedPageContextId}";
+
+        _logger.LogInformation("Saving PDF from live browser page. Job: {JobName}", jobName);
+
+        // Re-verify selector readiness if configured (defensive check; page may have updated since capture)
+        if (!string.IsNullOrWhiteSpace(_pdfConfig.WaitForSelector))
+        {
+            try
+            {
+                bool selectorPresent = await _capturedPage.EvaluateFunctionAsync<bool>("sel => !!document.querySelector(sel)", _pdfConfig.WaitForSelector);
+                _logger.LogDebug("Save diagnostic: Selector '{Selector}' present={Present}", _pdfConfig.WaitForSelector, selectorPresent);
+                if (selectorPresent)
+                {
+                    var escaped = _pdfConfig.WaitForSelector.Replace("'", "\\'");
+                    await _capturedPage.WaitForFunctionAsync($"() => (document.querySelector('{escaped}')?.textContent || '').trim().length > 0", new PuppeteerSharp.WaitForFunctionOptions
+                    {
+                        Timeout = 5000
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Selector verification during save failed; continuing");
+            }
+        }
+
+        // Optional diagnostic screenshot before PDF
+        if (_pdfConfig.CaptureDiagnosticScreenshot)
+        {
+            try
+            {
+                var shotsDir = DataPaths.EnsureDir("screenshots");
+                var shotPath = Path.Combine(shotsDir, $"presave_{DateTime.Now:yyyyMMdd_HHmmssfff}_{orderId}.png");
+                await _capturedPage.ScreenshotAsync(shotPath, new PuppeteerSharp.ScreenshotOptions { FullPage = true });
+                _logger.LogInformation("Captured pre-save diagnostic screenshot: {Path}", shotPath);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to capture pre-save diagnostic screenshot");
+            }
+        }
+
+        // Force portrait orientation via CSS and hide "Short Items" section
+        _logger.LogDebug("Injecting PDF save styles (portrait orientation + hiding Short Items)");
+        try
+        {
+            await _capturedPage.EvaluateExpressionAsync(@"
+                // Inject CSS to force portrait mode for PDF printing
+                const style = document.createElement('style');
+                style.textContent = `
+                    @page {
+                        size: portrait;
+                        margin: 0.5in;
+                    }
+                    @media print {
+                        body {
+                            -webkit-print-color-adjust: exact;
+                            print-color-adjust: exact;
+                        }
+                    }
+                `;
+                document.head.appendChild(style);
+
+                // Customer highlighting (highlight customer name in bold/red for better visibility)
+                let customerStyledCount = 0;
+                const customerNameElement = document.querySelector('.customer-name, [class*=""customer""]');
+                if (customerNameElement) {
+                    const text = customerNameElement.textContent.trim();
+                    if (text && text.length > 0) {
+                        // Find all elements containing this customer name and style them
+                        document.querySelectorAll('*').forEach(el => {
+                            if (el.textContent.includes(text) && el.children.length === 0) {
+                                el.style.fontWeight = 'bold';
+                                el.style.color = '#d32f2f';
+                                customerStyledCount++;
+                            } else {
+                                // Check parent's full text for 'CUSTOMER: [name]' pattern
+                                const parent = el.closest('div, td, th, p, span');
+                                if (parent) {
+                                    const parentText = parent.textContent.trim();
+                                    const allText = parentText.replace(/\s+/g, ' ');
+                                    if (allText.match(/CUSTOMER:\s*/ + text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))) {
+                                        el.classList.add('customer-highlight');
+                                        customerStyledCount++;
+                                    }
+                                }
+                            }
+                        });
+                    }
+                }
+
+                // Hide any element with heading or title containing 'Short Items' or 'ShortItems'
+                const shortItemsElements = [];
+
+                // Method 1: Find by heading text (h1-h6 tags)
+                document.querySelectorAll('h1, h2, h3, h4, h5, h6').forEach(heading => {
+                    const text = heading.textContent.trim().toLowerCase().replace(/\s+/g, '');
+                    if (text === 'shortitems' || text.includes('shortitems')) {
+                        // Hide the heading and its next sibling (likely the table)
+                        heading.style.display = 'none';
+                        if (heading.nextElementSibling) {
+                            heading.nextElementSibling.style.display = 'none';
+                        }
+                        // Also try to hide parent if it's a wrapper
+                        const parent = heading.closest('div, section, article');
+                        if (parent && parent.textContent.trim().toLowerCase().replace(/\s+/g, '').includes('shortitems')) {
+                            parent.style.display = 'none';
+                        }
+                        shortItemsElements.push(heading);
+                    }
+                });
+
+                // Method 2: Find tables that have empty body (Short Items table has headers but no data)
+                document.querySelectorAll('table').forEach(table => {
+                    const headers = Array.from(table.querySelectorAll('th, thead td')).map(h => h.textContent.trim().toLowerCase());
+                    const hasShortItemsHeaders = headers.some(h => h.includes('order') && h.includes('sku') && h.includes('product'));
+                    const tbody = table.querySelector('tbody');
+                    const hasNoDataRows = !tbody || tbody.querySelectorAll('tr').length === 0 ||
+                                          (tbody.querySelectorAll('tr').length === 1 && !tbody.textContent.trim());
+
+                    // If it looks like the Short Items table (has expected headers and no data)
+                    if (hasShortItemsHeaders && hasNoDataRows) {
+                        table.style.display = 'none';
+                        shortItemsElements.push(table);
+
+                        // Also hide any preceding heading
+                        let prev = table.previousElementSibling;
+                        while (prev && prev.tagName && prev.tagName.match(/^H[1-6]$/)) {
+                            const text = prev.textContent.trim().toLowerCase().replace(/\s+/g, '');
+                            if (text.includes('shortitems')) {
+                                prev.style.display = 'none';
+                            }
+                            break;
+                        }
+                    }
+                });
+
+                console.log('PDF save styles injected. Hidden Short Items elements: ' + shortItemsElements.length + ', Styled customer elements: ' + customerStyledCount);
+            ");
+            _logger.LogInformation("Portrait orientation CSS + Short Items hiding applied");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to inject PDF save styles (continuing with PDF generation)");
+        }
+
+        // Generate PDF directly from the live page (preserves CSS and JavaScript state)
+        var pdfBytes = await CreatePdfFromPageAsync(_capturedPage, ct);
+
+        // Save the PDF to disk (MUST succeed)
+        var outputDir = DataPaths.EnsureDir("out");
+        var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmssfff");
+        var filename = $"{timestamp}_{jobName}.pdf";
+        var filePath = Path.Combine(outputDir, filename);
+        await File.WriteAllBytesAsync(filePath, pdfBytes, ct);
+        _logger.LogInformation("PDF saved to {Path}", filePath);
+
+        // Store the file path for potential printing later
+        _lastSavedPdfPath = filePath;
+
+        _logger.LogInformation("Successfully saved page to PDF");
+
+        // Dispose the page and clear reference
+        await _capturedPage.DisposeAsync();
+        _capturedPage = null;
+        if (_capturedBrowser != null && _pdfConfig.IsolateBrowserPerPicklist)
+        {
+            try
+            {
+                await _capturedBrowser.CloseAsync();
+                _capturedBrowser.Dispose();
+                _logger.LogDebug("Closed isolated browser instance for picklist context {ContextId}", _capturedPageContextId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "Failed closing isolated browser (non-fatal)");
+            }
+            finally
+            {
+                _capturedBrowser = null;
+            }
+        }
+        _capturedPageContextId = string.Empty;
+        _lastInterceptedPicklistJson = null;
+    }
+
+    private async Task ExecutePrintSavedPdfAsync(SubAction action, string orderId, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(_lastSavedPdfPath))
+        {
+            _logger.LogWarning("No saved PDF path available. Skipping print action.");
+            return;
+        }
+
+        if (!File.Exists(_lastSavedPdfPath))
+        {
+            _logger.LogWarning("Saved PDF file not found at {Path}. Skipping print action.", _lastSavedPdfPath);
+            _lastSavedPdfPath = null;
+            return;
+        }
+
+        var jobName = string.IsNullOrWhiteSpace(_capturedPageContextId)
+            ? action.Name
+            : $"{action.Name}-{_capturedPageContextId}";
+
+        _logger.LogInformation("Printing saved PDF. Job: {JobName}, Path: {Path}", jobName, _lastSavedPdfPath);
+
+        // Read the PDF file
+        var pdfBytes = await File.ReadAllBytesAsync(_lastSavedPdfPath, ct);
+
+        // Send to printer if configured (MUST succeed - exception will trigger retry)
+        var printerName = GetActiveConfig().PrinterName;
+        await _printer.PrintPdfBytesAsync(pdfBytes, jobName, printerName, ct);
+        _logger.LogInformation("PDF sent to printer {Printer}: {JobName}", printerName ?? "default", jobName);
+
+        _logger.LogInformation("Successfully printed saved PDF");
+
+        // Clear the saved path reference
+        _lastSavedPdfPath = null;
     }
 
     private async Task<byte[]> CreatePdfFromPageAsync(PuppeteerSharp.IPage page, CancellationToken ct)
@@ -2237,6 +2595,29 @@ public class SubActionExecutor : ISubActionExecutor
     {
         return input.Replace("{id}", orderId, StringComparison.OrdinalIgnoreCase)
                     .Replace("{orderId}", orderId, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private Dictionary<string, object> JsonElementToDictionary(JsonElement element)
+    {
+        var dict = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+
+        if (element.ValueKind == JsonValueKind.Object)
+        {
+            foreach (var property in element.EnumerateObject())
+            {
+                dict[property.Name] = property.Value.ValueKind switch
+                {
+                    JsonValueKind.String => property.Value.GetString() ?? string.Empty,
+                    JsonValueKind.Number => property.Value.GetDouble(),
+                    JsonValueKind.True => true,
+                    JsonValueKind.False => false,
+                    JsonValueKind.Null => string.Empty,
+                    _ => property.Value.GetRawText()
+                };
+            }
+        }
+
+        return dict;
     }
 
     private string ExtractHtmlFromJson(string jsonResponse, string jsonPath)

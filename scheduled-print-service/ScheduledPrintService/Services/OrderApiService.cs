@@ -239,7 +239,7 @@ public class OrderApiService : IOrderApiService
             _logger.LogInformation("Response preview: {Preview}...", preview);
 
             // Parse JSON and extract order records
-            var orders = ParseOrderRecords(responseBody);
+            var orders = ParseOrderRecords(responseBody, apiConfig);
             _logger.LogInformation("Extracted {Count} order records", orders.Count);
 
             if (orders.Count > 0)
@@ -320,6 +320,11 @@ public class OrderApiService : IOrderApiService
 
     private List<OrderRecord> ParseOrderRecords(string jsonResponse)
     {
+        return ParseOrderRecords(jsonResponse, _config);
+    }
+
+    private List<OrderRecord> ParseOrderRecords(string jsonResponse, ApiConfig config)
+    {
         var records = new List<OrderRecord>();
 
         try
@@ -354,12 +359,28 @@ public class OrderApiService : IOrderApiService
                 return records;
             }
 
+            var totalItems = 0;
+            var filteredOutItems = 0;
+
             foreach (var item in dataElement.EnumerateArray())
             {
+                totalItems++;
+
                 try
                 {
+                    // Apply primary API filter if configured (BEFORE extracting ID)
+                    if (!string.IsNullOrEmpty(config.PrimaryFilterType))
+                    {
+                        if (!ApplyPrimaryFilter(item, config))
+                        {
+                            filteredOutItems++;
+                            _logger.LogDebug("Item filtered out by primary API filter: {FilterType}", config.PrimaryFilterType);
+                            continue; // Skip this item
+                        }
+                    }
+
                     // Extract ID using configured JSON path
-                    var id = ExtractIdFromJsonPath(item, _config.IdJsonPath);
+                    var id = ExtractIdFromJsonPath(item, config.IdJsonPath);
 
                     if (!string.IsNullOrEmpty(id))
                     {
@@ -371,13 +392,19 @@ public class OrderApiService : IOrderApiService
                     }
                     else
                     {
-                        _logger.LogWarning("Could not extract ID from record using path: {Path}", _config.IdJsonPath);
+                        _logger.LogWarning("Could not extract ID from record using path: {Path}", config.IdJsonPath);
                     }
                 }
                 catch (Exception ex)
                 {
                     _logger.LogWarning(ex, "Failed to parse individual record");
                 }
+            }
+
+            if (filteredOutItems > 0)
+            {
+                _logger.LogInformation("Primary API filter applied: {Total} total items, {Filtered} filtered out, {Kept} kept",
+                    totalItems, filteredOutItems, records.Count);
             }
         }
         catch (JsonException ex)
@@ -421,5 +448,95 @@ public class OrderApiService : IOrderApiService
         }
 
         return string.Empty;
+    }
+
+    private bool StartsWithAny(string fieldValue, string commaSeparatedValues)
+    {
+        // Split comma-separated values and check if field starts with any of them
+        var values = commaSeparatedValues.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        foreach (var value in values)
+        {
+            if (fieldValue.StartsWith(value, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private bool ApplyPrimaryFilter(JsonElement item, ApiConfig config)
+    {
+        try
+        {
+            var filterType = config.PrimaryFilterType!.ToLowerInvariant();
+            var filterValue = config.PrimaryFilterValue ?? string.Empty;
+
+            // Get field value - handle both direct fields and array indices
+            string fieldValue;
+
+            if (config.PrimaryFilterArrayIndex.HasValue)
+            {
+                // Handle array index filtering (e.g., data[x][17])
+                var arrayIndex = config.PrimaryFilterArrayIndex.Value;
+
+                if (item.ValueKind == JsonValueKind.Array)
+                {
+                    var array = item.EnumerateArray().ToList();
+                    if (arrayIndex < array.Count)
+                    {
+                        fieldValue = array[arrayIndex].ToString();
+                    }
+                    else
+                    {
+                        _logger.LogDebug("Array index {Index} out of bounds (array length: {Length})", arrayIndex, array.Count);
+                        return true; // Allow through if index is out of bounds
+                    }
+                }
+                else
+                {
+                    _logger.LogWarning("Filter configured for array index but item is not an array. Kind={Kind}", item.ValueKind);
+                    return true; // Allow through if misconfigured
+                }
+            }
+            else if (!string.IsNullOrEmpty(config.PrimaryFilterField))
+            {
+                // Handle field-based filtering
+                if (item.TryGetProperty(config.PrimaryFilterField, out var fieldElement))
+                {
+                    fieldValue = fieldElement.ToString();
+                }
+                else
+                {
+                    _logger.LogDebug("Field {Field} not found in item", config.PrimaryFilterField);
+                    return true; // Allow through if field not found
+                }
+            }
+            else
+            {
+                _logger.LogWarning("Primary filter configuration missing both PrimaryFilterArrayIndex and PrimaryFilterField");
+                return true; // Allow through if misconfigured
+            }
+
+            // Apply filter based on filter type
+            return filterType switch
+            {
+                "startswith" => fieldValue.StartsWith(filterValue, StringComparison.OrdinalIgnoreCase),
+                "notstartswith" => !fieldValue.StartsWith(filterValue, StringComparison.OrdinalIgnoreCase),
+                "startswithany" => StartsWithAny(fieldValue, filterValue),
+                "notstartswithany" => !StartsWithAny(fieldValue, filterValue),
+                "contains" => fieldValue.Contains(filterValue, StringComparison.OrdinalIgnoreCase),
+                "notcontains" => !fieldValue.Contains(filterValue, StringComparison.OrdinalIgnoreCase),
+                "equals" => fieldValue.Equals(filterValue, StringComparison.OrdinalIgnoreCase),
+                "notequals" => !fieldValue.Equals(filterValue, StringComparison.OrdinalIgnoreCase),
+                "notempty" => !string.IsNullOrWhiteSpace(fieldValue),
+                "empty" => string.IsNullOrWhiteSpace(fieldValue),
+                _ => true // Unknown filter type - allow through
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Error applying primary filter");
+            return true; // Allow through on error
+        }
     }
 }

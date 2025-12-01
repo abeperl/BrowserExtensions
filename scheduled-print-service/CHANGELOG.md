@@ -1,0 +1,297 @@
+# Changelog
+
+## 2025-11-30 - API #3 NavigateOnly Context Passing Fix
+
+### Problem
+After implementing the split save/print actions, API 3's `NavigateOnly` sub-action had a critical bug:
+- **Token substitution failing**: `{itemNotes}` placeholder not being replaced with actual values
+- **Null context**: The action received `null` instead of order data dictionary
+- **SPA navigation triggered**: URL with literal `{itemNotes}` doesn't contain `.html`, so static file detection failed
+- **404 errors and timeouts**: Browser tried to navigate to broken URLs like `https://mj.3plnext.com/{itemNotes}`
+
+**Root Cause:** `ExecuteActionAsync` was passing `null` for context instead of converting `orderData` to dictionary.
+
+### Solution
+Fixed two issues in `SubActionExecutor.cs`:
+
+**Fix #1 - Pass Order Data as Context** (Line 245-248):
+Changed from passing `null` to converting `orderData` to dictionary, matching the pattern used by `GetUrlAndPrint` action.
+
+**Fix #2 - Add Static HTML Detection** (Lines 1231-1334):
+Added static file detection logic to `ExecuteNavigateOnlyAsync` method (matching existing implementation in `ExecuteGetUrlAndPrintAsync`):
+
+1. **Detection Logic**: Checks if URL contains `.html` and no `#` hash
+2. **Direct Navigation**: Uses `page.GoToAsync()` directly for static HTML files
+3. **Network Idle Wait**: Applies configured wait time after direct navigation
+4. **SPA Path Preserved**: Existing SPA navigation logic only runs for hash routes
+
+### Code Changes
+
+**SubActionExecutor.cs:245-248** - Pass order data context to NavigateOnly:
+```csharp
+case "navigateonly":
+    var navContext = JsonElementToDictionary(orderData);
+    await ExecuteNavigateOnlyAsync(action, orderId, navContext, ct);
+    break;
+```
+
+**SubActionExecutor.cs:1231-1261** - Added static file detection:
+```csharp
+// Detect if this is a direct file path (e.g., /Store/CustomForms/file.html) vs SPA hash route
+var isDirectFile = url.Contains(".html", StringComparison.OrdinalIgnoreCase) &&
+                  !url.Contains("#") &&
+                  (url.Contains("/") || url.Contains("\\"));
+
+if (isDirectFile)
+{
+    // Direct navigation to static HTML file - no SPA shell loading needed
+    _logger.LogInformation("Direct file navigation detected (contains .html), navigating directly to {Url}", url);
+    await page.GoToAsync(url, new PuppeteerSharp.NavigationOptions
+    {
+        WaitUntil = new[] { PuppeteerSharp.WaitUntilNavigation.Load },
+        Timeout = 60000
+    });
+    // ... wait for network idle ...
+}
+else
+{
+    // SPA hash navigation - existing logic
+}
+```
+
+**SubActionExecutor.cs:1262-1978** - Wrapped SPA-specific logic in `else` block:
+- SPA shell loading
+- Token injection to localStorage/sessionStorage
+- SPA framework readiness detection
+- Hash route navigation
+- Picklist API interception
+- Knockout.js binding detection
+
+### Expected Behavior
+
+**Before Fix:**
+```
+[WRN] Unresolved token(s) in navigation URL after substitution: {itemNotes}
+[INF] Navigating (capture only) to URL: https://mj.3plnext.com/{itemNotes}
+[DBG] SPA navigation detected, loading application shell before hash navigation
+[404 errors and timeouts]
+```
+
+**After Fix:**
+```
+[INF] Navigating (capture only) to URL: https://mj.3plnext.com/Store/CustomForms/order123.html
+[INF] Direct file navigation detected (contains .html), navigating directly to URL
+[INF] Direct navigation completed successfully
+```
+
+### Benefits
+- ✅ Token substitution now works - `{itemNotes}` replaced with actual file paths
+- ✅ Static HTML files load directly without SPA overhead
+- ✅ No more 404 errors from incorrect navigation
+- ✅ Faster page loads for custom forms
+- ✅ Preserves existing SPA navigation for hash routes
+- ✅ Consistent with other action types (`GetUrlAndPrint`)
+
+### Files Changed
+- `ScheduledPrintService/Services/SubActionExecutor.cs` (Line 246-247, Lines 1231-1978)
+  - Pass order data context to NavigateOnly action
+  - Add static HTML file detection logic
+
+## 2025-11-30 - API #3 Independent Save/Print Actions
+
+### Major Enhancement: Split PDF Save and Print Operations
+
+**Problem**: API 3 had a single `PrintCapturedHtml` action that always both saved AND printed PDFs. No way to control these operations independently.
+
+**Solution**: Implemented two separate sub-actions with independent enable/disable control.
+
+### New Sub-Action Architecture
+
+API 3 now executes three sub-actions in sequence:
+
+1. **Navigate to Custom Form** (`NavigateOnly`)
+   - Performs GET request to static HTML page
+   - No SPA navigation
+   - Captures page in memory
+
+2. **Save PDF to Disk** (`SaveCapturedHtml`) - NEW
+   - Creates PDF from captured page
+   - Saves to `data/out/{timestamp}_{jobname}.pdf`
+   - Can be enabled/disabled independently
+
+3. **Print Saved PDF** (`PrintSavedPdf`) - NEW
+   - Reads saved PDF file
+   - Sends to configured printer
+   - Can be enabled/disabled independently
+
+### Code Changes
+
+**SubActionExecutor.cs:**
+- Added `_lastSavedPdfPath` field to track saved PDF location
+- Implemented `ExecuteSaveCapturedHtmlAsync()` - saves PDF only
+- Implemented `ExecutePrintSavedPdfAsync()` - prints saved PDF only
+- Updated action type switch statements for new action types
+
+**Database (api_config.db):**
+- Updated SubAction Id=15: Changed from `PrintCapturedHtml` to `SaveCapturedHtml`
+- Created SubAction Id=16: New `PrintSavedPdf` action
+- Both actions have `IsEnabled` flag for independent control
+
+### Management Tools
+
+**PowerShell Script** (`scripts/manage-api3-actions.ps1`):
+```powershell
+# View status
+.\scripts\manage-api3-actions.ps1 -Action status
+
+# Common configurations
+.\scripts\manage-api3-actions.ps1 -Action both         # Save + Print
+.\scripts\manage-api3-actions.ps1 -Action save-only    # Testing mode
+.\scripts\manage-api3-actions.ps1 -Action print-only   # No disk storage
+.\scripts\manage-api3-actions.ps1 -Action neither      # Navigate only
+
+# Fine-grained control
+.\scripts\manage-api3-actions.ps1 -Action enable-save
+.\scripts\manage-api3-actions.ps1 -Action disable-print
+```
+
+**SQL Reference** (`scripts/toggle-api3-actions.sql`):
+- SQL commands for manual database updates
+- Common configuration examples
+
+**Documentation** (`docs/API-3-CONFIGURATION.md`):
+- Comprehensive guide to new architecture
+- Use case examples
+- Technical implementation details
+- Troubleshooting guide
+
+### Use Cases
+
+1. **Production Mode** (both enabled)
+   - PDFs saved for records + printed
+   - Default configuration
+
+2. **Testing Mode** (save-only)
+   - Save PDFs for review
+   - No physical printing (saves paper/toner)
+
+3. **Print-Only Mode**
+   - Direct to printer, no disk storage
+   - High-volume environments
+
+4. **Navigation Test** (neither)
+   - Test page loading only
+   - No PDF operations
+
+### Benefits
+
+- ✅ Independent control over save and print
+- ✅ Easy testing without wasting paper
+- ✅ Can skip disk storage when not needed
+- ✅ PowerShell script for quick configuration changes
+- ✅ Comprehensive documentation
+- ✅ Backward compatible (both enabled by default)
+
+### Files Changed
+
+- `ScheduledPrintService/Services/SubActionExecutor.cs` - New action implementations
+- `data/api_config.db` - Updated sub-action configuration
+- `scripts/manage-api3-actions.ps1` - NEW management tool
+- `scripts/toggle-api3-actions.sql` - NEW SQL reference
+- `docs/API-3-CONFIGURATION.md` - NEW comprehensive guide
+
+## 2025-11-28 - Project Reorganization
+
+### Project Structure Improvements
+- **Created organized folder structure**
+  - `/docs/` - All documentation (22 markdown files)
+  - `/scripts/` - All PowerShell and SQL scripts (48 files)
+  - `/data/` - Runtime data files (excluded from git)
+
+### Changes Made
+1. **Documentation** - Moved all `.md` files to `/docs/`
+   - API guides, installation docs, monitoring guides
+   - Deployment documentation
+   - Created new PROJECT-STRUCTURE.md
+
+2. **Scripts** - Moved all automation to `/scripts/`
+   - PowerShell deployment scripts (`.ps1`)
+   - SQL migration scripts (`.sql`)
+   - Batch files (`.bat`)
+
+3. **Data** - Centralized runtime data in `/data/`
+   - `api_config.db` - SQLite database
+   - Log files and output artifacts
+   - Added `.gitignore` to exclude from version control
+
+4. **Build Configuration**
+   - Updated `.csproj` with relative paths
+   - Database and install script still copied to publish output
+   - Verified build and publish process works correctly
+
+### Files Organization
+
+**Documentation (22 files):**
+- README.md (main)
+- INSTALL.md
+- API-POLLING-GUIDE.md
+- CHAINING-GUIDE.md
+- MONITORING-GUIDE.md
+- TOKEN-RENEWAL.md
+- API-CONFIG-*.md (various API docs)
+- DEPLOYMENT-*.md (deployment guides)
+- PROJECT-*.md (project documentation)
+
+**Scripts (48 files):**
+- Installation: install-service.ps1, uninstall-service.ps1
+- Deployment: deploy-*.ps1, migrate-*.ps1
+- Configuration: configure-*.ps1, create-*.ps1, add-*.ps1
+- Diagnostics: check-*.ps1, diagnose-*.ps1
+- SQL Migrations: *.sql files
+
+**Data (excluded from git):**
+- api_config.db
+- error.txt, output.txt, printed-urls.txt
+
+### Benefits
+- ✅ Clean project root
+- ✅ Clear separation of concerns
+- ✅ Easy to find documentation
+- ✅ Scripts organized in one place
+- ✅ Runtime data excluded from version control
+- ✅ Build process unchanged
+- ✅ Publish output unchanged
+
+## 2025-11-28 - API #3 Fixes
+
+### ID Extraction Fix
+- **Issue**: Used wrong config object for IdJsonPath
+- **Fix**: Added overload to `ParseOrderRecords` accepting `ApiConfig`
+- **Result**: IDs now extracted using `orderDetailsId` field
+
+### Placeholder Replacement Fix
+- **Issue**: `{itemNotes}` not replaced in URLs
+- **Fix**: Convert `JsonElement` to dictionary before URL replacement
+- **Result**: URLs now have actual values instead of literal placeholders
+
+### Filter Implementation
+- **Issue**: Processing orders even when `itemNotes` is empty
+- **Fix**: Check filter before executing each action
+- **Result**: Orders with empty `itemNotes` are skipped
+
+### Navigation Improvement
+- **Issue**: Static HTML files treated as SPA routes
+- **Fix**: Detect direct HTML files and navigate directly
+- **Result**: Custom forms load correctly without SPA shell
+
+### Customer Styling Enhancement
+- **Improvements**: Added 3 methods to find customer element
+- **Result**: More robust customer name detection
+
+### Diagnostic Screenshots
+- **Change**: Disabled by default (only on errors)
+- **Config**: `appsettings.json` - `CaptureDiagnosticScreenshot: false`
+
+## Previous Changes
+
+See individual documentation files for historical changes.

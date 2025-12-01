@@ -39,9 +39,13 @@ $ColorWarning = "Yellow"
 $ColorError = "Red"
 
 # Check if sqlite3 is available
-$sqlite3Path = Get-Command sqlite3 -ErrorAction SilentlyContinue
-if (-not $sqlite3Path) {
-    Write-Host "ERROR: sqlite3 not found. Please install SQLite3 command-line tools." -ForegroundColor $ColorError
+$sqlite3Path = $null
+if (Test-Path ".\sqlite3.exe") {
+    $sqlite3Path = ".\sqlite3.exe"
+} elseif (Get-Command sqlite3 -ErrorAction SilentlyContinue) {
+    $sqlite3Path = "sqlite3"
+} else {
+    Write-Host "ERROR: sqlite3 not found. Please install SQLite3 command-line tools or place sqlite3.exe in the current directory." -ForegroundColor $ColorError
     exit 1
 }
 
@@ -65,7 +69,7 @@ function Invoke-Sqlite {
         [switch]$ShowResults
     )
 
-    $output = & sqlite3 $DatabasePath $Query 2>&1
+    $output = & $sqlite3Path $DatabasePath $Query 2>&1
 
     if ($LASTEXITCODE -ne 0) {
         Write-Host "ERROR: SQL execution failed: $output" -ForegroundColor $ColorError
@@ -89,7 +93,7 @@ if ($BackupDatabase) {
     Copy-Item $DatabasePath $backupPath
 
     if (Test-Path $backupPath) {
-        Write-Host "✓ Backup created: $backupPath" -ForegroundColor $ColorSuccess
+        Write-Host "[OK] Backup created: $backupPath" -ForegroundColor $ColorSuccess
     } else {
         Write-Host "ERROR: Backup failed!" -ForegroundColor $ColorError
         exit 1
@@ -106,12 +110,36 @@ if ($ApplyMigration) {
         exit 1
     }
 
-    # Execute migration
+    # Step 1: Add PrinterName column if it doesn't exist
+    Write-Host "Checking if PrinterName column needs to be added..." -ForegroundColor $ColorInfo
+    $tableInfo = & $sqlite3Path $DatabasePath "PRAGMA table_info(PrimaryApi);"
+    $columnExists = $false
+    foreach ($line in $tableInfo) {
+        if ($line -match "PrinterName") {
+            $columnExists = $true
+            break
+        }
+    }
+
+    if (-not $columnExists) {
+        Write-Host "Adding PrinterName column..." -ForegroundColor $ColorInfo
+        & $sqlite3Path $DatabasePath "ALTER TABLE PrimaryApi ADD COLUMN PrinterName TEXT;"
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "[OK] PrinterName column added" -ForegroundColor $ColorSuccess
+        } else {
+            Write-Host "ERROR: Failed to add PrinterName column" -ForegroundColor $ColorError
+            exit 1
+        }
+    } else {
+        Write-Host "[OK] PrinterName column already exists" -ForegroundColor $ColorSuccess
+    }
+
+    # Step 2: Execute migration
     Write-Host "Executing SQL migration..." -ForegroundColor $ColorInfo
-    & sqlite3 $DatabasePath < ".\update-api-2-and-create-api-4.sql"
+    Get-Content ".\update-api-2-and-create-api-4.sql" -Raw | & $sqlite3Path $DatabasePath
 
     if ($LASTEXITCODE -eq 0) {
-        Write-Host "✓ Migration applied successfully!" -ForegroundColor $ColorSuccess
+        Write-Host "[OK] Migration applied successfully!" -ForegroundColor $ColorSuccess
     } else {
         Write-Host "ERROR: Migration failed!" -ForegroundColor $ColorError
         exit 1
@@ -127,11 +155,11 @@ if ($VerifySetup) {
     # Check PrinterName column exists
     Write-Host "Checking PrinterName column..." -ForegroundColor $ColorInfo
     $sql = "PRAGMA table_info(PrimaryApi);"
-    $tableInfo = & sqlite3 $DatabasePath $sql
+    $tableInfo = & $sqlite3Path $DatabasePath $sql
     if ($tableInfo -like "*PrinterName*") {
-        Write-Host "✓ PrinterName column exists" -ForegroundColor $ColorSuccess
+        Write-Host "[OK] PrinterName column exists" -ForegroundColor $ColorSuccess
     } else {
-        Write-Host "✗ PrinterName column NOT found!" -ForegroundColor $ColorError
+        Write-Host "[ERROR] PrinterName column NOT found!" -ForegroundColor $ColorError
     }
     Write-Host ""
 
@@ -144,7 +172,13 @@ if ($VerifySetup) {
     # Check API 2 Filter
     Write-Host "API 2 Filter Configuration:" -ForegroundColor $ColorInfo
     $sql = @'
-SELECT s.ActionNumber, s.ActionName, s.ActionType, json_extract(s.Configuration, '$.ChainedFilterArrayIndex') AS FilterIndex, json_extract(s.Configuration, '$.ChainedFilterType') AS FilterType, json_extract(s.Configuration, '$.ChainedFilterValue') AS FilterValue FROM SubAction s JOIN PrimaryApi p ON s.PrimaryApiId = p.Id WHERE p.ApiNumber = 2 AND s.ActionType = 'NavigateOnly';
+SELECT s.ActionNumber, s.ActionName, s.ActionType,
+       json_extract(s.Configuration, '$.ChainedFilterArrayIndex') AS FilterIndex,
+       json_extract(s.Configuration, '$.ChainedFilterType') AS FilterType,
+       json_extract(s.Configuration, '$.ChainedFilterValue') AS FilterValue
+FROM SubAction s
+JOIN PrimaryApi p ON s.PrimaryApiId = p.Id
+WHERE p.ApiNumber = 2 AND s.ActionType = 'NavigateOnly';
 '@
     Invoke-Sqlite -Query $sql -ShowResults
     Write-Host ""
@@ -158,7 +192,13 @@ SELECT s.ActionNumber, s.ActionName, s.ActionType, json_extract(s.Configuration,
     # Check API 4 Filter
     Write-Host "API 4 Filter Configuration:" -ForegroundColor $ColorInfo
     $sql = @'
-SELECT s.ActionNumber, s.ActionName, s.ActionType, json_extract(s.Configuration, '$.ChainedFilterArrayIndex') AS FilterIndex, json_extract(s.Configuration, '$.ChainedFilterType') AS FilterType, json_extract(s.Configuration, '$.ChainedFilterValue') AS FilterValue FROM SubAction s JOIN PrimaryApi p ON s.PrimaryApiId = p.Id WHERE p.ApiNumber = 4 AND s.ActionType = 'NavigateOnly';
+SELECT s.ActionNumber, s.ActionName, s.ActionType,
+       json_extract(s.Configuration, '$.ChainedFilterArrayIndex') AS FilterIndex,
+       json_extract(s.Configuration, '$.ChainedFilterType') AS FilterType,
+       json_extract(s.Configuration, '$.ChainedFilterValue') AS FilterValue
+FROM SubAction s
+JOIN PrimaryApi p ON s.PrimaryApiId = p.Id
+WHERE p.ApiNumber = 4 AND s.ActionType = 'NavigateOnly';
 '@
     Invoke-Sqlite -Query $sql -ShowResults
     Write-Host ""
@@ -166,12 +206,12 @@ SELECT s.ActionNumber, s.ActionName, s.ActionType, json_extract(s.Configuration,
     # Check Schedules
     Write-Host "Schedule Configuration:" -ForegroundColor $ColorInfo
     $sql = @"
-SELECT s.ScheduleName, sa.ApiNumber, s.IntervalSeconds, s.IsEnabled FROM Schedule s JOIN ScheduleApi sa ON s.Id = sa.ScheduleId WHERE sa.ApiNumber IN (2, 4) ORDER BY sa.ApiNumber;
+SELECT s.ScheduleName, sa.ApiNumber, s.CronExpression, s.IsEnabled FROM Schedule s JOIN ScheduleApi sa ON s.Id = sa.ScheduleId WHERE sa.ApiNumber IN (2, 4) ORDER BY sa.ApiNumber;
 "@
     Invoke-Sqlite -Query $sql -ShowResults
     Write-Host ""
 
-    Write-Host "✓ Verification complete" -ForegroundColor $ColorSuccess
+    Write-Host "[OK] Verification complete" -ForegroundColor $ColorSuccess
     Write-Host ""
 }
 
@@ -182,7 +222,7 @@ if ($EnableApi2Schedule) {
     $sql = "UPDATE Schedule SET IsEnabled = 1 WHERE Id IN (SELECT ScheduleId FROM ScheduleApi WHERE ApiNumber = 2);"
 
     if (Invoke-Sqlite -Query $sql) {
-        Write-Host "✓ API 2 schedule enabled" -ForegroundColor $ColorSuccess
+        Write-Host "[OK] API 2 schedule enabled" -ForegroundColor $ColorSuccess
         Write-Host ""
         Write-Host "IMPORTANT: Restart the ScheduledPrintService Windows service for changes to take effect." -ForegroundColor $ColorWarning
         Write-Host "  Restart-Service -Name 'ScheduledPrintService'" -ForegroundColor $ColorInfo
@@ -197,7 +237,7 @@ if ($EnableApi4Schedule) {
     $sql = "UPDATE Schedule SET IsEnabled = 1 WHERE ScheduleName = 'Picklist Non-SS Print Schedule';"
 
     if (Invoke-Sqlite -Query $sql) {
-        Write-Host "✓ API 4 schedule enabled" -ForegroundColor $ColorSuccess
+        Write-Host "[OK] API 4 schedule enabled" -ForegroundColor $ColorSuccess
         Write-Host ""
         Write-Host "IMPORTANT: Restart the ScheduledPrintService Windows service for changes to take effect." -ForegroundColor $ColorWarning
         Write-Host "  Restart-Service -Name 'ScheduledPrintService'" -ForegroundColor $ColorInfo

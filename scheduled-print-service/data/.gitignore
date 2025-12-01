@@ -1,0 +1,6 @@
+# Ignore all data files
+*
+
+# Except this .gitignore and template database
+!.gitignore
+!api_config.db.template

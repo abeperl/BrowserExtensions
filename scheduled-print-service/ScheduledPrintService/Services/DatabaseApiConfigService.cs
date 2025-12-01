@@ -40,7 +40,7 @@ public class DatabaseApiConfigService : IDatabaseApiConfigService
         // Load primary API
         var cmd = connection.CreateCommand();
         cmd.CommandText = @"
-            SELECT ApiNumber, ApiName, BaseUrl, Endpoint, HttpMethod, Headers, Params, Payload, IsEnabled, PrinterName
+            SELECT ApiNumber, ApiName, BaseUrl, Endpoint, HttpMethod, Headers, Params, Payload, IsEnabled, PrinterName, Configuration
             FROM PrimaryApi
             WHERE ApiNumber = @ApiNumber";
         cmd.Parameters.AddWithValue("@ApiNumber", apiNumber);
@@ -116,6 +116,66 @@ public class DatabaseApiConfigService : IDatabaseApiConfigService
             if (!string.IsNullOrWhiteSpace(payloadJson))
             {
                 config.PrimaryPayload = payloadJson;
+            }
+        }
+
+        // Parse Configuration column for primary API filters
+        var configOrdinal = reader.GetOrdinal("Configuration");
+        if (!reader.IsDBNull(configOrdinal))
+        {
+            var configJson = reader.GetString(configOrdinal);
+            if (!string.IsNullOrWhiteSpace(configJson))
+            {
+                try
+                {
+                    var configDoc = JsonDocument.Parse(configJson);
+                    var root = configDoc.RootElement;
+
+                    if (root.TryGetProperty("ChainedArrayJsonPath", out var arrayPathElement))
+                    {
+                        config.PrimaryFilterArrayJsonPath = arrayPathElement.GetString();
+                    }
+
+                    if (root.TryGetProperty("ChainedFilterArrayIndex", out var filterIndexElement))
+                    {
+                        if (filterIndexElement.ValueKind == JsonValueKind.Number)
+                        {
+                            config.PrimaryFilterArrayIndex = filterIndexElement.GetInt32();
+                        }
+                    }
+
+                    if (root.TryGetProperty("ChainedFilterType", out var filterTypeElement))
+                    {
+                        config.PrimaryFilterType = filterTypeElement.GetString();
+                    }
+
+                    if (root.TryGetProperty("ChainedFilterValue", out var filterValueElement))
+                    {
+                        config.PrimaryFilterValue = filterValueElement.GetString();
+                    }
+
+                    if (root.TryGetProperty("ChainedFilterField", out var filterFieldElement))
+                    {
+                        config.PrimaryFilterField = filterFieldElement.GetString();
+                    }
+
+                    // Parse IdJsonPath if present in configuration
+                    if (root.TryGetProperty("IdJsonPath", out var idJsonPathElement))
+                    {
+                        var idJsonPath = idJsonPathElement.GetString();
+                        if (!string.IsNullOrWhiteSpace(idJsonPath))
+                        {
+                            config.IdJsonPath = idJsonPath;
+                        }
+                    }
+
+                    _logger.LogInformation("Loaded primary API filter configuration: Type={FilterType}, ArrayIndex={ArrayIndex}, Value={FilterValue}",
+                        config.PrimaryFilterType, config.PrimaryFilterArrayIndex, config.PrimaryFilterValue);
+                }
+                catch (JsonException ex)
+                {
+                    _logger.LogWarning(ex, "Failed to parse Configuration JSON for primary API");
+                }
             }
         }
 

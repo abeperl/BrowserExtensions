@@ -28,14 +28,16 @@
     <Content Include="appsettings.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="api_config.db">
+    <Content Include="../data/api_config.db">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>api_config.db</Link>
     </Content>
     <Content Include="runtimeconfig.template.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="install-service.ps1">
+    <Content Include="../scripts/install-service.ps1">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>install-service.ps1</Link>
     </Content>
   </ItemGroup>
 </Project>
