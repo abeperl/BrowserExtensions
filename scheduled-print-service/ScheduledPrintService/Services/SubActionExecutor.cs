@@ -351,7 +351,7 @@ public class SubActionExecutor : ISubActionExecutor
             var httpCt = activeConfig.ManualMode ? CancellationToken.None : ct;
             var response = await SendWithRetryAsync(factory, httpCt);
             var respBody = await response.Content.ReadAsStringAsync(httpCt);
-            _logger.LogDebug("Batch API response: {Body}", respBody);
+            _logger.LogDebug("Batch API response: {Body}", Truncate(respBody, 100));
 
             try
             {
@@ -522,7 +522,7 @@ public class SubActionExecutor : ISubActionExecutor
         response.EnsureSuccessStatusCode();
 
         var responseBody = await response.Content.ReadAsStringAsync(ct);
-        _logger.LogDebug("Sub-action API response: {Body}", responseBody);
+        _logger.LogDebug("Sub-action API response: {Body}", Truncate(responseBody, 100));
     }
 
     private async Task ExecuteGetHtmlAndPrintAsync(SubAction action, string orderId, CancellationToken ct)
@@ -573,7 +573,7 @@ public class SubActionExecutor : ISubActionExecutor
         }
 
         var responseBody = await response.Content.ReadAsStringAsync(ct);
-        _logger.LogDebug("Sub-action API response: {Body}", responseBody);
+        _logger.LogDebug("Sub-action API response: {Body}", Truncate(responseBody, 100));
 
         // Extract HTML from JSON response if path specified
         string htmlContent;
@@ -597,7 +597,8 @@ public class SubActionExecutor : ISubActionExecutor
 
         // Print the HTML
         var jobName = $"{action.Name}-{orderId}";
-        var printerName = GetActiveConfig().PrinterName;
+        // Use action-level printer name if specified, otherwise use API-level printer name
+        var printerName = action.PrinterName ?? GetActiveConfig().PrinterName;
         await _printer.PrintHtmlAsync(htmlContent, jobName, printerName, ct);
 
         _logger.LogInformation("Successfully printed {JobName} to printer {Printer}", jobName, printerName ?? "default");
@@ -614,26 +615,30 @@ public class SubActionExecutor : ISubActionExecutor
     {
         var activeConfig = GetActiveConfig();
 
-        // Find chained actions (actions with UseChainedInput that follow this action)
-        var sourceIndex = activeConfig.SubActions.IndexOf(sourceAction);
-        if (sourceIndex == -1)
+        // Get the action number of the source action
+        var sourceActionNumber = GetActionNumber(sourceAction);
+        if (sourceActionNumber == 0)
         {
-            _logger.LogDebug("Source action not found in config, skipping chained execution");
+            _logger.LogDebug("Could not determine action number for source action, skipping chained execution");
             return;
         }
 
+        // Find actions that chain from this specific action (based on ChainedFromActionNumber)
         var chainedActions = activeConfig.SubActions
-            .Skip(sourceIndex + 1)
-            .Where(a => a.Enabled && (a.UseChainedInput == true))
+            .Where(a => a.Enabled &&
+                       (a.UseChainedInput == true) &&
+                       (a.ChainedFromActionNumber == sourceActionNumber ||
+                        // Fallback: if ChainedFromActionNumber not set, use sequential logic
+                        (a.ChainedFromActionNumber == null && activeConfig.SubActions.IndexOf(a) > activeConfig.SubActions.IndexOf(sourceAction))))
             .ToList();
 
         if (chainedActions.Count == 0)
         {
-            _logger.LogDebug("No chained actions configured after '{ActionName}'", sourceAction.Name);
+            _logger.LogDebug("No chained actions configured for action #{ActionNum} '{ActionName}'", sourceActionNumber, sourceAction.Name);
             return;
         }
 
-        _logger.LogInformation("Found {Count} chained action(s) to execute", chainedActions.Count);
+        _logger.LogInformation("Found {Count} chained action(s) for action #{ActionNum}", chainedActions.Count, sourceActionNumber);
 
         // Extract data from response based on configuration
         var chainedData = ExtractChainedData(sourceAction, responseBody);
@@ -670,6 +675,13 @@ public class SubActionExecutor : ISubActionExecutor
                 }
             }
         }
+    }
+
+    private int GetActionNumber(SubAction action)
+    {
+        var activeConfig = GetActiveConfig();
+        var index = activeConfig.SubActions.IndexOf(action);
+        return index >= 0 ? index + 1 : 0; // Action numbers are 1-based
     }
 
     private List<Dictionary<string, object>> ExtractChainedData(SubAction sourceAction, string responseBody)
@@ -790,21 +802,44 @@ public class SubActionExecutor : ISubActionExecutor
 
     private bool ApplyChainedFilter(Dictionary<string, object> itemData, SubAction sourceAction)
     {
-        var filterField = sourceAction.ChainedFilterField!;
-        var filterType = sourceAction.ChainedFilterType!.ToLowerInvariant();
-        var filterValue = sourceAction.ChainedFilterValue ?? string.Empty;
+        // Apply primary filter
+        if (!string.IsNullOrEmpty(sourceAction.ChainedFilterType))
+        {
+            if (!ApplySingleFilter(itemData, sourceAction.ChainedFilterField, sourceAction.ChainedFilterType,
+                sourceAction.ChainedFilterValue, sourceAction.ChainedFilterValues, sourceAction.ChainedFilterArrayIndex))
+            {
+                return false; // Primary filter failed
+            }
+        }
+
+        // Apply additional filter (for combined filtering like API 3)
+        if (!string.IsNullOrEmpty(sourceAction.AdditionalFilterType))
+        {
+            if (!ApplySingleFilter(itemData, sourceAction.AdditionalFilterField, sourceAction.AdditionalFilterType,
+                sourceAction.AdditionalFilterValue, sourceAction.AdditionalFilterValues, null))
+            {
+                return false; // Additional filter failed
+            }
+        }
+
+        return true; // All filters passed
+    }
+
+    private bool ApplySingleFilter(Dictionary<string, object> itemData, string? filterField, string filterType,
+        string? filterValue, List<string>? filterValues, int? arrayIndex)
+    {
+        var filterTypeLower = filterType.ToLowerInvariant();
+        filterValue ??= string.Empty;
 
         // Get field value - handle both direct fields and array indices
         string fieldValue;
 
-        if (sourceAction.ChainedFilterArrayIndex.HasValue)
+        if (arrayIndex.HasValue)
         {
             // Handle array index filtering (e.g., data[x][17])
-            // Item is an array, get value at specified index
-            var arrayIndex = sourceAction.ChainedFilterArrayIndex.Value;
+            var index = arrayIndex.Value;
 
             // Check if itemData contains an array representation
-            // When ChainedItemFieldPath is like "[0]", the entire item is the array
             if (itemData.Count == 1 && itemData.ContainsKey("__array__"))
             {
                 // Special case: entire item is array
@@ -812,13 +847,13 @@ public class SubActionExecutor : ISubActionExecutor
                 if (arrayObj is JsonElement jsonArray && jsonArray.ValueKind == JsonValueKind.Array)
                 {
                     var arrayElements = jsonArray.EnumerateArray().ToList();
-                    if (arrayIndex >= 0 && arrayIndex < arrayElements.Count)
+                    if (index >= 0 && index < arrayElements.Count)
                     {
-                        fieldValue = ExtractJsonValue(arrayElements[arrayIndex])?.ToString() ?? string.Empty;
+                        fieldValue = ExtractJsonValue(arrayElements[index])?.ToString() ?? string.Empty;
                     }
                     else
                     {
-                        _logger.LogDebug("Array index {Index} out of bounds (length: {Length})", arrayIndex, arrayElements.Count);
+                        _logger.LogDebug("Array index {Index} out of bounds (length: {Length})", index, arrayElements.Count);
                         return false;
                     }
                 }
@@ -831,8 +866,7 @@ public class SubActionExecutor : ISubActionExecutor
             else
             {
                 // Try to get indexed value from item data
-                // Look for numeric keys (0, 1, 2, ..., 17, etc.)
-                var indexKey = arrayIndex.ToString();
+                var indexKey = index.ToString();
                 if (itemData.TryGetValue(indexKey, out var indexedValue))
                 {
                     fieldValue = indexedValue?.ToString() ?? string.Empty;
@@ -856,11 +890,11 @@ public class SubActionExecutor : ISubActionExecutor
         }
         else
         {
-            _logger.LogWarning("Filter configuration missing both ChainedFilterField and ChainedFilterArrayIndex");
+            _logger.LogWarning("Filter configuration missing both filterField and arrayIndex");
             return true; // Allow through if misconfigured
         }
 
-        return filterType switch
+        return filterTypeLower switch
         {
             "notempty" => !string.IsNullOrWhiteSpace(fieldValue),
 
@@ -876,13 +910,38 @@ public class SubActionExecutor : ISubActionExecutor
 
             "notequals" => !fieldValue.Equals(filterValue, StringComparison.OrdinalIgnoreCase),
 
-            // Special filter: must be a file path (contains .html and doesn't start with {)
+            // Multi-value filters
+            "startswithany" => StartsWithAny(fieldValue, filterValues ?? new List<string>()),
+
+            "notstartswithany" => !StartsWithAny(fieldValue, filterValues ?? new List<string>()),
+
+            // Special filter: must be a file path (contains .html and doesn't start with { or [)
             "isfilepath" => !string.IsNullOrWhiteSpace(fieldValue) &&
                            fieldValue.Contains(".html", StringComparison.OrdinalIgnoreCase) &&
-                           !fieldValue.TrimStart().StartsWith("{"),
+                           !fieldValue.TrimStart().StartsWith("{") &&
+                           !fieldValue.TrimStart().StartsWith("["),
 
             _ => true // Unknown filter type, allow item through
         };
+    }
+
+    private bool StartsWithAny(string fieldValue, List<string> prefixes)
+    {
+        if (prefixes == null || prefixes.Count == 0)
+        {
+            _logger.LogWarning("StartsWithAny called with null or empty prefix list");
+            return false;
+        }
+
+        foreach (var prefix in prefixes)
+        {
+            if (fieldValue.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private async Task ExecuteChainedActionAsync(SubAction action, Dictionary<string, object> context, CancellationToken ct)
@@ -932,9 +991,9 @@ public class SubActionExecutor : ISubActionExecutor
         var url = ReplaceTokensWithContext(action.Endpoint, orderId, context);
         _logger.LogInformation("Fetching URL with Puppeteer: {Url}", url);
 
-        // Get current authentication credentials
-        var token = _tokenRenewal.GetCurrentToken();
-        var cookies = _tokenRenewal.GetCurrentCookies();
+        // Get current authentication credentials from active config (includes cached tokens)
+        var token = activeConfig.BearerToken;
+        var cookies = activeConfig.Cookies;
 
         await using var page = await _browserManager.NewPageAsync(ct, token, cookies);
 
@@ -2217,17 +2276,20 @@ public class SubActionExecutor : ISubActionExecutor
 
         // Generate PDF directly from the live page (preserves CSS and JavaScript state)
         var pdfBytes = await CreatePdfFromPageAsync(_capturedPage, ct);
-        
+
         // Save the PDF to disk (MUST succeed)
         var outputDir = DataPaths.EnsureDir("out");
         var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmssfff");
-        var filename = $"{timestamp}_{jobName}.pdf";
+        // Use OutputFilePrefix if specified, otherwise use job name
+        var filePrefix = !string.IsNullOrWhiteSpace(action.OutputFilePrefix) ? action.OutputFilePrefix : jobName;
+        var filename = $"{filePrefix}_{timestamp}_{_capturedPageContextId}.pdf";
         var filePath = Path.Combine(outputDir, filename);
         await File.WriteAllBytesAsync(filePath, pdfBytes, ct);
-        _logger.LogInformation("PDF saved to {Path}", filePath);
+        _logger.LogInformation("PDF saved to {Path} (prefix: {Prefix})", filePath, filePrefix);
 
         // Send to printer if configured (MUST succeed - exception will trigger retry)
-        var printerName = GetActiveConfig().PrinterName;
+        // Use action-level printer name if specified, otherwise use API-level printer name
+        var printerName = action.PrinterName ?? GetActiveConfig().PrinterName;
         await _printer.PrintPdfBytesAsync(pdfBytes, jobName, printerName, ct);
         _logger.LogInformation("PDF sent to printer {Printer}: {JobName}", printerName ?? "default", jobName);
 
@@ -2465,10 +2527,12 @@ public class SubActionExecutor : ISubActionExecutor
         // Save the PDF to disk (MUST succeed)
         var outputDir = DataPaths.EnsureDir("out");
         var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmssfff");
-        var filename = $"{timestamp}_{jobName}.pdf";
+        // Use OutputFilePrefix if specified, otherwise use job name
+        var filePrefix = !string.IsNullOrWhiteSpace(action.OutputFilePrefix) ? action.OutputFilePrefix : jobName;
+        var filename = $"{filePrefix}_{timestamp}_{_capturedPageContextId}.pdf";
         var filePath = Path.Combine(outputDir, filename);
         await File.WriteAllBytesAsync(filePath, pdfBytes, ct);
-        _logger.LogInformation("PDF saved to {Path}", filePath);
+        _logger.LogInformation("PDF saved to {Path} (prefix: {Prefix})", filePath, filePrefix);
 
         // Store the file path for potential printing later
         _lastSavedPdfPath = filePath;
@@ -2524,7 +2588,8 @@ public class SubActionExecutor : ISubActionExecutor
         var pdfBytes = await File.ReadAllBytesAsync(_lastSavedPdfPath, ct);
 
         // Send to printer if configured (MUST succeed - exception will trigger retry)
-        var printerName = GetActiveConfig().PrinterName;
+        // Use action-level printer name if specified, otherwise use API-level printer name
+        var printerName = action.PrinterName ?? GetActiveConfig().PrinterName;
         await _printer.PrintPdfBytesAsync(pdfBytes, jobName, printerName, ct);
         _logger.LogInformation("PDF sent to printer {Printer}: {JobName}", printerName ?? "default", jobName);
 
@@ -2612,7 +2677,7 @@ public class SubActionExecutor : ISubActionExecutor
         response.EnsureSuccessStatusCode();
 
         var responseBody = await response.Content.ReadAsStringAsync(ct);
-        _logger.LogDebug("Chained API response: {Body}", responseBody);
+        _logger.LogDebug("Chained API response: {Body}", Truncate(responseBody, 100));
     }
 
     private string ExtractJobNameFromContext(Dictionary<string, object> context)

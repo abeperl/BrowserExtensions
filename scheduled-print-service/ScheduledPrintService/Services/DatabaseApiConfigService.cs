@@ -65,16 +65,30 @@ public class DatabaseApiConfigService : IDatabaseApiConfigService
         // Parse headers JSON
         var headersJson = reader.GetString(reader.GetOrdinal("Headers"));
         var headersDoc = JsonDocument.Parse(headersJson);
-        
-        if (headersDoc.RootElement.TryGetProperty("Authorization", out var authElement))
+
+        // Try to load cached token from ApiAuth table first (for better token reuse)
+        var (_, _, cachedToken, tokenExpiresAt) = LoadAuthCredentials(config.BaseUrl);
+        bool usedCachedToken = false;
+
+        // Use cached token if it's still valid (not expired and has >5 minutes remaining)
+        if (!string.IsNullOrEmpty(cachedToken) && tokenExpiresAt.HasValue && tokenExpiresAt.Value > DateTime.UtcNow.AddMinutes(5))
+        {
+            config.BearerToken = cachedToken;
+            usedCachedToken = true;
+            _logger.LogDebug("Using cached token from ApiAuth table, expires at {ExpiresAt}", tokenExpiresAt);
+        }
+        // Otherwise, fall back to token from Headers JSON (static/placeholder token)
+        else if (headersDoc.RootElement.TryGetProperty("Authorization", out var authElement))
         {
             var authValue = authElement.GetString() ?? string.Empty;
             if (authValue.StartsWith("Bearer "))
             {
                 config.BearerToken = authValue.Substring(7);
+                _logger.LogDebug("Using token from Headers JSON (cached token unavailable or expired)");
             }
         }
 
+        // Parse cookies from Headers JSON
         if (headersDoc.RootElement.TryGetProperty("Cookie", out var cookieElement))
         {
             var cookieValue = cookieElement.GetString() ?? string.Empty;
@@ -87,6 +101,14 @@ public class DatabaseApiConfigService : IDatabaseApiConfigService
                     config.Cookies[kv[0].Trim()] = kv[1].Trim();
                 }
             }
+        }
+
+        // IMPORTANT: If we used cached token, update the cookies to use the cached token too
+        // This ensures Puppeteer browser pages have the correct token
+        if (usedCachedToken && !string.IsNullOrEmpty(config.BearerToken))
+        {
+            config.Cookies["token"] = config.BearerToken;
+            _logger.LogDebug("Updated cookies with cached token for Puppeteer browser");
         }
 
         if (headersDoc.RootElement.TryGetProperty("WarehouseId", out var warehouseElement))

@@ -144,12 +144,39 @@ public class SubAction
     // Chaining filter: field name to filter on (e.g., "itemNotes")
     public string? ChainedFilterField { get; set; }
 
-    // Chaining filter: filter type - "NotEmpty", "Contains", "NotStartsWith", "IsFilePath"
+    // Chaining filter: filter type - "NotEmpty", "Contains", "NotStartsWith", "StartsWithAny", "NotStartsWithAny", "IsFilePath"
     public string? ChainedFilterType { get; set; }
 
     // Chaining filter: value to compare against (optional, depends on filter type)
     public string? ChainedFilterValue { get; set; }
 
+    // Chaining filter: multiple values for StartsWithAny/NotStartsWithAny filters (JSON array)
+    public List<string>? ChainedFilterValues { get; set; }
+
     // Chaining filter: array index to filter on (e.g., 17 to check data[x][17])
     public int? ChainedFilterArrayIndex { get; set; }
+
+    // Additional filter: field name for second-level filtering (e.g., "orderId" for API 3)
+    public string? AdditionalFilterField { get; set; }
+
+    // Additional filter: filter type (same types as ChainedFilterType)
+    public string? AdditionalFilterType { get; set; }
+
+    // Additional filter: single value to compare against
+    public string? AdditionalFilterValue { get; set; }
+
+    // Additional filter: multiple values for StartsWithAny/NotStartsWithAny filters
+    public List<string>? AdditionalFilterValues { get; set; }
+
+    // Action chaining: action number to chain from (receives output from that action)
+    public int? ChainedFromActionNumber { get; set; }
+
+    // Output file prefix for saved PDFs (used by SaveCapturedHtml and PrintSavedPdf)
+    public string? OutputFilePrefix { get; set; }
+
+    // Printer name override for this specific action
+    public string? PrinterName { get; set; }
+
+    // JSON path to extract ID field from item (e.g., "orderDetailsId")
+    public string? IdJsonPath { get; set; }
 }

@@ -11,6 +11,25 @@ This repository contains two browser extensions:
 
 ## Development Commands
 
+### Scheduled Print Service
+
+**CRITICAL: Always publish to the SAME folder after ANY code changes**
+
+```bash
+cd scheduled-print-service
+powershell -ExecutionPolicy Bypass -File scripts/publish.ps1 -SelfContained
+```
+
+**NEVER create new publish folders. ALWAYS use the publish script.**
+- Correct: `scheduled-print-service/publish/` (output from publish.ps1)
+- Wrong: `scheduled-print-service/ScheduledPrintService/bin/publish/`
+- Wrong: Any other location
+
+After any code modification:
+1. Run the publish script: `powershell -ExecutionPolicy Bypass -File scripts/publish.ps1 -SelfContained`
+2. Verify files are in `scheduled-print-service/publish/`
+3. The script automatically builds and publishes with self-contained deployment
+
 ### Word Template Extension
 
 #### Building Packages

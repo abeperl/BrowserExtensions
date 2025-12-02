@@ -70,6 +70,12 @@ public class TokenRenewalService : ITokenRenewalService
             lock (_lock)
             {
                 _currentToken = cachedToken;
+                // Also update cookies with cached token for consistency
+                _currentCookies = new Dictionary<string, string>
+                {
+                    ["token"] = cachedToken,
+                    ["isRefreshedToken"] = "false"
+                };
             }
             return true;
         }
@@ -196,8 +202,51 @@ public class TokenRenewalService : ITokenRenewalService
                 _logger.LogInformation("Successfully renewed authentication token");
             }
 
-            // Save token to database (expires in 24 hours - adjust as needed)
-            var expiresAt = DateTime.UtcNow.AddHours(24);
+            // Parse JWT token to extract actual expiration time
+            DateTime expiresAt;
+            try
+            {
+                // JWT format: header.payload.signature
+                var parts = newToken.Split('.');
+                if (parts.Length == 3)
+                {
+                    // Decode payload (Base64Url encoded)
+                    var payload = parts[1];
+                    // Add padding if needed
+                    payload = payload.PadRight(payload.Length + (4 - payload.Length % 4) % 4, '=');
+                    payload = payload.Replace('-', '+').Replace('_', '/');
+
+                    var payloadBytes = Convert.FromBase64String(payload);
+                    var payloadJson = Encoding.UTF8.GetString(payloadBytes);
+                    var payloadDoc = JsonDocument.Parse(payloadJson);
+
+                    if (payloadDoc.RootElement.TryGetProperty("exp", out var expElement))
+                    {
+                        var exp = expElement.GetInt64();
+                        // Convert Unix timestamp to DateTime
+                        expiresAt = DateTimeOffset.FromUnixTimeSeconds(exp).UtcDateTime;
+                        _logger.LogDebug("Token expires at {ExpiresAt} (from JWT exp claim)", expiresAt);
+                    }
+                    else
+                    {
+                        // Fallback: assume 5 hours (typical for this API)
+                        expiresAt = DateTime.UtcNow.AddHours(5);
+                        _logger.LogWarning("No 'exp' claim in JWT, using default 5 hour expiration");
+                    }
+                }
+                else
+                {
+                    // Not a valid JWT, use default
+                    expiresAt = DateTime.UtcNow.AddHours(5);
+                    _logger.LogWarning("Token is not a valid JWT format, using default 5 hour expiration");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to parse JWT expiration, using default 5 hour expiration");
+                expiresAt = DateTime.UtcNow.AddHours(5);
+            }
+
             _dbConfigService.UpdateAuthToken(_config.BaseUrl, newToken, expiresAt);
 
             return true;
