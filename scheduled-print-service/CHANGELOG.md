@@ -1,5 +1,39 @@
 # Changelog
 
+## 2025-11-30 - Add Cookie Token Synchronization Logging
+
+### Enhancement
+Added diagnostic logging to verify cookie token synchronization with Authorization header during token renewals.
+
+### Changes Made
+Enhanced `UpdateHttpClientAuth()` method in both `OrderApiService.cs` and `SubActionExecutor.cs` to log:
+- Authorization header Bearer token updates (with length)
+- Cookie header updates with token verification
+- Cookie token length and comparison with Authorization header token
+- Warnings when cookie token is missing or cookies are unavailable
+
+**New Debug Logs:**
+```
+[DBG] Updated Authorization header with Bearer token (length: 847)
+[DBG] Updated Cookie header with token (cookie token length: 847, matches auth: True)
+```
+
+**Warning Logs (if issues detected):**
+```
+[WRN] Cookie header updated but 'token' cookie is missing or empty!
+[WRN] No cookies available to set in Cookie header
+```
+
+### Purpose
+These logs help diagnose token renewal issues by verifying:
+1. Both Authorization header and Cookie header are updated with the same token
+2. Cookie contains the 'token' field with correct value
+3. Token synchronization between headers and cookies is maintained
+
+### Files Changed
+- `ScheduledPrintService/Services/OrderApiService.cs` (Lines 62-101)
+- `ScheduledPrintService/Services/SubActionExecutor.cs` (Lines 79-118)
+
 ## 2025-11-30 - Remove Filtered Items Debug Logs
 
 ### Problem

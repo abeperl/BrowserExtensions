@@ -201,4 +201,3 @@ console.log(typeof window._handleScanError); // should be 'function'
 - Status Dropdown: Adds dropdown for status selection
 - Status Auto-Fill: Auto-fills status when modal appears
 - Scan Modal Enlarger: Makes modal bigger for better visibility
-- Item Line ID Column: Shows item line IDs in table

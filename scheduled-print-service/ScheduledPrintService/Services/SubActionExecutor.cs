@@ -88,6 +88,7 @@ public class SubActionExecutor : ISubActionExecutor
         {
             _httpClient.DefaultRequestHeaders.Authorization =
                 new AuthenticationHeaderValue("Bearer", token);
+            _logger.LogDebug("Updated Authorization header with Bearer token (length: {Length})", token.Length);
         }
 
         // Update cookies
@@ -96,6 +97,23 @@ public class SubActionExecutor : ISubActionExecutor
         {
             var cookieHeader = string.Join("; ", cookies.Select(kvp => $"{kvp.Key}={kvp.Value}"));
             _httpClient.DefaultRequestHeaders.Add("Cookie", cookieHeader);
+
+            // Log cookie update with token verification
+            var cookieToken = cookies.ContainsKey("token") ? cookies["token"] : null;
+            if (!string.IsNullOrEmpty(cookieToken))
+            {
+                _logger.LogDebug("Updated Cookie header with token (cookie token length: {CookieLength}, matches auth: {Matches})",
+                    cookieToken.Length,
+                    cookieToken == token);
+            }
+            else
+            {
+                _logger.LogWarning("Cookie header updated but 'token' cookie is missing or empty!");
+            }
+        }
+        else
+        {
+            _logger.LogWarning("No cookies available to set in Cookie header");
         }
     }
 

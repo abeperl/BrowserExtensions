@@ -55,13 +55,14 @@ window._handleScanError = function() {
 
 ### Error Detection Points
 
-#### 1. Snackbar Interceptor
+#### Snackbar Interceptor (Primary Error Handler)
 **Location**: [router.js:227-322](router.js#L227-L322)
 
-Intercepts `window.snackbar.show()` calls:
+Intercepts **ALL** `window.snackbar.show()` calls from the application:
 - Detects `cs-danger` and `danger` types → triggers error handler
 - Detects `cs-warning` and `warning` types → triggers error handler
 - Shows overlay instead of native snackbar
+- **This catches errors from all sources:** API failures, validation errors, business logic errors, etc.
 
 ```javascript
 window.snackbar.show = function(message, type) {
@@ -81,77 +82,20 @@ window.snackbar.show = function(message, type) {
 };
 ```
 
-#### 2. tf.service.post Interceptor
-**Location**: [router.js:325-400](router.js#L325-L400)
-
-Intercepts `tf.service.post()` for PersonalizedAndCustomizedOrders API:
-
-**Success Response Handler**:
-```javascript
-const isSuccess = response.responseCode === 0 || response.responseCode === 200;
-
-if (!isSuccess) {
-    const errorMsg = response.responseMessage || response.message || 'Unknown error';
-    OverlayManager.error({ message: `Update failed: ${errorMsg}`, duration: 4000 });
-    window._handleScanError(); // Clear and refocus
-}
-```
-
-**Error Callback Handler**:
-```javascript
-const wrappedErrorCallback = function(error) {
-    const errorMsg = error.message || error.responseMessage || 'Request failed';
-    OverlayManager.error({ message: `Error: ${errorMsg}`, duration: 4000 });
-    window._handleScanError(); // Clear and refocus
-    if (errorCallback) errorCallback(error);
-};
-```
-
-#### 3. Fetch API Interceptor
-**Location**: [router.js:431-530](router.js#L431-L530)
-
-Intercepts `window.fetch()` for PersonalizedAndCustomizedOrders API:
-
-**Error Response**:
-```javascript
-if (!isSuccess) {
-    const errorMsg = data.message || data.error || 'Unknown error';
-    OverlayManager.error({ message: `API Error: ${errorMsg}`, duration: 4000 });
-    window._handleScanError(); // Clear and refocus
-}
-```
-
-**Network Error**:
-```javascript
-catch (error) {
-    OverlayManager.error({ message: `Request failed: ${error.message}`, duration: 4000 });
-    window._handleScanError(); // Clear and refocus
-    throw error;
-}
-```
-
-#### 4. XMLHttpRequest Interceptor
-**Location**: [router.js:536-591](router.js#L536-L591)
-
-Intercepts `XMLHttpRequest` for PersonalizedAndCustomizedOrders API:
-
-```javascript
-if (!isSuccess) {
-    const errorMsg = data.message || data.error || `HTTP ${this.status}`;
-    OverlayManager.error({ message: `Update failed: ${errorMsg}`, duration: 4000 });
-    window._handleScanError(); // Clear and refocus
-}
-```
+**Why Snackbar-Only?**
+The application already uses `snackbar.show()` to display all errors (API failures, validation errors, etc.), so intercepting at the snackbar level catches everything without needing separate API interceptors.
 
 ## Error Types Handled
 
-| Error Source | Detection Method | Handler Called |
-|--------------|------------------|----------------|
-| Snackbar danger/warning | Type check | `window._handleScanError()` |
-| API response code ≠ 0/200 | Response inspection | `window._handleScanError()` |
-| Network/timeout errors | try-catch | `window._handleScanError()` |
-| HTTP error status | Status code check | `window._handleScanError()` |
-| Validation errors | Snackbar interception | `window._handleScanError()` |
+All errors are caught via snackbar interception:
+
+| Error Source | How It Works | Handler Called |
+|--------------|--------------|----------------|
+| API failures | Application calls `snackbar.show(msg, 'cs-danger')` | `window._handleScanError()` |
+| Validation errors | Application calls `snackbar.show(msg, 'cs-danger')` | `window._handleScanError()` |
+| Business logic errors | Application calls `snackbar.show(msg, 'cs-danger')` | `window._handleScanError()` |
+| Warnings | Application calls `snackbar.show(msg, 'cs-warning')` | `window._handleScanError()` |
+| Network/timeout errors | Application calls `snackbar.show(msg, 'cs-danger')` | `window._handleScanError()` |
 
 ## Workflow Comparison
 
