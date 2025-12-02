@@ -47,6 +47,11 @@ public class ApiConfig
     public string? PrimaryFilterValue { get; set; }
     public string? PrimaryFilterField { get; set; }
 
+    // Primary API field mapping for placeholder replacement
+    // Maps dictionary keys to JSON paths or field names in the API response
+    // Example: { "customerName": "Customers", "orderNumber": "[0]" }
+    public Dictionary<string, string>? PrimaryApiFieldMap { get; set; }
+
     // Sub-actions to perform for each order
     public List<SubAction> SubActions { get; set; } = new();
 }
@@ -179,4 +184,31 @@ public class SubAction
 
     // JSON path to extract ID field from item (e.g., "orderDetailsId")
     public string? IdJsonPath { get; set; }
+
+    // HTML injection configurations for NavigateOnly actions
+    // Injects dynamic HTML into the page with placeholder replacement
+    public List<HtmlInjection>? HtmlInjections { get; set; }
+}
+
+/// <summary>
+/// Configuration for injecting HTML into a page during NavigateOnly actions
+/// </summary>
+public class HtmlInjection
+{
+    /// <summary>
+    /// CSS selector to target the element where HTML will be injected
+    /// </summary>
+    public string TargetSelector { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Where to insert the HTML relative to the target element
+    /// Options: "append", "prepend", "after", "before", "replace"
+    /// </summary>
+    public string InsertPosition { get; set; } = "append";
+
+    /// <summary>
+    /// HTML template with {placeholders} that will be replaced with values from the primary API response dictionary
+    /// Example: "<h4 class=\"title\">{customerName}</h4>"
+    /// </summary>
+    public string HtmlTemplate { get; set; } = string.Empty;
 }

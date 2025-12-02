@@ -163,6 +163,9 @@ public class SubActionExecutor : ISubActionExecutor
         var activeConfig = GetActiveConfig();
         _logger.LogDebug("Executing {Count} sub-actions for order {OrderId}", activeConfig.SubActions.Count, orderId);
 
+        // Extract field values from primary API response for placeholder replacement
+        var fieldValuesDictionary = ExtractFieldValuesFromOrderData(orderData, activeConfig);
+
         for (int i = 0; i < activeConfig.SubActions.Count; i++)
         {
             var action = activeConfig.SubActions[i];
@@ -183,13 +186,18 @@ public class SubActionExecutor : ISubActionExecutor
                 }
 
                 // Apply filter if configured (skip action if filter doesn't match)
-                if (!string.IsNullOrEmpty(action.ChainedFilterType) && !string.IsNullOrEmpty(action.ChainedFilterField))
+                // Filter can use either ChainedFilterField OR ChainedFilterArrayIndex
+                if (!string.IsNullOrEmpty(action.ChainedFilterType) &&
+                    (!string.IsNullOrEmpty(action.ChainedFilterField) || action.ChainedFilterArrayIndex.HasValue))
                 {
                     var orderDict = JsonElementToDictionary(orderData);
                     if (!ApplyChainedFilter(orderDict, action))
                     {
-                        _logger.LogDebug("[{Num}/{Total}] {ActionName} skipped for order {OrderId} due to filter: {FilterType} on field {Field}",
-                            actionNum, activeConfig.SubActions.Count, action.Name, orderId, action.ChainedFilterType, action.ChainedFilterField);
+                        var filterTarget = action.ChainedFilterArrayIndex.HasValue
+                            ? $"array index {action.ChainedFilterArrayIndex.Value}"
+                            : $"field {action.ChainedFilterField}";
+                        _logger.LogInformation("[{Num}/{Total}] {ActionName} skipped for order {OrderId} due to filter: {FilterType} on {Target}",
+                            actionNum, activeConfig.SubActions.Count, action.Name, orderId, action.ChainedFilterType, filterTarget);
                         continue; // Skip this action for this order
                     }
                 }
@@ -197,7 +205,7 @@ public class SubActionExecutor : ISubActionExecutor
                 _logger.LogInformation("[{Num}/{Total}] {ActionName} for order {OrderId}",
                     actionNum, activeConfig.SubActions.Count, action.Name, orderId);
 
-                await ExecuteActionAsync(action, orderId, orderData, ct);
+                await ExecuteActionAsync(action, orderId, orderData, fieldValuesDictionary, ct);
 
                 _logger.LogInformation("[{Num}/{Total}] {ActionName} completed successfully",
                     actionNum, activeConfig.SubActions.Count, action.Name);
@@ -243,7 +251,7 @@ public class SubActionExecutor : ISubActionExecutor
         }
     }
 
-    private async Task ExecuteActionAsync(SubAction action, string orderId, JsonElement orderData, CancellationToken ct)
+    private async Task ExecuteActionAsync(SubAction action, string orderId, JsonElement orderData, Dictionary<string, string> fieldValues, CancellationToken ct)
     {
         switch (action.Type.ToLowerInvariant())
         {
@@ -257,12 +265,22 @@ public class SubActionExecutor : ISubActionExecutor
 
             case "geturlandprint":
                 var context = JsonElementToDictionary(orderData);
+                // Merge field values into context for placeholder replacement
+                foreach (var kvp in fieldValues)
+                {
+                    context[kvp.Key] = kvp.Value;
+                }
                 await ExecuteGetUrlAndPrintAsync(action, orderId, context, ct);
                 break;
 
             case "navigateonly":
                 var navContext = JsonElementToDictionary(orderData);
-                await ExecuteNavigateOnlyAsync(action, orderId, navContext, ct);
+                // Merge field values into context for placeholder replacement
+                foreach (var kvp in fieldValues)
+                {
+                    navContext[kvp.Key] = kvp.Value;
+                }
+                await ExecuteNavigateOnlyAsync(action, orderId, navContext, fieldValues, ct);
                 break;
 
             case "printcapturedhtml":
@@ -953,7 +971,8 @@ public class SubActionExecutor : ISubActionExecutor
                 break;
 
             case "navigateonly":
-                await ExecuteNavigateOnlyAsync(action, string.Empty, context, ct);
+                // For batch context, use empty field values dictionary
+                await ExecuteNavigateOnlyAsync(action, string.Empty, context, new Dictionary<string, string>(), ct);
                 break;
 
             case "printcapturedpage":
@@ -1173,7 +1192,7 @@ public class SubActionExecutor : ISubActionExecutor
     }
 
     // New: Navigate only, keep page alive for subsequent print action (supports chained context & enhanced diagnostics)
-    private async Task ExecuteNavigateOnlyAsync(SubAction action, string orderId, Dictionary<string, object>? context, CancellationToken ct)
+    private async Task ExecuteNavigateOnlyAsync(SubAction action, string orderId, Dictionary<string, object>? context, Dictionary<string, string> fieldValues, CancellationToken ct)
     {
         var activeConfig = GetActiveConfig();
         var rawEndpoint = action.Endpoint;
@@ -1188,9 +1207,9 @@ public class SubActionExecutor : ISubActionExecutor
 
         _logger.LogInformation("Navigating (capture only) to URL: {Url} (raw endpoint: {RawEndpoint})", url, rawEndpoint);
 
-        // Get current authentication credentials
-        var token = _tokenRenewal.GetCurrentToken();
-        var cookies = _tokenRenewal.GetCurrentCookies();
+        // Get current authentication credentials from activeConfig (includes cached tokens from database)
+        var token = activeConfig.BearerToken;
+        var cookies = activeConfig.Cookies;
 
         // Don't use 'await using' - we need to keep the page alive
         // Dispose any previously captured page defensively to avoid multi-page interference
@@ -1362,8 +1381,10 @@ public class SubActionExecutor : ISubActionExecutor
             // This ensures the token and userData are available when we navigate to the hash route
             try
             {
-                var storageToken = _tokenRenewal.GetCurrentToken();
-                var currentCookies = _tokenRenewal.GetCurrentCookies();
+                // Use activeConfig to ensure we get the cached token loaded from database
+                // _tokenRenewal.GetCurrentToken() only has tokens from actual renewals, not cached loads
+                var storageToken = activeConfig.BearerToken;
+                var currentCookies = activeConfig.Cookies;
 
                 if (!string.IsNullOrWhiteSpace(storageToken))
                 {
@@ -2055,6 +2076,9 @@ public class SubActionExecutor : ISubActionExecutor
                 }
         } // End of SPA navigation path
 
+        // Perform HTML injection if configured
+        await PerformHtmlInjectionsAsync(page, action, fieldValues);
+
         // Store the live page for subsequent print action (don't dispose it) - common to both paths
         _capturedPage = page;
         _capturedPageContextId = context != null && context.TryGetValue("pickListId", out var ctxPicklistId) ? ctxPicklistId?.ToString() ?? orderId : orderId;
@@ -2721,6 +2745,170 @@ public class SubActionExecutor : ISubActionExecutor
                     .Replace("{orderId}", orderId, StringComparison.OrdinalIgnoreCase);
     }
 
+    /// <summary>
+    /// Performs HTML injections on a page with placeholder replacement
+    /// </summary>
+    private async Task PerformHtmlInjectionsAsync(PuppeteerSharp.IPage page, SubAction action, Dictionary<string, string> fieldValues)
+    {
+        if (action.HtmlInjections == null || action.HtmlInjections.Count == 0)
+        {
+            return; // No injections configured
+        }
+
+        _logger.LogInformation("Performing {Count} HTML injection(s)", action.HtmlInjections.Count);
+
+        foreach (var injection in action.HtmlInjections)
+        {
+            try
+            {
+                // Replace placeholders in HTML template with field values
+                var html = injection.HtmlTemplate;
+                foreach (var kvp in fieldValues)
+                {
+                    var placeholder = $"{{{kvp.Key}}}";
+                    html = html.Replace(placeholder, kvp.Value, StringComparison.OrdinalIgnoreCase);
+                }
+
+                // Escape quotes and newlines for JavaScript
+                var escapedHtml = html.Replace("\\", "\\\\").Replace("'", "\\'").Replace("\r", "").Replace("\n", "\\n");
+
+                // Build JavaScript injection code based on insert position
+                var jsCode = injection.InsertPosition.ToLowerInvariant() switch
+                {
+                    "append" => $@"
+                        (function() {{
+                            var target = document.querySelector('{injection.TargetSelector}');
+                            if (target) {{
+                                target.insertAdjacentHTML('beforeend', '{escapedHtml}');
+                                return 'HTML appended to ' + '{injection.TargetSelector}';
+                            }} else {{
+                                return 'Target not found: {injection.TargetSelector}';
+                            }}
+                        }})();
+                    ",
+                    "prepend" => $@"
+                        (function() {{
+                            var target = document.querySelector('{injection.TargetSelector}');
+                            if (target) {{
+                                target.insertAdjacentHTML('afterbegin', '{escapedHtml}');
+                                return 'HTML prepended to ' + '{injection.TargetSelector}';
+                            }} else {{
+                                return 'Target not found: {injection.TargetSelector}';
+                            }}
+                        }})();
+                    ",
+                    "after" => $@"
+                        (function() {{
+                            var target = document.querySelector('{injection.TargetSelector}');
+                            if (target) {{
+                                target.insertAdjacentHTML('afterend', '{escapedHtml}');
+                                return 'HTML inserted after ' + '{injection.TargetSelector}';
+                            }} else {{
+                                return 'Target not found: {injection.TargetSelector}';
+                            }}
+                        }})();
+                    ",
+                    "before" => $@"
+                        (function() {{
+                            var target = document.querySelector('{injection.TargetSelector}');
+                            if (target) {{
+                                target.insertAdjacentHTML('beforebegin', '{escapedHtml}');
+                                return 'HTML inserted before ' + '{injection.TargetSelector}';
+                            }} else {{
+                                return 'Target not found: {injection.TargetSelector}';
+                            }}
+                        }})();
+                    ",
+                    "replace" => $@"
+                        (function() {{
+                            var target = document.querySelector('{injection.TargetSelector}');
+                            if (target) {{
+                                target.innerHTML = '{escapedHtml}';
+                                return 'HTML replaced in ' + '{injection.TargetSelector}';
+                            }} else {{
+                                return 'Target not found: {injection.TargetSelector}';
+                            }}
+                        }})();
+                    ",
+                    _ => throw new ArgumentException($"Invalid InsertPosition: {injection.InsertPosition}")
+                };
+
+                // Execute JavaScript injection
+                var result = await page.EvaluateExpressionAsync<string>(jsCode);
+                _logger.LogInformation("HTML injection result: {Result}", result);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to inject HTML for selector '{Selector}': {Message}",
+                    injection.TargetSelector, ex.Message);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Extracts field values from primary API response data for placeholder replacement
+    /// </summary>
+    private Dictionary<string, string> ExtractFieldValuesFromOrderData(JsonElement orderData, ApiConfig config)
+    {
+        var fieldValues = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        // If no field map configured, return empty dictionary
+        if (config.PrimaryApiFieldMap == null || config.PrimaryApiFieldMap.Count == 0)
+        {
+            return fieldValues;
+        }
+
+        _logger.LogDebug("Extracting {Count} field values from order data", config.PrimaryApiFieldMap.Count);
+
+        foreach (var mapping in config.PrimaryApiFieldMap)
+        {
+            var fieldName = mapping.Key;
+            var jsonPathOrField = mapping.Value;
+
+            try
+            {
+                string? value = null;
+
+                // Handle array index notation (e.g., "[17]")
+                if (jsonPathOrField.StartsWith("[") && jsonPathOrField.EndsWith("]"))
+                {
+                    if (int.TryParse(jsonPathOrField.Trim('[', ']'), out var index))
+                    {
+                        if (orderData.ValueKind == JsonValueKind.Array)
+                        {
+                            var arrayElements = orderData.EnumerateArray().ToList();
+                            if (index >= 0 && index < arrayElements.Count)
+                            {
+                                value = ExtractJsonValue(arrayElements[index])?.ToString();
+                            }
+                        }
+                    }
+                }
+                // Handle simple property name
+                else if (orderData.ValueKind == JsonValueKind.Object && orderData.TryGetProperty(jsonPathOrField, out var property))
+                {
+                    value = ExtractJsonValue(property)?.ToString();
+                }
+
+                if (!string.IsNullOrEmpty(value))
+                {
+                    fieldValues[fieldName] = value;
+                    _logger.LogDebug("Extracted field '{Field}': {Value}", fieldName, value.Length > 50 ? value.Substring(0, 50) + "..." : value);
+                }
+                else
+                {
+                    _logger.LogDebug("Field '{Field}' not found or empty in order data (path: {Path})", fieldName, jsonPathOrField);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to extract field '{Field}' from order data", fieldName);
+            }
+        }
+
+        return fieldValues;
+    }
+
     private Dictionary<string, object> JsonElementToDictionary(JsonElement element)
     {
         var dict = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
@@ -2737,6 +2925,23 @@ public class SubActionExecutor : ISubActionExecutor
                     JsonValueKind.False => false,
                     JsonValueKind.Null => string.Empty,
                     _ => property.Value.GetRawText()
+                };
+            }
+        }
+        else if (element.ValueKind == JsonValueKind.Array)
+        {
+            // Handle array data by creating dictionary with numeric string keys ("0", "1", "2", etc.)
+            var arrayElements = element.EnumerateArray().ToList();
+            for (int i = 0; i < arrayElements.Count; i++)
+            {
+                dict[i.ToString()] = arrayElements[i].ValueKind switch
+                {
+                    JsonValueKind.String => arrayElements[i].GetString() ?? string.Empty,
+                    JsonValueKind.Number => arrayElements[i].GetDouble(),
+                    JsonValueKind.True => true,
+                    JsonValueKind.False => false,
+                    JsonValueKind.Null => string.Empty,
+                    _ => arrayElements[i].GetRawText()
                 };
             }
         }

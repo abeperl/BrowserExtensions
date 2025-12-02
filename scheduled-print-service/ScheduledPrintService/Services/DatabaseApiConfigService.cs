@@ -191,6 +191,21 @@ public class DatabaseApiConfigService : IDatabaseApiConfigService
                         }
                     }
 
+                    // Parse PrimaryApiFieldMap for placeholder replacement (HTML injection feature)
+                    if (root.TryGetProperty("PrimaryApiFieldMap", out var fieldMapElement) && fieldMapElement.ValueKind == JsonValueKind.Object)
+                    {
+                        config.PrimaryApiFieldMap = new Dictionary<string, string>();
+                        foreach (var prop in fieldMapElement.EnumerateObject())
+                        {
+                            var value = prop.Value.GetString();
+                            if (!string.IsNullOrWhiteSpace(value))
+                            {
+                                config.PrimaryApiFieldMap[prop.Name] = value;
+                            }
+                        }
+                        _logger.LogInformation("Loaded {Count} field mappings for placeholder replacement", config.PrimaryApiFieldMap.Count);
+                    }
+
                     _logger.LogInformation("Loaded primary API filter configuration: Type={FilterType}, ArrayIndex={ArrayIndex}, Value={FilterValue}",
                         config.PrimaryFilterType, config.PrimaryFilterArrayIndex, config.PrimaryFilterValue);
                 }
