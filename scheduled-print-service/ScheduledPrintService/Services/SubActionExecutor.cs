@@ -164,7 +164,9 @@ public class SubActionExecutor : ISubActionExecutor
         _logger.LogDebug("Executing {Count} sub-actions for order {OrderId}", activeConfig.SubActions.Count, orderId);
 
         // Extract field values from primary API response for placeholder replacement
+        // This is done fresh for each order to ensure current order data is used
         var fieldValuesDictionary = ExtractFieldValuesFromOrderData(orderData, activeConfig);
+        _logger.LogDebug("Extracted {Count} fields for order {OrderId} placeholder replacement", fieldValuesDictionary.Count, orderId);
 
         for (int i = 0; i < activeConfig.SubActions.Count; i++)
         {
@@ -1105,51 +1107,8 @@ public class SubActionExecutor : ISubActionExecutor
                         max-width: 8.5in !important;
                     }
                 }
-                .customer-highlight {
-                    background-color: #000 !important;
-                    color: #fff !important;
-                    font-weight: bold !important;
-                    font-size: 1.4em !important;
-                    padding: 8px 12px !important;
-                    display: inline-block !important;
-                    margin: 4px 0 !important;
-                    border-radius: 4px !important;
-                }
             `;
             document.head.appendChild(style);
-
-            // Find and style CUSTOMER field (label + value)
-            let customerStyledCount = 0;
-            const allElements = Array.from(document.querySelectorAll('*'));
-            allElements.forEach(el => {
-                const text = el.textContent?.trim() || '';
-
-                // Method 1: Look for element containing 'CUSTOMER:' label combined with value
-                if (text.startsWith('CUSTOMER:') && text.length < 100) {
-                    el.classList.add('customer-highlight');
-                    customerStyledCount++;
-                }
-                // Method 2: Look for the value separately if it's in a different element (previous sibling check)
-                else if (el.previousElementSibling) {
-                    const prevText = el.previousElementSibling.textContent?.trim() || '';
-                    if (prevText === 'CUSTOMER:' && text.length > 2 && text.length < 100 && !text.includes(':')) {
-                        el.classList.add('customer-highlight');
-                        customerStyledCount++;
-                    }
-                }
-                // Method 3: Look for parent element that contains CUSTOMER: label
-                else if (el.parentElement) {
-                    const parentText = el.parentElement.textContent?.trim() || '';
-                    if (parentText.includes('CUSTOMER:') && text.length > 2 && text.length < 100 && !text.includes(':') && text !== 'CUSTOMER:') {
-                        // Check if this is the customer value (not another label)
-                        const allText = parentText.replace(/\s+/g, ' ');
-                        if (allText.match(/CUSTOMER:\s*/ + text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))) {
-                            el.classList.add('customer-highlight');
-                            customerStyledCount++;
-                        }
-                    }
-                }
-            });
 
             // Find and hide any table or section containing 'short items' text
             const elementsToHide = Array.from(document.querySelectorAll('*')).filter(el => {
@@ -1475,17 +1434,93 @@ public class SubActionExecutor : ISubActionExecutor
                 if (!string.Equals(effectiveHref, url, StringComparison.OrdinalIgnoreCase))
                 {
                     _logger.LogWarning("Effective window.location.href ({Effective}) does not match expected URL ({Expected}) - SPA may have redirected to home or token substitution failed", effectiveHref, url);
-                    // Second attempt after short delay if mismatch persists (route race mitigation)
-                    await Task.Delay(1500); // Increased delay for production stability
-                    await page.EvaluateExpressionAsync($"window.location.href='{url.Replace("'","%27")}'");
-                    var retryHref = await page.EvaluateExpressionAsync<string>("window.location.href");
-                    if (!string.Equals(retryHref, url, StringComparison.OrdinalIgnoreCase))
+
+                    // Check if redirected to login page (indicates 401 auth failure)
+                    if (effectiveHref.Contains("#account?returnurl=", StringComparison.OrdinalIgnoreCase) ||
+                        effectiveHref.Contains("#account/", StringComparison.OrdinalIgnoreCase))
                     {
-                        _logger.LogWarning("Retry href assignment still mismatched ({RetryHref}); giving up and continuing with diagnostics", retryHref);
+                        _logger.LogWarning("Detected redirect to login page - attempting token renewal");
+
+                        // Attempt token renewal (force fresh token from server)
+                        bool tokenRenewed = await _tokenRenewal.RenewTokenAsync(ct, forceRefresh: true);
+
+                        if (tokenRenewed)
+                        {
+                            _logger.LogInformation("Token renewed successfully after SPA auth redirect - updating page localStorage and retrying navigation");
+
+                            // Update page's localStorage with new token
+                            var newToken = _tokenRenewal.GetCurrentToken();
+                            var newCookies = _tokenRenewal.GetCurrentCookies();
+
+                            if (!string.IsNullOrWhiteSpace(newToken))
+                            {
+                                await page.EvaluateExpressionAsync($"localStorage.setItem('auth_token', '{newToken.Replace("'", "\\'")}')");
+                                _logger.LogDebug("Updated page localStorage with renewed token");
+                            }
+
+                            if (newCookies != null && newCookies.Count > 0)
+                            {
+                                // Convert Dictionary<string, string> to Puppeteer CookieParam format
+                                foreach (var cookie in newCookies)
+                                {
+                                    await page.SetCookieAsync(new PuppeteerSharp.CookieParam
+                                    {
+                                        Name = cookie.Key,
+                                        Value = cookie.Value,
+                                        Domain = new Uri(activeConfig.BaseUrl).Host,
+                                        Path = "/",
+                                        Secure = true,
+                                        HttpOnly = false
+                                    });
+                                }
+                                _logger.LogDebug("Updated page cookies with renewed credentials ({Count} cookies)", newCookies.Count);
+                            }
+
+                            // Update activeConfig for subsequent operations
+                            UpdateHttpClientAuth();
+
+                            // Force full page reload to make SPA re-initialize with new token
+                            // Using location.reload() instead of hash navigation because SPA framework
+                            // has already initialized with old token in memory
+                            _logger.LogInformation("Forcing page reload to re-initialize SPA with fresh token");
+                            await page.ReloadAsync(new PuppeteerSharp.NavigationOptions { WaitUntil = new[] { PuppeteerSharp.WaitUntilNavigation.Load } });
+                            await Task.Delay(1000); // Wait for reload to complete
+
+                            // Now navigate to target URL (page will use fresh token from localStorage)
+                            await page.EvaluateExpressionAsync($"window.location.href='{url.Replace("'","%27")}'");
+                            await Task.Delay(2000); // Give SPA time to load with new token
+
+                            var postRenewalHref = await page.EvaluateExpressionAsync<string>("window.location.href");
+                            if (string.Equals(postRenewalHref, url, StringComparison.OrdinalIgnoreCase))
+                            {
+                                _logger.LogInformation("Navigation succeeded after token renewal");
+                            }
+                            else
+                            {
+                                _logger.LogWarning("Navigation still mismatched after token renewal: {PostRenewalHref}", postRenewalHref);
+                            }
+                        }
+                        else
+                        {
+                            _logger.LogCritical("Failed to renew token after detecting SPA auth redirect - authentication is broken");
+                            throw new TokenRenewalException("Unable to renew authentication token after SPA redirected to login");
+                        }
                     }
                     else
                     {
-                        _logger.LogInformation("Retry href assignment succeeded; effective href now matches target URL");
+                        // Not a login redirect - use original retry logic
+                        // Second attempt after short delay if mismatch persists (route race mitigation)
+                        await Task.Delay(1500); // Increased delay for production stability
+                        await page.EvaluateExpressionAsync($"window.location.href='{url.Replace("'","%27")}'");
+                        var retryHref = await page.EvaluateExpressionAsync<string>("window.location.href");
+                        if (!string.Equals(retryHref, url, StringComparison.OrdinalIgnoreCase))
+                        {
+                            _logger.LogWarning("Retry href assignment still mismatched ({RetryHref}); giving up and continuing with diagnostics", retryHref);
+                        }
+                        else
+                        {
+                            _logger.LogInformation("Retry href assignment succeeded; effective href now matches target URL");
+                        }
                     }
                 }
                 else
@@ -2197,51 +2232,8 @@ public class SubActionExecutor : ISubActionExecutor
                             max-width: 8.5in !important;
                         }
                     }
-                    .customer-highlight {
-                        background-color: #000 !important;
-                        color: #fff !important;
-                        font-weight: bold !important;
-                        font-size: 1.4em !important;
-                        padding: 8px 12px !important;
-                        display: inline-block !important;
-                        margin: 4px 0 !important;
-                        border-radius: 4px !important;
-                    }
                 `;
                 document.head.appendChild(style);
-
-                // Find and style CUSTOMER field (label + value)
-                let customerStyledCount = 0;
-                const allElements = Array.from(document.querySelectorAll('*'));
-                allElements.forEach(el => {
-                    const text = el.textContent?.trim() || '';
-
-                    // Method 1: Look for element containing 'CUSTOMER:' label combined with value
-                    if (text.startsWith('CUSTOMER:') && text.length < 100) {
-                        el.classList.add('customer-highlight');
-                        customerStyledCount++;
-                    }
-                    // Method 2: Look for the value separately if it's in a different element (previous sibling check)
-                    else if (el.previousElementSibling) {
-                        const prevText = el.previousElementSibling.textContent?.trim() || '';
-                        if (prevText === 'CUSTOMER:' && text.length > 2 && text.length < 100 && !text.includes(':')) {
-                            el.classList.add('customer-highlight');
-                            customerStyledCount++;
-                        }
-                    }
-                    // Method 3: Look for parent element that contains CUSTOMER: label
-                    else if (el.parentElement) {
-                        const parentText = el.parentElement.textContent?.trim() || '';
-                        if (parentText.includes('CUSTOMER:') && text.length > 2 && text.length < 100 && !text.includes(':') && text !== 'CUSTOMER:') {
-                            // Check if this is the customer value (not another label)
-                            const allText = parentText.replace(/\s+/g, ' ');
-                            if (allText.match(/CUSTOMER:\s*/ + text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))) {
-                                el.classList.add('customer-highlight');
-                                customerStyledCount++;
-                            }
-                        }
-                    }
-                });
 
                 // Hide any element with heading or title containing 'Short Items' or 'ShortItems'
                 const shortItemsElements = [];
@@ -2289,7 +2281,7 @@ public class SubActionExecutor : ISubActionExecutor
                     }
                 });
 
-                console.log('PDF print styles injected. Hidden Short Items elements: ' + shortItemsElements.length + ', Styled customer elements: ' + customerStyledCount);
+                console.log('PDF print styles injected. Hidden Short Items elements: ' + shortItemsElements.length);
             ");
             _logger.LogInformation("Portrait orientation CSS + Short Items hiding applied");
         }
@@ -2418,77 +2410,8 @@ public class SubActionExecutor : ISubActionExecutor
                             print-color-adjust: exact;
                         }
                     }
-                    .customer-highlight {
-                        background-color: #000 !important;
-                        color: #fff !important;
-                        font-weight: bold !important;
-                        font-size: 1.4em !important;
-                        padding: 8px 12px !important;
-                        display: inline-block !important;
-                        margin: 4px 0 !important;
-                        border-radius: 4px !important;
-                        border: 2px solid #000 !important;
-                    }
                 `;
                 document.head.appendChild(style);
-
-                // Find and style CUSTOMER field (label + value)
-                let customerStyledCount = 0;
-
-                // Method 1: Target the exact structure - span with data-bind='Customers'
-                const customerValueSpan = document.querySelector('span[data-bind=""Customers""]');
-                if (customerValueSpan) {
-                    customerValueSpan.classList.add('customer-highlight');
-                    customerStyledCount++;
-                    console.log('Applied customer-highlight to span[data-bind=""Customers""]:', customerValueSpan.textContent);
-                }
-
-                // Method 2: Find label containing 'Customer' text and get next sibling span
-                const allLabels = Array.from(document.querySelectorAll('label'));
-                allLabels.forEach(label => {
-                    const labelText = label.textContent?.trim() || '';
-                    if (labelText.toLowerCase().includes('customer') && labelText.includes(':')) {
-                        const nextSibling = label.nextElementSibling;
-                        if (nextSibling && nextSibling.tagName === 'SPAN' && nextSibling.classList.contains('form-control')) {
-                            nextSibling.classList.add('customer-highlight');
-                            customerStyledCount++;
-                            console.log('Applied customer-highlight to label sibling span:', nextSibling.textContent);
-                        }
-                    }
-                });
-
-                // Method 3: Fallback - search all elements for the patterns (case-insensitive)
-                const allElements = Array.from(document.querySelectorAll('*'));
-                allElements.forEach(el => {
-                    const text = el.textContent?.trim() || '';
-
-                    // Look for element containing 'CUSTOMER:' or 'Customer:' label combined with value
-                    if ((text.toUpperCase().startsWith('CUSTOMER:') || text.match(/^Customer\s*:/i)) && text.length < 100) {
-                        el.classList.add('customer-highlight');
-                        customerStyledCount++;
-                    }
-                    // Look for the value separately if it's in a different element (previous sibling check)
-                    else if (el.previousElementSibling) {
-                        const prevText = el.previousElementSibling.textContent?.trim() || '';
-                        if ((prevText.toUpperCase() === 'CUSTOMER:' || prevText.match(/^Customer\s*:$/i)) && text.length > 2 && text.length < 100 && !text.includes(':')) {
-                            el.classList.add('customer-highlight');
-                            customerStyledCount++;
-                        }
-                    }
-                    // Look for parent element that contains CUSTOMER: label
-                    else if (el.parentElement) {
-                        const parentText = el.parentElement.textContent?.trim() || '';
-                        if ((parentText.toUpperCase().includes('CUSTOMER:') || parentText.match(/Customer\s*:/i)) && text.length > 2 && text.length < 100 && !text.includes(':') && !text.match(/^Customer\s*:?$/i)) {
-                            // Check if this is the customer value (not another label)
-                            const allText = parentText.replace(/\s+/g, ' ');
-                            const escapedText = text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                            if (allText.match(new RegExp('Customer\\s*:\\s*' + escapedText, 'i'))) {
-                                el.classList.add('customer-highlight');
-                                customerStyledCount++;
-                            }
-                        }
-                    }
-                });
 
                 // Hide any element with heading or title containing 'Short Items' or 'ShortItems'
                 const shortItemsElements = [];
@@ -2536,7 +2459,7 @@ public class SubActionExecutor : ISubActionExecutor
                     }
                 });
 
-                console.log('PDF save styles injected. Hidden Short Items elements: ' + shortItemsElements.length + ', Styled customer elements: ' + customerStyledCount);
+                console.log('PDF save styles injected. Hidden Short Items elements: ' + shortItemsElements.length);
             ");
             _logger.LogInformation("Portrait orientation CSS + Short Items hiding applied");
         }
@@ -2761,13 +2684,27 @@ public class SubActionExecutor : ISubActionExecutor
         {
             try
             {
-                // Replace placeholders in HTML template with field values
+                // Replace placeholders in HTML template with field values using regex
+                // Matches {fieldName} and replaces with actual value if field exists
                 var html = injection.HtmlTemplate;
-                foreach (var kvp in fieldValues)
+                
+                html = System.Text.RegularExpressions.Regex.Replace(html, @"\{([^}]+)\}", match =>
                 {
-                    var placeholder = $"{{{kvp.Key}}}";
-                    html = html.Replace(placeholder, kvp.Value, StringComparison.OrdinalIgnoreCase);
-                }
+                    var fieldName = match.Groups[1].Value;
+                    
+                    // Look up field value (case-insensitive)
+                    if (fieldValues.TryGetValue(fieldName, out var value))
+                    {
+                        _logger.LogDebug("Replaced placeholder {{{Field}}} with value: {Value}", 
+                            fieldName, 
+                            value.Length > 50 ? value.Substring(0, 50) + "..." : value);
+                        return value;
+                    }
+                    
+                    // Placeholder not found, leave as-is
+                    _logger.LogDebug("Placeholder {{{Field}}} not found in extracted fields, leaving unchanged", fieldName);
+                    return match.Value; // Return original {fieldName}
+                });
 
                 // Escape quotes and newlines for JavaScript
                 var escapedHtml = html.Replace("\\", "\\\\").Replace("'", "\\'").Replace("\r", "").Replace("\n", "\\n");
@@ -2846,67 +2783,106 @@ public class SubActionExecutor : ISubActionExecutor
     }
 
     /// <summary>
-    /// Extracts field values from primary API response data for placeholder replacement
+    /// Extracts ALL field values from primary API response data for placeholder replacement
+    /// Automatically flattens the entire JSON structure into name-value pairs
+    /// Called fresh for each order to ensure current order's data is used
     /// </summary>
     private Dictionary<string, string> ExtractFieldValuesFromOrderData(JsonElement orderData, ApiConfig config)
     {
+        // Always create a new dictionary for each order (never reuse)
         var fieldValues = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
-        // If no field map configured, return empty dictionary
-        if (config.PrimaryApiFieldMap == null || config.PrimaryApiFieldMap.Count == 0)
+        _logger.LogDebug("Extracting all available fields from order data (fresh extraction for current order)");
+
+        try
         {
-            return fieldValues;
+            // Recursively flatten the entire JSON structure
+            FlattenJsonElement(orderData, string.Empty, fieldValues);
+
+            _logger.LogInformation("Extracted {Count} field(s) from order data for placeholder replacement", fieldValues.Count);
+            
+            // Log first few fields for debugging (limit to avoid log spam)
+            var sampleFields = fieldValues.Take(10).Select(kvp => 
+                $"{kvp.Key}={kvp.Value.Substring(0, Math.Min(30, kvp.Value.Length))}{(kvp.Value.Length > 30 ? "..." : "")}");
+            _logger.LogDebug("Sample fields: {Fields}", string.Join(", ", sampleFields));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to extract fields from order data");
         }
 
-        _logger.LogDebug("Extracting {Count} field values from order data", config.PrimaryApiFieldMap.Count);
+        return fieldValues;
+    }
 
-        foreach (var mapping in config.PrimaryApiFieldMap)
+    /// <summary>
+    /// Recursively flattens a JSON element into a dictionary of field names and values
+    /// </summary>
+    private void FlattenJsonElement(JsonElement element, string prefix, Dictionary<string, string> result)
+    {
+        switch (element.ValueKind)
         {
-            var fieldName = mapping.Key;
-            var jsonPathOrField = mapping.Value;
-
-            try
-            {
-                string? value = null;
-
-                // Handle array index notation (e.g., "[17]")
-                if (jsonPathOrField.StartsWith("[") && jsonPathOrField.EndsWith("]"))
+            case JsonValueKind.Object:
+                foreach (var property in element.EnumerateObject())
                 {
-                    if (int.TryParse(jsonPathOrField.Trim('[', ']'), out var index))
+                    var key = string.IsNullOrEmpty(prefix) ? property.Name : $"{prefix}.{property.Name}";
+                    FlattenJsonElement(property.Value, key, result);
+                }
+                break;
+
+            case JsonValueKind.Array:
+                var arrayItems = element.EnumerateArray().ToList();
+                
+                // If array contains primitives, join them with commas
+                if (arrayItems.Count > 0 && arrayItems.All(item => 
+                    item.ValueKind == JsonValueKind.String || 
+                    item.ValueKind == JsonValueKind.Number ||
+                    item.ValueKind == JsonValueKind.True ||
+                    item.ValueKind == JsonValueKind.False))
+                {
+                    var values = arrayItems.Select(item => ExtractJsonValue(item)?.ToString() ?? string.Empty)
+                                          .Where(v => !string.IsNullOrEmpty(v));
+                    
+                    if (values.Any())
                     {
-                        if (orderData.ValueKind == JsonValueKind.Array)
+                        // Store array as comma-separated string under the field name
+                        result[prefix] = string.Join(", ", values);
+                        
+                        // Also store first element with [0] suffix for easy access
+                        if (arrayItems.Count > 0)
                         {
-                            var arrayElements = orderData.EnumerateArray().ToList();
-                            if (index >= 0 && index < arrayElements.Count)
+                            var firstValue = ExtractJsonValue(arrayItems[0])?.ToString();
+                            if (!string.IsNullOrEmpty(firstValue))
                             {
-                                value = ExtractJsonValue(arrayElements[index])?.ToString();
+                                result[$"{prefix}[0]"] = firstValue;
                             }
                         }
                     }
                 }
-                // Handle simple property name
-                else if (orderData.ValueKind == JsonValueKind.Object && orderData.TryGetProperty(jsonPathOrField, out var property))
-                {
-                    value = ExtractJsonValue(property)?.ToString();
-                }
-
-                if (!string.IsNullOrEmpty(value))
-                {
-                    fieldValues[fieldName] = value;
-                    _logger.LogDebug("Extracted field '{Field}': {Value}", fieldName, value.Length > 50 ? value.Substring(0, 50) + "..." : value);
-                }
                 else
                 {
-                    _logger.LogDebug("Field '{Field}' not found or empty in order data (path: {Path})", fieldName, jsonPathOrField);
+                    // Array contains objects, flatten each with index
+                    for (int i = 0; i < arrayItems.Count; i++)
+                    {
+                        FlattenJsonElement(arrayItems[i], $"{prefix}[{i}]", result);
+                    }
                 }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Failed to extract field '{Field}' from order data", fieldName);
-            }
-        }
+                break;
 
-        return fieldValues;
+            case JsonValueKind.String:
+            case JsonValueKind.Number:
+            case JsonValueKind.True:
+            case JsonValueKind.False:
+                var value = ExtractJsonValue(element)?.ToString();
+                if (!string.IsNullOrEmpty(value) && !string.IsNullOrEmpty(prefix))
+                {
+                    result[prefix] = value;
+                }
+                break;
+
+            case JsonValueKind.Null:
+                // Skip null values
+                break;
+        }
     }
 
     private Dictionary<string, object> JsonElementToDictionary(JsonElement element)
