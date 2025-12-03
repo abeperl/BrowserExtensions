@@ -142,6 +142,11 @@ bld/
 secrets.json
 *.env.local
 
+# Database files (environment-specific)
+*.db
+*.db-shm
+*.db-wal
+
 # =========================
 # Claude AI Assistant
 # =========================
