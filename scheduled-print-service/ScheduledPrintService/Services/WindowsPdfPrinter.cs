@@ -50,18 +50,18 @@ public class WindowsPdfPrinter : IPdfPrinter
             // Try multiple printing methods in order of preference
             bool printed = false;
 
-            // Method 1: Try SumatraPDF if available (best for silent printing, no UI, very reliable)
-            if (!printed && TryFindSumatraPDF(out var sumatraPath))
-            {
-                _logger.LogInformation("Attempting to print using SumatraPDF: {SumatraPath}", sumatraPath);
-                printed = await PrintWithSumatraPDFAsync(tempFile, printer!, sumatraPath, ct);
-            }
-
-            // Method 2: Try Ghostscript if available (excellent for server-side PDF printing)
+            // Method 1: Try Ghostscript if available (best for avoiding EMF bloat, direct PostScript/PCL output)
             if (!printed && TryFindGhostscript(out var gsPath))
             {
                 _logger.LogInformation("Attempting to print using Ghostscript: {GsPath}", gsPath);
                 printed = await PrintWithGhostscriptAsync(tempFile, printer!, gsPath, ct);
+            }
+
+            // Method 2: Try SumatraPDF if available (fast, silent printing, but may use EMF)
+            if (!printed && TryFindSumatraPDF(out var sumatraPath))
+            {
+                _logger.LogInformation("Attempting to print using SumatraPDF: {SumatraPath}", sumatraPath);
+                printed = await PrintWithSumatraPDFAsync(tempFile, printer!, sumatraPath, ct);
             }
 
             // Method 3: Try Adobe Reader if available (may hang if another instance is running)
