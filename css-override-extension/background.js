@@ -66,6 +66,9 @@ class CSSOverrideManager {
 
   async handleTabUpdate(tabId, changeInfo, tab) {
     if (changeInfo.status === 'loading' && tab.url) {
+      // Inject print interceptor script first
+      await this.injectPrintInterceptor(tabId);
+      // Then apply CSS rules
       await this.applyCSSRules(tabId, tab.url);
     }
   }
@@ -74,6 +77,19 @@ class CSSOverrideManager {
     // Clean up active injections
     if (this.activeInjections.has(tabId)) {
       this.activeInjections.delete(tabId);
+    }
+  }
+
+  async injectPrintInterceptor(tabId) {
+    try {
+      await chrome.scripting.executeScript({
+        target: { tabId, allFrames: true },
+        files: ['print-interceptor.js'],
+        world: 'MAIN'
+      });
+      console.log('Print interceptor injected into tab:', tabId);
+    } catch (error) {
+      console.error('Failed to inject print interceptor:', error);
     }
   }
 

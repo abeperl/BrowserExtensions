@@ -498,8 +498,19 @@
                 }, 500);
 
                 console.log('✅ Placard enhancement observer set up');
+
+                // ========== CARTON LABEL MANAGER - CONSOLIDATED ==========
+                if (typeof window.cartonLabelManager !== 'undefined') {
+                    console.log('📦 Carton Label Manager enabled on Shipment Details');
+                    console.log('💡 Features: CSS, URL Redirect, Auto-Print');
+                    console.log('💡 Stats: window.cartonLabelManager.stats()');
+                } else {
+                    console.error('❌ Carton Label Manager (carton-label-manager.js) NOT LOADED');
+                    console.error('💡 Make sure carton-label-manager.js is included in your scripts');
+                    console.error('💡 Expected: window.cartonLabelManager to be defined');
+                }
             },
-            description: 'Placard text enhancer for shipment details page'
+            description: 'Placard text enhancer + Carton Label Manager for shipment details page'
         },
         {
             name: 'Outbound Packing Route',
@@ -657,13 +668,11 @@
                     console.warn('⚠️ makeSkuItemsClickable and makeQtyItemsClickable not loaded');
                 }
 
-                // ========== SIMPLE AUTO PRINT - JUST CLICK BUTTONS ==========
-                if (typeof window.simpleAutoPrint !== 'undefined') {
-                    console.log('🖨️ Simple Auto Print feature enabled');
-                    console.log('💡 Auto-click:', window.simpleAutoPrint.config.autoClickEnabled ? 'ENABLED' : 'DISABLED');
-                    console.log('💡 Auto-click delay:', window.simpleAutoPrint.config.autoClickDelay + 'ms');
-                    console.log('💡 Delay between clicks:', window.simpleAutoPrint.config.delayBetweenClicks + 'ms');
-                    console.log('💡 Force PrintWithUtility=false:', window.simpleAutoPrint.config.forcePrintWithUtilityFalse ? 'YES' : 'NO');
+                // ========== CARTON LABEL MANAGER - CONSOLIDATED ==========
+                if (typeof window.cartonLabelManager !== 'undefined') {
+                    console.log('📦 Carton Label Manager enabled');
+                    console.log('💡 Auto-click:', window.cartonLabelManager.config.autoClickEnabled ? 'ENABLED' : 'DISABLED');
+                    console.log('💡 Features: CSS, URL Redirect, Auto-Print');
 
                     // Set up MutationObserver to watch for shipment modal
                     const modalObserver = new MutationObserver((mutations) => {
@@ -678,7 +687,7 @@
 
                                         console.log('🔄 Shipment modal detected by router');
                                         setTimeout(() => {
-                                            window.simpleAutoPrint.handleModal();
+                                            window.cartonLabelManager.handleModal();
                                         }, 100);
                                     }
                                 }
@@ -689,7 +698,7 @@
                                 mutation.target.id === '_modal_block_ui') {
 
                                 setTimeout(() => {
-                                    window.simpleAutoPrint.handleModal();
+                                    window.cartonLabelManager.handleModal();
                                 }, 100);
                             }
                         });
@@ -705,17 +714,17 @@
 
                     // Try immediately in case modal already exists
                     setTimeout(() => {
-                        window.simpleAutoPrint.handleModal();
+                        window.cartonLabelManager.handleModal();
                     }, 500);
 
-                    console.log('✅ Simple Auto Print observer set up');
-                    console.log('💡 Manual trigger: window.simpleAutoPrint.clickButtons()');
-                    console.log('💡 Disable auto: window.simpleAutoPrint.setAutoClick(false)');
+                    console.log('✅ Carton Label Manager observer set up');
+                    console.log('💡 Stats: window.cartonLabelManager.stats()');
+                    console.log('💡 Disable auto: window.cartonLabelManager.setAutoClick(false)');
 
                 } else {
-                    console.error('❌ Simple Auto Print (simple-auto-print.js) NOT LOADED');
-                    console.error('💡 Make sure simple-auto-print.js is included in your scripts');
-                    console.error('💡 Expected: window.simpleAutoPrint to be defined');
+                    console.error('❌ Carton Label Manager (carton-label-manager.js) NOT LOADED');
+                    console.error('💡 Make sure carton-label-manager.js is included in your scripts');
+                    console.error('💡 Expected: window.cartonLabelManager to be defined');
                 }
             },
             description: 'SKU and Qty item linker + Silent auto print for outbound packing page'
