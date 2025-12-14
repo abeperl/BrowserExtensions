@@ -860,6 +860,25 @@
                 console.log('✅ Packing slip column route configured with observer');
             },
             description: 'Adds packing slip column to outbound shipment table'
+        },
+        {
+            name: 'Order Details Production Status Route',
+            pattern: /^#SO\/orderdetails(\?.*)?$/i,
+            action: () => {
+                console.log('🚀 Matched #SO/orderdetails route');
+
+                // Initialize production status column feature
+                if (typeof window.initProductionStatusColumn === 'function') {
+                    console.log('📊 Initializing Production Status Column feature');
+                    window.initProductionStatusColumn();
+                } else {
+                    console.warn('⚠️ Production Status Column functions not loaded');
+                    console.warn('⚠️ Make sure production-status-column.js is injected before router.js');
+                }
+
+                console.log('✅ Order details production status route configured');
+            },
+            description: 'Adds Production Status column to order items table with API data'
         }
     ];
 

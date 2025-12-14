@@ -1,0 +1,3330 @@
+<html class="wf-poppins-n3-active wf-poppins-n4-active wf-poppins-n5-active wf-poppins-n6-active wf-poppins-n7-active wf-roboto-n3-active wf-roboto-n4-active wf-roboto-n5-active wf-roboto-n6-active wf-roboto-n7-active wf-plusjakartasans-n3-active wf-plusjakartasans-n4-active wf-plusjakartasans-n5-active wf-plusjakartasans-n6-active wf-plusjakartasans-n7-active wf-active" style="--sidebar-width: 250px;"><head>
+    <meta charset="utf-8">
+    <title>Home - POS</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+    <link rel="icon" type="image/png" href="assets/images/logo.png">
+    <link href="styles/bootstrap.min.css?vr=2" rel="stylesheet">
+    <!-- <link href="styles/vendors.bundle.css?vr=2" rel="stylesheet" />
+    <link href="styles/style.bundle.css?vr=2" rel="stylesheet" /> -->
+    <link href="styles/validator.css?vr=2" rel="stylesheet">
+    <link href="scripts/plugins/loader/loader.css?vr=2" rel="stylesheet">
+    <link href="scripts/plugins/modal/modal.css?vr=2" rel="stylesheet">
+    <link href="scripts/plugins/snackbar/matech-snackbar.css?vr=2" rel="stylesheet">
+    <link href="scripts/plugins/autocomplete/matechautocomplete.css?vr=2" rel="stylesheet">
+    <link href="scripts/plugins/datetimepicker/jquery.datetimepicker.css?vr=2" rel="stylesheet">
+    <link href="styles/datepicker.min.css?vr=2" rel="stylesheet">
+    <link href="styles/select2.min.css?vr=2" rel="stylesheet">
+    <link href="scripts/plugins/combotree/style.css?vr=2" rel="stylesheet">
+    <link href="scripts/plugins/daterangepicker/daterangepicker.css?vr=2" rel="stylesheet">
+    <!-- <link href="styles/styles.css?vr=2" rel="stylesheet" /> -->
+    <!-- <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css?vr=2"> -->
+    <link rel="stylesheet" href="styles/font-awesome.min.css?vr=2">
+    <link href="styles/table.css?vr=2" rel="stylesheet">
+    <link href="scripts/plugins/tagview/tagview.css?vr=2" rel="stylesheet">
+    <link href="styles/barcode.css?vr=2" rel="stylesheet">
+    <link href="styles/code128.css?vr=2" rel="stylesheet">
+    <link href="styles/themes.css?vr=2" rel="stylesheet">
+    <link href="styles/theme.css?vr=2" rel="stylesheet">
+
+    <title></title><link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Poppins:300,400,500,600,700%7CRoboto:300,400,500,600,700%7CPlus+Jakarta+Sans:300,400,500,600,700" media="all">
+<style>
+  .loader {
+    display: flex;
+    align-items: center;
+  }
+  .bar {
+    display: inline-block;
+    width: 1px;
+    height: 5px;
+    background-color: rgba(255, 255, 255, .5);
+    border-radius: 10px;
+    animation: scale-up4 1s linear infinite;
+  }
+  .bar:nth-child(2) {
+    height: 10px;
+    margin: 0 3px;
+    animation-delay: .25s;
+  }
+  .bar:nth-child(3) {
+    animation-delay: .5s;
+  }
+  @keyframes scale-up4 {
+    20% {
+      background-color: #ffff;
+      transform: scaleY(1.5);
+    }
+    40% {
+      transform: scaleY(1);
+    }
+  }
+</style><style>
+    /* Enhanced toggle button styles */
+    #toggle-sidenav {
+        position: fixed !important;
+        top: 20px !important;
+        left: 20px !important;
+        z-index: 1001 !important;
+        background: #2563eb !important;
+        color: white !important;
+        border: none !important;
+        border-radius: 6px !important;
+        width: 40px !important;
+        height: 40px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        cursor: pointer !important;
+        font-size: 1rem !important;
+        transition: all 0.2s ease-in-out !important;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1) !important;
+    }
+
+    #toggle-sidenav:hover {
+        background: #1d4ed8 !important;
+        transform: scale(1.05) !important;
+    }
+    
+    /* Right-click context menu on toggle button */
+    #toggle-sidenav:after {
+        content: attr(title);
+        position: absolute;
+        bottom: -30px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(0,0,0,0.8);
+        color: white;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 11px;
+        white-space: nowrap;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.2s;
+        z-index: 10001;
+    }
+    
+    #toggle-sidenav:hover:after {
+        opacity: 1;
+    }
+
+    #toggle-sidenav::after {
+        content: '☰' !important;
+        font-size: 16px !important;
+    }
+
+    /* Force override existing margin styles - highest specificity with multiple content selectors */
+    body .content-area,
+    body .page-wrapper,
+    body .main-wrapper,
+    body .page-container,
+    body .content,
+    body .main-content,
+    body .dashboard-wrp,
+    html body .content-area,
+    html body .page-wrapper,
+    html body .main-wrapper,
+    html body .content,
+    html body .main-content,
+    html body .dashboard-wrp {
+        transition: margin-left 0.3s ease-in-out !important;
+        box-sizing: border-box !important;
+    }
+
+    /* Collapsed state - 60px sidebar */
+    body.sidebar-collapsed .content-area,
+    body.sidebar-collapsed .page-wrapper,
+    body.sidebar-collapsed .main-wrapper,
+    body.sidebar-collapsed .page-container,
+    body.sidebar-collapsed .content,
+    body.sidebar-collapsed .main-content,
+    body.sidebar-collapsed .dashboard-wrp,
+    html body.sidebar-collapsed .content-area,
+    html body.sidebar-collapsed .page-wrapper,
+    html body.sidebar-collapsed .main-wrapper,
+    html body.sidebar-collapsed .content,
+    html body.sidebar-collapsed .main-content,
+    html body.sidebar-collapsed .dashboard-wrp,
+    div.page-wrapper.sidebar-collapsed,
+    main.content-area.sidebar-collapsed {
+        margin-left: 60px !important;
+        width: calc(100vw - 60px) !important;
+        max-width: calc(100vw - 60px) !important;
+    }
+
+    /* Hidden state - no sidebar */
+    body.sidebar-hidden .content-area,
+    body.sidebar-hidden .page-wrapper,
+    body.sidebar-hidden .main-wrapper,
+    body.sidebar-hidden .page-container,
+    body.sidebar-hidden .content,
+    body.sidebar-hidden .main-content,
+    body.sidebar-hidden .dashboard-wrp,
+    html body.sidebar-hidden .content-area,
+    html body.sidebar-hidden .page-wrapper,
+    html body.sidebar-hidden .main-wrapper,
+    html body.sidebar-hidden .content,
+    html body.sidebar-hidden .main-content,
+    html body.sidebar-hidden .dashboard-wrp,
+    div.page-wrapper.sidebar-hidden,
+    main.content-area.sidebar-hidden {
+        margin-left: 0 !important;
+        width: 100vw !important;
+        max-width: 100vw !important;
+    }
+
+    /* Expanded state - detect existing sidebar width dynamically */
+    body:not(.sidebar-collapsed):not(.sidebar-hidden) .content-area,
+    body:not(.sidebar-collapsed):not(.sidebar-hidden) .page-wrapper,
+    body:not(.sidebar-collapsed):not(.sidebar-hidden) .main-wrapper,
+    body:not(.sidebar-collapsed):not(.sidebar-hidden) .page-container,
+    body:not(.sidebar-collapsed):not(.sidebar-hidden) .content,
+    body:not(.sidebar-collapsed):not(.sidebar-hidden) .main-content,
+    body:not(.sidebar-collapsed):not(.sidebar-hidden) .dashboard-wrp,
+    html body:not(.sidebar-collapsed):not(.sidebar-hidden) .content-area,
+    html body:not(.sidebar-collapsed):not(.sidebar-hidden) .page-wrapper,
+    html body:not(.sidebar-collapsed):not(.sidebar-hidden) .main-wrapper,
+    html body:not(.sidebar-collapsed):not(.sidebar-hidden) .content,
+    html body:not(.sidebar-collapsed):not(.sidebar-hidden) .main-content,
+    html body:not(.sidebar-collapsed):not(.sidebar-hidden) .dashboard-wrp {
+        margin-left: var(--sidebar-width, 270px) !important;
+        width: calc(100vw - var(--sidebar-width, 270px)) !important;
+        max-width: calc(100vw - var(--sidebar-width, 270px)) !important;
+    }
+
+    /* Ensure tables and content use full available width */
+    body.sidebar-collapsed .dataTables_wrapper,
+    body.sidebar-collapsed .table-responsive,
+    body.sidebar-collapsed .dashboard-wrp,
+    body.sidebar-hidden .dataTables_wrapper,
+    body.sidebar-hidden .table-responsive,
+    body.sidebar-hidden .dashboard-wrp {
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+
+    /* State-specific toggle positions and icons */
+    body.sidebar-collapsed #toggle-sidenav {
+        left: 80px !important;
+    }
+
+    body.sidebar-collapsed #toggle-sidenav::after {
+        content: '◀' !important;
+    }
+
+    body.sidebar-hidden #toggle-sidenav {
+        left: 20px !important;
+    }
+
+    body.sidebar-hidden #toggle-sidenav::after {
+        content: '▶' !important;
+    }
+
+    /* Normal state toggle */
+    body:not(.sidebar-collapsed):not(.sidebar-hidden) #toggle-sidenav {
+        left: 20px !important;
+    }
+
+    body:not(.sidebar-collapsed):not(.sidebar-hidden) #toggle-sidenav::after {
+        content: '☰' !important;
+    }
+
+    /* Mobile responsive */
+    @media (max-width: 768px) {
+        #toggle-sidenav {
+            display: none !important;
+        }
+        
+        body .content-area,
+        body .page-wrapper,
+        body .main-wrapper,
+        body .page-container,
+        body.sidebar-collapsed .content-area,
+        body.sidebar-collapsed .page-wrapper,
+        body.sidebar-collapsed .main-wrapper,
+        body.sidebar-hidden .content-area,
+        body.sidebar-hidden .page-wrapper,
+        body.sidebar-hidden .main-wrapper {
+            margin-left: 0 !important;
+        }
+    }
+    </style><style>
+    /* Enhanced toggle button styles */
+    #toggle-sidenav {
+        position: fixed !important;
+        top: 20px !important;
+        left: 20px !important;
+        z-index: 1001 !important;
+        background: #2563eb !important;
+        color: white !important;
+        border: none !important;
+        border-radius: 6px !important;
+        width: 40px !important;
+        height: 40px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        cursor: pointer !important;
+        font-size: 1rem !important;
+        transition: all 0.2s ease-in-out !important;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1) !important;
+    }
+
+    #toggle-sidenav:hover {
+        background: #1d4ed8 !important;
+        transform: scale(1.05) !important;
+    }
+    
+    /* Right-click context menu on toggle button */
+    #toggle-sidenav:after {
+        content: attr(title);
+        position: absolute;
+        bottom: -30px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(0,0,0,0.8);
+        color: white;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 11px;
+        white-space: nowrap;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.2s;
+        z-index: 10001;
+    }
+    
+    #toggle-sidenav:hover:after {
+        opacity: 1;
+    }
+
+    #toggle-sidenav::after {
+        content: '☰' !important;
+        font-size: 16px !important;
+    }
+
+    /* Force override existing margin styles - highest specificity with multiple content selectors */
+    body .content-area,
+    body .page-wrapper,
+    body .main-wrapper,
+    body .page-container,
+    body .content,
+    body .main-content,
+    body .dashboard-wrp,
+    html body .content-area,
+    html body .page-wrapper,
+    html body .main-wrapper,
+    html body .content,
+    html body .main-content,
+    html body .dashboard-wrp {
+        transition: margin-left 0.3s ease-in-out !important;
+        box-sizing: border-box !important;
+    }
+
+    /* Collapsed state - 60px sidebar */
+    body.sidebar-collapsed .content-area,
+    body.sidebar-collapsed .page-wrapper,
+    body.sidebar-collapsed .main-wrapper,
+    body.sidebar-collapsed .page-container,
+    body.sidebar-collapsed .content,
+    body.sidebar-collapsed .main-content,
+    body.sidebar-collapsed .dashboard-wrp,
+    html body.sidebar-collapsed .content-area,
+    html body.sidebar-collapsed .page-wrapper,
+    html body.sidebar-collapsed .main-wrapper,
+    html body.sidebar-collapsed .content,
+    html body.sidebar-collapsed .main-content,
+    html body.sidebar-collapsed .dashboard-wrp,
+    div.page-wrapper.sidebar-collapsed,
+    main.content-area.sidebar-collapsed {
+        margin-left: 60px !important;
+        width: calc(100vw - 60px) !important;
+        max-width: calc(100vw - 60px) !important;
+    }
+
+    /* Hidden state - no sidebar */
+    body.sidebar-hidden .content-area,
+    body.sidebar-hidden .page-wrapper,
+    body.sidebar-hidden .main-wrapper,
+    body.sidebar-hidden .page-container,
+    body.sidebar-hidden .content,
+    body.sidebar-hidden .main-content,
+    body.sidebar-hidden .dashboard-wrp,
+    html body.sidebar-hidden .content-area,
+    html body.sidebar-hidden .page-wrapper,
+    html body.sidebar-hidden .main-wrapper,
+    html body.sidebar-hidden .content,
+    html body.sidebar-hidden .main-content,
+    html body.sidebar-hidden .dashboard-wrp,
+    div.page-wrapper.sidebar-hidden,
+    main.content-area.sidebar-hidden {
+        margin-left: 0 !important;
+        width: 100vw !important;
+        max-width: 100vw !important;
+    }
+
+    /* Expanded state - detect existing sidebar width dynamically */
+    body:not(.sidebar-collapsed):not(.sidebar-hidden) .content-area,
+    body:not(.sidebar-collapsed):not(.sidebar-hidden) .page-wrapper,
+    body:not(.sidebar-collapsed):not(.sidebar-hidden) .main-wrapper,
+    body:not(.sidebar-collapsed):not(.sidebar-hidden) .page-container,
+    body:not(.sidebar-collapsed):not(.sidebar-hidden) .content,
+    body:not(.sidebar-collapsed):not(.sidebar-hidden) .main-content,
+    body:not(.sidebar-collapsed):not(.sidebar-hidden) .dashboard-wrp,
+    html body:not(.sidebar-collapsed):not(.sidebar-hidden) .content-area,
+    html body:not(.sidebar-collapsed):not(.sidebar-hidden) .page-wrapper,
+    html body:not(.sidebar-collapsed):not(.sidebar-hidden) .main-wrapper,
+    html body:not(.sidebar-collapsed):not(.sidebar-hidden) .content,
+    html body:not(.sidebar-collapsed):not(.sidebar-hidden) .main-content,
+    html body:not(.sidebar-collapsed):not(.sidebar-hidden) .dashboard-wrp {
+        margin-left: var(--sidebar-width, 270px) !important;
+        width: calc(100vw - var(--sidebar-width, 270px)) !important;
+        max-width: calc(100vw - var(--sidebar-width, 270px)) !important;
+    }
+
+    /* Ensure tables and content use full available width */
+    body.sidebar-collapsed .dataTables_wrapper,
+    body.sidebar-collapsed .table-responsive,
+    body.sidebar-collapsed .dashboard-wrp,
+    body.sidebar-hidden .dataTables_wrapper,
+    body.sidebar-hidden .table-responsive,
+    body.sidebar-hidden .dashboard-wrp {
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+
+    /* State-specific toggle positions and icons */
+    body.sidebar-collapsed #toggle-sidenav {
+        left: 80px !important;
+    }
+
+    body.sidebar-collapsed #toggle-sidenav::after {
+        content: '◀' !important;
+    }
+
+    body.sidebar-hidden #toggle-sidenav {
+        left: 20px !important;
+    }
+
+    body.sidebar-hidden #toggle-sidenav::after {
+        content: '▶' !important;
+    }
+
+    /* Normal state toggle */
+    body:not(.sidebar-collapsed):not(.sidebar-hidden) #toggle-sidenav {
+        left: 20px !important;
+    }
+
+    body:not(.sidebar-collapsed):not(.sidebar-hidden) #toggle-sidenav::after {
+        content: '☰' !important;
+    }
+
+    /* Mobile responsive */
+    @media (max-width: 768px) {
+        #toggle-sidenav {
+            display: none !important;
+        }
+        
+        body .content-area,
+        body .page-wrapper,
+        body .main-wrapper,
+        body .page-container,
+        body.sidebar-collapsed .content-area,
+        body.sidebar-collapsed .page-wrapper,
+        body.sidebar-collapsed .main-wrapper,
+        body.sidebar-hidden .content-area,
+        body.sidebar-hidden .page-wrapper,
+        body.sidebar-hidden .main-wrapper {
+            margin-left: 0 !important;
+        }
+    }
+    </style></head>
+
+<body class="">
+    <div id="__app_layout"><div class="main-wrapper">
+    <div><div class="header">
+
+    <div class="header-left active">
+        <a href="index.html" class="logo">
+            <img src="assets/images/logo.png" alt="">
+        </a>
+        <a href="index.html" class="logo-small">
+            <img src="assets/images/logo.png" alt="">
+        </a>
+    </div>
+
+    <a id="mobile_btn" class="mobile_btn">
+        <span class="bar-icon">
+            <span></span>
+            <span></span>
+            <span></span>
+        </span>
+    </a>
+    <!-- <div class="today-summary" id="todaySalesSummary">
+        <ul>
+            <li>
+                <label locale-res="TotalSales"></label>
+                <span data-bind="totalSales" class="currencySign commapr form-text">0</span>
+            </li>
+            <li>
+                <label locale-res="TotalCard"></label>
+                <span data-bind="totalCard" class="currencySign commapr form-text">0</span>
+            </li>
+            <li>
+                <label locale-res="TotalCash"></label>
+                <span data-bind="totalCash" class="currencySign commapr form-text">0</span>
+            </li>
+            <li>
+                <label locale-res="TotalCheque"></label>
+                <span data-bind="totalCheque" class="currencySign commapr form-text">0</span>
+            </li>
+            <li>
+                <label locale-res="TotalPayout"></label>
+                <span data-bind="totalPayout" class="currencySign commapr form-text">0</span>
+            </li>
+            <li>
+                <label locale-res="TotalOtherPayment"></label>
+                <span data-bind="totalOtherPayment" class="currencySign commapr form-text">0</span>
+            </li>
+            <li>
+                <label locale-res="TotalRefund"></label>
+                <span data-bind="totalRefund" class="currencySign commapr form-text">0</span>
+            </li>
+            <li class="actions">
+                <i class="c-pointer fa fa-download" id="export-today-summary"></i>
+            </li>
+        </ul>
+    </div> -->
+    <div class="order-no-search">
+        <div class="form-group">
+            <label locale-res="SalesOrderNo">Order #</label>
+            <div class="matech-autocomplete-wrapper order-search"><input type="text" class="form-control" id="orderno-search-header" placeholder="Search" autocomplete="off" matech-plugin="autocomplete"><div class="auto-complete-dropdown" style="min-width: 130px;"></div><div class="loader"><svg class="circular" viewBox="25 25 50 50"><circle class="path" cx="50" cy="50" r="20" fill="none" stroke-width="2" stroke-miterlimit="10"></circle></svg></div></div>
+        </div>
+    </div>
+    <div class="order-no-search mobile-no-search">
+        <div class="form-group">
+            <label locale-res="MobileNo">Account #</label>
+            <div class="matech-autocomplete-wrapper order-search"><input type="text" class="form-control" id="phoneno-search-header" placeholder="Search" autocomplete="off" matech-plugin="autocomplete"><div class="auto-complete-dropdown" style="min-width: 130px;"></div><div class="loader"><svg class="circular" viewBox="25 25 50 50"><circle class="path" cx="50" cy="50" r="20" fill="none" stroke-width="2" stroke-miterlimit="10"></circle></svg></div></div>
+        </div>
+    </div>
+    <ul class="nav user-menu">
+        <li>
+            <button class="price-check drawer-btn" id="open-drawer">Open
+                Drawer</button>
+        </li>
+        <li>
+            <button class="price-check" id="price-check">$</button>
+        </li>
+        <li>
+            <div class="top-dropdown-store">
+                <div class="header-dropdown-label" locale-res="Store">Store</div>
+                <select id="store-main-dropdown" class="form-control select2 select2-hidden-accessible" tabindex="-1" aria-hidden="true"><option value="1">WILLIAMSBURG</option><option value="2">BORO PARK</option><option value="3">MONSEY</option><option value="4">MONROE</option><option value="5">SALES</option><option value="6">OFFICE</option></select><span class="select2 select2-container select2-container--default" dir="ltr" style="width: 159.333px;"><span class="selection"><span class="select2-selection select2-selection--single" role="combobox" aria-haspopup="true" aria-expanded="false" tabindex="0" aria-labelledby="select2-store-main-dropdown-container"><span class="select2-selection__rendered" id="select2-store-main-dropdown-container" title="SALES">SALES</span><span class="select2-selection__arrow" role="presentation"><b role="presentation"></b></span></span></span><span class="dropdown-wrapper" aria-hidden="true"></span></span>
+            </div>
+        </li>
+        <li class="nav-item dropdown has-arrow main-drop user-drop">
+            <a href="javascript:void(0);" class="dropdown-toggle nav-link userset show" data-toggle="dropdown" aria-expanded="true">
+                <span class="user-img">
+                    <h6 class="username" id="user-name-header">Abe Perl</h6>
+                </span>
+            </a>
+            <div class="dropdown-menu menu-drop-user">
+                <div class="profilename">
+                    <div class="profileset">
+                        <span class="user-img">
+                            <img src="assets/images/theme/profile.png" alt="">
+                            <span class="status online"></span>
+                        </span>
+                        <div class="profilesets">
+                            <h5 id="user-role-header">Administrator</h5>
+                        </div>
+                    </div>
+                    <hr class="m-0">
+                    <button id="myProfile" class="dropdown-item pb-0 justify-content-center">
+                        <span>My Profile</span>
+                    </button>
+                </div>
+            </div>
+        </li>
+        <li class="nav-item dropdown has-arrow logout-wrp">
+            <button id="signOut" class="dropdown-item logout pb-0 justify-content-center">
+                <svg class="" style="
+    width: 25px;
+    height: 25px;
+">
+                    <use xlink:href="assets/images/icons.svg#ic_logout"></use>
+                </svg>
+            </button>
+        </li>
+    </ul>
+
+</div>
+
+</div>
+    <div><div id="toggle-sidenav" unselectable="on" class="unselectable" toggle="#sidenav" toggle-class="close-nav" title="Sidebar Toggle
+Left: Toggle • Right: Settings
+Alt+M: Toggle • Alt+C: Collapse • Alt+E: Expand • Alt+H: Hide"></div>
+
+<div class="sidebar mobile-open" id="sidebar">
+  <div class="sidebar-inner slimscroll">
+    <div id="sidebar-menu" class="sidebar-menu">
+      <ul class="vertical-menu main-menu" id="side-nav-menu" data-repeat="menu"><li class="menu-item" title="Dashboard (Dashboard)"><a href="#Home"><svg class="menu-icon"><use xlink:href="assets/images/icons.svg#ic_dashboard"></use></svg><span class="menu-text">Dashboard</span></a></li><li class="menu-item" title="Register (Register)"><a href="#SO/socreate"><svg class="menu-icon"><use xlink:href="assets/images/icons.svg#ic_shipment"></use></svg><span class="menu-text">Register</span></a></li><li class="menu-item" title="Purchase Order (null)"><a href="#PO"><svg class="menu-icon"><use xlink:href="assets/images/icons.svg#ic_inbound"></use></svg><span class="menu-text">Purchase Order</span></a></li><li class="menu-item" title="Credit Memo (null)"><a href="#po/creditmemo"><svg class="menu-icon"><use xlink:href="assets/images/icons.svg#ic_shipment"></use></svg><span class="menu-text">Credit Memo</span></a></li><li class="menu-item has-sub" title="Orders (null)"><a><svg class="menu-icon"><use xlink:href="assets/images/icons.svg#ic_shipment"></use></svg><span class="menu-text">Orders</span></a><ul class="sub-menu"><li class="menu-item" title="Orders (Orders)"><a href="#SO"><svg class="menu-icon"><use xlink:href="assets/images/icons.svg#ic_shipment"></use></svg><span class="menu-text">Orders</span></a></li><li class="menu-item" title="Operations Orders (null)"><a href="#SO/operationorders"><svg class="menu-icon"><use xlink:href="assets/images/icons.svg#ic_shipment"></use></svg><span class="menu-text">Operations Orders</span></a></li><li class="menu-item" title="Invoice (null)"><a href="#SO/invoice"><svg class="menu-icon"><use xlink:href="assets/images/icons.svg#"></use></svg><span class="menu-text">Invoice</span></a></li></ul></li><li class="menu-item has-sub" title="Catalog (Catalog)"><a><svg class="menu-icon"><use xlink:href="assets/images/icons.svg#ic_products"></use></svg><span class="menu-text">Catalog</span></a><ul class="sub-menu"><li class="menu-item" title="Product (Product)"><a href="#products"><svg class="menu-icon"><use xlink:href="assets/images/icons.svg#ic_products"></use></svg><span class="menu-text">Product</span></a></li><li class="menu-item" title="Categories (Categories)"><a href="#products/categories
+"><svg class="menu-icon"><use xlink:href="assets/images/icons.svg#ic_products"></use></svg><span class="menu-text">Categories</span></a></li><li class="menu-item" title="Inventory (null)"><a href="#inventory"><svg class="menu-icon"><use xlink:href="assets/images/icons.svg#ic_inventory"></use></svg><span class="menu-text">Inventory</span></a></li></ul></li><li class="menu-item" title="Customers (null)"><a href="#setup/customers"><svg class="menu-icon"><use xlink:href="assets/images/icons.svg#ic_administration"></use></svg><span class="menu-text">Customers</span></a></li><li class="menu-item" title="Customer Ledger (Customer Ledger)"><a href="#CL"><svg class="menu-icon"><use xlink:href="assets/images/icons.svg#ic_shipment"></use></svg><span class="menu-text">Customer Ledger</span></a></li><li class="menu-item" title="Supplier Ledger (Supplier Ledger)"><a href="#SL"><svg class="menu-icon"><use xlink:href="assets/images/icons.svg#ic_shipment"></use></svg><span class="menu-text">Supplier Ledger</span></a></li><li class="menu-item" title="Item Order Wise Search (null)"><a href="#SO/skusearch"><svg class="menu-icon"><use xlink:href="assets/images/icons.svg#ic_shipment"></use></svg><span class="menu-text">Item Order Wise Search</span></a></li><li class="menu-item" title="Product Type Search (null)"><a href="#so/ProductTypeSeach"><svg class="menu-icon"><use xlink:href="assets/images/icons.svg#ic_shipment"></use></svg><span class="menu-text">Product Type Search</span></a></li><li class="menu-item" title="Gift Card (null)"><a href="#giftcard"><svg class="menu-icon"><use xlink:href="assets/images/icons.svg#ic_inventory"></use></svg><span class="menu-text">Gift Card</span></a></li><li class="menu-item" title="Pay Out (null)"><a href="#payout"><svg class="menu-icon"><use xlink:href="assets/images/icons.svg#ic_inventory"></use></svg><span class="menu-text">Pay Out</span></a></li><li class="menu-item" title="Store Transfer Request (null)"><a href="#PO/storeRequest"><svg class="menu-icon"><use xlink:href="assets/images/icons.svg#ic_shipment"></use></svg><span class="menu-text">Store Transfer Request</span></a></li><li class="menu-item" title="Shipping Label Request (null)"><a href="#po/shipmentLabel"><svg class="menu-icon"><use xlink:href="assets/images/icons.svg#ic_shipment"></use></svg><span class="menu-text">Shipping Label Request</span></a></li><li class="menu-item" title="Checks List (null)"><a href="#so/checks"><svg class="menu-icon"><use xlink:href="assets/images/icons.svg#ic_shipment"></use></svg><span class="menu-text">Checks List</span></a></li><li class="menu-item" title="Vouchers List (Vouchers List)"><a href="#so/vouchers"><svg class="menu-icon"><use xlink:href="assets/images/icons.svg#ic_shipment"></use></svg><span class="menu-text">Vouchers List</span></a></li><li class="menu-item" title="Process Custom Order (null)"><a href="#SO/processcustomorder"><svg class="menu-icon"><use xlink:href="assets/images/icons.svg#ic_shipment"></use></svg><span class="menu-text">Process Custom Order</span></a></li><li class="menu-item has-sub" title="Setup (null)"><a><svg class="menu-icon"><use xlink:href="assets/images/icons.svg#ic_administration"></use></svg><span class="menu-text">Setup</span></a><ul class="sub-menu"><li class="menu-item" title="Coupons (Coupons)"><a href="#setup/coupons"><svg class="menu-icon"><use xlink:href="assets/images/icons.svg#Coupons"></use></svg><span class="menu-text">Coupons</span></a></li><li class="menu-item" title="Operation Item Status (Operation Item Status)"><a href="#setup/operationitemstatus"><svg class="menu-icon"><use xlink:href="assets/images/icons.svg#ic_administration"></use></svg><span class="menu-text">Operation Item Status</span></a></li><li class="menu-item" title="Product Types (Product Types)"><a href="#setup/producttypes"><svg class="menu-icon"><use xlink:href="assets/images/icons.svg#ic_administration"></use></svg><span class="menu-text">Product Types</span></a></li><li class="menu-item" title="Sale Item Status (Sale Item Status)"><a href="#setup/saleitemstatus"><svg class="menu-icon"><use xlink:href="assets/images/icons.svg#ic_administration"></use></svg><span class="menu-text">Sale Item Status</span></a></li><li class="menu-item" title="Sale Order Custom Status (null)"><a href="#setup/salesordercustomstatus"><svg class="menu-icon"><use xlink:href="assets/images/icons.svg#ic_administration"></use></svg><span class="menu-text">Sale Order Custom Status</span></a></li><li class="menu-item" title="SMTP Settings (SMTP Settings)"><a href="#setup/smtpsettings"><svg class="menu-icon"><use xlink:href="assets/images/icons.svg#ic_administration"></use></svg><span class="menu-text">SMTP Settings</span></a></li><li class="menu-item" title="Store SMS Carrier (Store SMS Carrier)"><a href="#setup/storesmssetting"><svg class="menu-icon"><use xlink:href="assets/images/icons.svg#ic_administration"></use></svg><span class="menu-text">Store SMS Carrier</span></a></li><li class="menu-item" title="Discount Coupon (null)"><a href="#setup/discountcoupons"><svg class="menu-icon"><use xlink:href="assets/images/icons.svg#"></use></svg><span class="menu-text">Discount Coupon</span></a></li><li class="menu-item" title="Users (Users)"><a href="#setup/user"><svg class="menu-icon"><use xlink:href="assets/images/icons.svg#ic_administration"></use></svg><span class="menu-text">Users</span></a></li><li class="menu-item" title="Stores (Stores)"><a href="#setup/store"><svg class="menu-icon"><use xlink:href="assets/images/icons.svg#ic_administration"></use></svg><span class="menu-text">Stores</span></a></li><li class="menu-item" title="Document Template (null)"><a href="#setup/documenttypetemplate"><svg class="menu-icon"><use xlink:href="assets/images/icons.svg#test"></use></svg><span class="menu-text">Document Template</span></a></li><li class="menu-item" title="Suppliers (Suppliers)"><a href="#setup/suppliers"><svg class="menu-icon"><use xlink:href="assets/images/icons.svg#ic_administration"></use></svg><span class="menu-text">Suppliers</span></a></li></ul></li><li class="menu-item has-sub" title="Reports (null)"><a><svg class="menu-icon"><use xlink:href="assets/images/icons.svg#ic_administration"></use></svg><span class="menu-text">Reports</span></a><ul class="sub-menu"><li class="menu-item" title="In/Out Transaction Report (In/Out Transaction Report)"><a href="#finance/ledgerdetail"><svg class="menu-icon"><use xlink:href="assets/images/icons.svg#ic_administration"></use></svg><span class="menu-text">In/Out Transaction Report</span></a></li><li class="menu-item" title="Reports (null)"><a href="#reports"><svg class="menu-icon"><use xlink:href="assets/images/icons.svg#"></use></svg><span class="menu-text">Reports</span></a></li></ul></li></ul>
+    </div>
+  </div>
+</div>
+</div>
+    <!-- Page content holder -->
+    <div class="content-area" id="content">
+        <!-- Demo content -->
+        <div class="page-wrapper loader-cont">
+            <div class="content">
+                <div container="view"><div class="content-inner-wrp"><div app-layout="home" app-title="Home">
+    <link href="pages/home/dashboard.css" rel="stylesheet">
+    <div class="dashboard-wrp" style="">
+        <div id="amount-widget">
+            <div class="row" data-repeat="data"><div class="col-lg-3 col-sm-6 col-12 box" data-row="0">
+                    <div class="dash-widget">
+                        <div class="dash-widgetimg">
+                            <span><img src="assets/images/theme/icons/dash1.svg" alt="img" data-repeat-item="data-name:displayText" data-name="PO Pending Amount"></span>
+                        </div>
+                        <div class="dash-widgetcontent">
+                            <h5><span class="counters currencySign commapr" data-repeat-item="keyFigure">31,792.17</span></h5>
+                            <h6 data-repeat-item="displayText">PO Pending Amount</h6>
+                        </div>
+                    </div>
+                </div><div class="col-lg-3 col-sm-6 col-12 box" data-row="1">
+                    <div class="dash-widget">
+                        <div class="dash-widgetimg">
+                            <span><img src="assets/images/theme/icons/dash1.svg" alt="img" data-repeat-item="data-name:displayText" data-name="Total Products Amount"></span>
+                        </div>
+                        <div class="dash-widgetcontent">
+                            <h5><span class="counters currencySign commapr" data-repeat-item="keyFigure">0.00</span></h5>
+                            <h6 data-repeat-item="displayText">Total Products Amount</h6>
+                        </div>
+                    </div>
+                </div><div class="col-lg-3 col-sm-6 col-12 box" data-row="2">
+                    <div class="dash-widget">
+                        <div class="dash-widgetimg">
+                            <span><img src="assets/images/theme/icons/dash1.svg" alt="img" data-repeat-item="data-name:displayText" data-name="Total Sales"></span>
+                        </div>
+                        <div class="dash-widgetcontent">
+                            <h5><span class="counters currencySign commapr" data-repeat-item="keyFigure">0.00</span></h5>
+                            <h6 data-repeat-item="displayText">Total Sales</h6>
+                        </div>
+                    </div>
+                </div><div class="col-lg-3 col-sm-6 col-12 box" data-row="3">
+                    <div class="dash-widget">
+                        <div class="dash-widgetimg">
+                            <span><img src="assets/images/theme/icons/dash1.svg" alt="img" data-repeat-item="data-name:displayText" data-name="Total Other Payment"></span>
+                        </div>
+                        <div class="dash-widgetcontent">
+                            <h5><span class="counters currencySign commapr" data-repeat-item="keyFigure">0.00</span></h5>
+                            <h6 data-repeat-item="displayText">Total Other Payment</h6>
+                        </div>
+                    </div>
+                </div><div class="col-lg-3 col-sm-6 col-12 box" data-row="4">
+                    <div class="dash-widget">
+                        <div class="dash-widgetimg">
+                            <span><img src="assets/images/theme/icons/dash1.svg" alt="img" data-repeat-item="data-name:displayText" data-name="Total Card"></span>
+                        </div>
+                        <div class="dash-widgetcontent">
+                            <h5><span class="counters currencySign commapr" data-repeat-item="keyFigure">0.00</span></h5>
+                            <h6 data-repeat-item="displayText">Total Card</h6>
+                        </div>
+                    </div>
+                </div><div class="col-lg-3 col-sm-6 col-12 box" data-row="5">
+                    <div class="dash-widget">
+                        <div class="dash-widgetimg">
+                            <span><img src="assets/images/theme/icons/dash1.svg" alt="img" data-repeat-item="data-name:displayText" data-name="Total Refund"></span>
+                        </div>
+                        <div class="dash-widgetcontent">
+                            <h5><span class="counters currencySign commapr" data-repeat-item="keyFigure">0.00</span></h5>
+                            <h6 data-repeat-item="displayText">Total Refund</h6>
+                        </div>
+                    </div>
+                </div><div class="col-lg-3 col-sm-6 col-12 box" data-row="6">
+                    <div class="dash-widget">
+                        <div class="dash-widgetimg">
+                            <span><img src="assets/images/theme/icons/dash1.svg" alt="img" data-repeat-item="data-name:displayText" data-name="Total Cheque"></span>
+                        </div>
+                        <div class="dash-widgetcontent">
+                            <h5><span class="counters currencySign commapr" data-repeat-item="keyFigure">0.00</span></h5>
+                            <h6 data-repeat-item="displayText">Total Cheque</h6>
+                        </div>
+                    </div>
+                </div><div class="col-lg-3 col-sm-6 col-12 box" data-row="7">
+                    <div class="dash-widget">
+                        <div class="dash-widgetimg">
+                            <span><img src="assets/images/theme/icons/dash1.svg" alt="img" data-repeat-item="data-name:displayText" data-name="Total Cash"></span>
+                        </div>
+                        <div class="dash-widgetcontent">
+                            <h5><span class="counters currencySign commapr" data-repeat-item="keyFigure">0.00</span></h5>
+                            <h6 data-repeat-item="displayText">Total Cash</h6>
+                        </div>
+                    </div>
+                </div><div class="col-lg-3 col-sm-6 col-12 box" data-row="8">
+                    <div class="dash-widget">
+                        <div class="dash-widgetimg">
+                            <span><img src="assets/images/theme/icons/dash1.svg" alt="img" data-repeat-item="data-name:displayText" data-name="Total Payout"></span>
+                        </div>
+                        <div class="dash-widgetcontent">
+                            <h5><span class="counters currencySign commapr" data-repeat-item="keyFigure">0.00</span></h5>
+                            <h6 data-repeat-item="displayText">Total Payout</h6>
+                        </div>
+                    </div>
+                </div></div>
+        </div>
+        <div id="key-widget">
+            <div class="row" data-repeat="data"><div class="col-lg-3 col-sm-6 col-12 d-flex box" data-row="0">
+                    <a data-repeat-item="href:url" target="_blank" class="dash-count" href="#SO/CustomOrders?filters=sales-order-tablesearch|&amp;__page_state=Pending">
+                        <div class="dash-counts">
+                            <h4 data-repeat-item="keyFigure">84</h4>
+                            <h5 data-repeat-item="displayText">PO Pending</h5>
+                        </div>
+                    </a>
+                </div><div class="col-lg-3 col-sm-6 col-12 d-flex box" data-row="1">
+                    <a data-repeat-item="href:url" target="_blank" class="dash-count" href="#SO/CustomOrders?filters=sales-order-tablesearch|&amp;__page_state=MoveToProduction">
+                        <div class="dash-counts">
+                            <h4 data-repeat-item="keyFigure">0</h4>
+                            <h5 data-repeat-item="displayText">Move To Production Count</h5>
+                        </div>
+                    </a>
+                </div><div class="col-lg-3 col-sm-6 col-12 d-flex box" data-row="2">
+                    <a data-repeat-item="href:url" target="_blank" class="dash-count" href="#products">
+                        <div class="dash-counts">
+                            <h4 data-repeat-item="keyFigure">18580</h4>
+                            <h5 data-repeat-item="displayText">Total Products</h5>
+                        </div>
+                    </a>
+                </div><div class="col-lg-3 col-sm-6 col-12 d-flex box" data-row="3">
+                    <a data-repeat-item="href:url" target="_blank" class="dash-count" href="#inventory">
+                        <div class="dash-counts">
+                            <h4 data-repeat-item="keyFigure">3</h4>
+                            <h5 data-repeat-item="displayText">Total Products Quantity</h5>
+                        </div>
+                    </a>
+                </div><div class="col-lg-3 col-sm-6 col-12 d-flex box" data-row="4">
+                    <a data-repeat-item="href:url" target="_blank" class="dash-count" href="#setup/customers">
+                        <div class="dash-counts">
+                            <h4 data-repeat-item="keyFigure">30135</h4>
+                            <h5 data-repeat-item="displayText">Total Active Customers</h5>
+                        </div>
+                    </a>
+                </div><div class="col-lg-3 col-sm-6 col-12 d-flex box" data-row="5">
+                    <a data-repeat-item="href:url" target="_blank" class="dash-count" href="#setup/customers">
+                        <div class="dash-counts">
+                            <h4 data-repeat-item="keyFigure">19</h4>
+                            <h5 data-repeat-item="displayText">Total InActive Customers</h5>
+                        </div>
+                    </a>
+                </div><div class="col-lg-3 col-sm-6 col-12 d-flex box" data-row="6">
+                    <a data-repeat-item="href:url" target="_blank" class="dash-count" href="#PO/storeRequest">
+                        <div class="dash-counts">
+                            <h4 data-repeat-item="keyFigure">0</h4>
+                            <h5 data-repeat-item="displayText">Pending Store Receivable</h5>
+                        </div>
+                    </a>
+                </div><div class="col-lg-3 col-sm-6 col-12 d-flex box" data-row="7">
+                    <a data-repeat-item="href:url" target="_blank" class="dash-count" href="#PO/storeRequest?__page_state=PendingTransfer">
+                        <div class="dash-counts">
+                            <h4 data-repeat-item="keyFigure">0</h4>
+                            <h5 data-repeat-item="displayText">Pending Store Transfer</h5>
+                        </div>
+                    </a>
+                </div><div class="col-lg-3 col-sm-6 col-12 d-flex box" data-row="8">
+                    <a data-repeat-item="href:url" target="_blank" class="dash-count" href="#PO/storeRequest?__page_state=Completed">
+                        <div class="dash-counts">
+                            <h4 data-repeat-item="keyFigure">1</h4>
+                            <h5 data-repeat-item="displayText">Completed Store Request</h5>
+                        </div>
+                    </a>
+                </div></div>
+        </div>
+        <div id="table-widget">
+            <div class="row" data-repeat="data"><div class="col-lg-6 col-sm-12 col-12 d-flex" data-row="0">
+                    <div class="card flex-fill">
+                        <div class="card-header pb-0 d-flex justify-content-between align-items-center">
+                            <h4 class="card-title mb-0" data-repeat-item="displayText">Recently Added Products List</h4>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive dataview height-100-per">
+                                <div>
+                                    <div class="table-wrp max-heoght-table" data-repeat-item="data-table:keyFigure" data-table="[{&quot;sku&quot;:&quot;CH325&quot;,&quot;title&quot;:&quot;ACRYLIC HAVDALAH SET GOLD #325 , TRAY, CANDLE, MATCH HOLDER AND BESAMIM HOLDER&quot;,&quot;sellPrice&quot;:39},{&quot;sku&quot;:&quot;CCBH604L-L&quot;,&quot;title&quot;:&quot;CHALLACH COVER HAND EMBROIDERED# 604 DESIGN LEATHER LARGE SIZE&quot;,&quot;sellPrice&quot;:450},{&quot;sku&quot;:&quot;CCBH602L-L&quot;,&quot;title&quot;:&quot;CHALLACH COVER HAND EMBROIDERED WITH BLUE FLOWERS #602 DESIGN LEATHER SIZE LARGE&quot;,&quot;sellPrice&quot;:337},{&quot;sku&quot;:&quot;CCBH-CPD-M&quot;,&quot;title&quot;:&quot;CHALLACH COVER HAND EMBROIDERED# CPD DESIGN LEATHER MED SIZE&quot;,&quot;sellPrice&quot;:212.5},{&quot;sku&quot;:&quot;CCBH-CPD-L&quot;,&quot;title&quot;:&quot;CHALLACH COVER HAND EMBROIDERED# CPD DESIGN LEATHER LARGE SIZE&quot;,&quot;sellPrice&quot;:312.5}]">
+                                    <table width="100%" class="table sticky-table"><tbody><tr></tr></tbody><thead><tr><th>sku</th><th>title</th><th>sell Price</th></tr></thead><tbody><tr><td>CH325</td><td>ACRYLIC HAVDALAH SET GOLD #325 , TRAY, CANDLE, MATCH HOLDER AND BESAMIM HOLDER</td><td>39</td></tr><tr><td>CCBH604L-L</td><td>CHALLACH COVER HAND EMBROIDERED# 604 DESIGN LEATHER LARGE SIZE</td><td>450</td></tr><tr><td>CCBH602L-L</td><td>CHALLACH COVER HAND EMBROIDERED WITH BLUE FLOWERS #602 DESIGN LEATHER SIZE LARGE</td><td>337</td></tr><tr><td>CCBH-CPD-M</td><td>CHALLACH COVER HAND EMBROIDERED# CPD DESIGN LEATHER MED SIZE</td><td>212.5</td></tr><tr><td>CCBH-CPD-L</td><td>CHALLACH COVER HAND EMBROIDERED# CPD DESIGN LEATHER LARGE SIZE</td><td>312.5</td></tr></tbody></table></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div></div>
+        </div>
+    </div>
+</div>
+</div></div>
+
+            </div>
+        </div>
+        <div class="panel-box modal-box modal-small" id="store-admin-pin-modal" style="display: none;">
+            <h4 class="panel-box-title text-center">
+                <span locale-res="PleaseCallStoreAdmin">Please Call Store Admin</span>
+            </h4>
+            <div class="page-body">
+                <div class="form-group">
+                    <label locale-res="UserName">User Name</label>
+                    <input type="text" class="form-control" data-name="UserName" autocomplete="off" required="" validate="">
+                </div>
+                <div class="form-group">
+                    <label locale-res="Pin">Pin</label>
+                    <input type="text" decimal="2" class="form-control" data-name="Pin" autocomplete="off" required="" validate="">
+                </div>
+            </div>
+            <div class="page-foot justify-end">
+                <div class="modal-box-controls">
+                    <button class="btn modal-box-button" data-value="save" locale-res="Save">Save</button>
+                    <button class="btn grey-brd modal-box-button" data-value="close" locale-res="Cancel">Cancel</button>
+                </div>
+            </div>
+            <div class="page-footer"></div>
+        </div>
+        <div class="panel-box modal-box modal-small" id="modal-price-check" style="display: none;">
+            <div class="modal-head">
+                <h4 class="panel-box-title text-center">
+                    <b locale-res="PriceCheck">Price Check</b>
+                </h4>
+                <button class="btn modal-box-button close-icon-btn" data-value="close">
+                    ✕
+                </button>
+            </div>
+            <div class="page-body" style="min-height: 200px;">
+                <div class="row">
+                    <div class="form-group col-sm-12">
+                        <label locale-res="Scan">Scan</label>
+                        <div class="matech-autocomplete-wrapper product-search"><input type="text" class="form-control" id="price-check-sku" autocomplete="off" required="" validate="" matech-plugin="autocomplete"><div class="auto-complete-dropdown" style="min-width: 100%;"></div><div class="loader"><svg class="circular" viewBox="25 25 50 50"><circle class="path" cx="50" cy="50" r="20" fill="none" stroke-width="2" stroke-miterlimit="10"></circle></svg></div></div>
+                    </div>
+                </div>
+                <div class="text-wrp row full-width" style="display:none;">
+                    <div class="form-group col-sm-12">
+                        <label><span locale-res="SKU">SKU</span>: <a class="form-text" target="_blank" data-bind="sku|href:productUrl"></a></label>
+                    </div>
+                    <div class="form-group col-sm-12">
+                        <label><span locale-res="UPC1">UPC</span>: <span class="form-text" target="_blank" data-bind="upC1|href:productUrl"></span></label>
+                    </div>
+                    <div class="form-group col-sm-12">
+                        <label><span locale-res="Title">Title</span>: <span class="form-text" target="_blank" data-bind="title|href:productUrl"></span></label>
+                    </div>
+                    <div class="form-group col-sm-12">
+                        <label><span locale-res="Price">Price</span>: <span class="form-text" data-bind="sellPrice"></span></label>
+                    </div>
+                    <div class="form-group col-sm-12">
+                        <label><span locale-res="Inventory">Inventory</span>: <span class="form-text" data-bind="remainingQty"></span></label>
+                    </div>
+                </div>
+            </div>
+            <div class="page-foot">
+                <div class="modal-box-controls">
+                    <button class="btn center-btn modal-box-button" data-value="close" locale-res="Cancel">Cancel</button>
+                </div>
+            </div>
+        </div>
+        <div class="panel-box modal-box modal-small" id="modal-store-change" style="display: none;">
+            <div class="modal-head">
+                <h4 class="panel-box-title text-center">
+                    <b locale-res="EnterPassword">Enter Password</b>
+                </h4>
+                <button class="btn modal-box-button close-icon-btn" data-value="close">
+                    ✕
+                </button>
+            </div>
+            <div class="page-body">
+                <div class="row" autocomplete="off">
+                    <div class="form-group col-sm-12">
+                        <input type="text" class="form-control" id="pswd-store-change" autocomplete="off" onclick="$(this).attr('type', 'password');" required="" validate="">
+                    </div>
+                </div>
+            </div>
+            <div class="page-foot">
+                <div class="modal-box-controls">
+                    <button class="btn btn-secondary center-btn modal-box-button" id="save-change-store-pswd" data-value="saveChangeStorePswd" locale-res="Save">Save</button>
+                    <button class="btn center-btn modal-box-button" data-value="closeChangeStore" locale-res="Cancel">Cancel</button>
+                </div>
+            </div>
+        </div>
+        <div class="footer-bar">
+            Powered by <a>POS</a>
+        </div>
+    </div>
+    <!-- End demo content -->
+</div>
+<script>
+    var notProc = new TFProcess(
+        "notProc",
+        function () { }, // start up function
+        function () {
+            // loop function
+            //console.log("notProc is running");
+        }
+    );
+    notProc.loopInterval = 10000;
+    tf.process.attach(notProc);
+    var breadcrumbHeader = [];
+</script></div>
+
+    <div id="__app_scripts">
+        <!-- <script src="scripts/vendors.bundle.js?vr=2"></script>
+        <script src="scripts/scripts.bundle.js?vr=2"></script> -->
+        <script src="scripts/jquery-3.4.1.min.js?vr=2"></script>
+        <script src="scripts/feather.min.js?vr=2"></script>
+        <script src="scripts/datatables.min.js?vr=2"></script>
+        <script src="scripts/dataTables.colReorder.js?vr=2"></script>
+        <script src="scripts/dataTables.fixedColumns.min.js?vr=2"></script>
+        <script src="scripts/dataTables.buttons.print.min.js?vr=2"></script>
+        <script src="scripts/plugins/loader/loader.js?vr=2"></script>
+        <script src="scripts/plugins/modal/modal.js?vr=2"></script>
+        <script src="scripts/plugins/toggler/toggler.js?vr=2"></script>
+        <script src="scripts/plugins/snackbar/matech-snackbar.js?vr=2"></script>
+        <script src="scripts/plugins/autocomplete/matechautocomplete.js?vr=2"></script>
+        <script src="scripts/tfaddons.js?vr=2"></script>
+        <script src="scripts/tf.js?vr=2"></script>
+        <script src="scripts/service.js?vr=2"></script>
+        <script src="scripts/common.js?vr=2"></script>
+        <script src="scripts/tfValidator.js?vr=2"></script>
+        <script src="scripts/app.js?vr=2"></script>
+        <script src="scripts/datepicker.min.js?vr=2"></script>
+        <script src="scripts/plugins/datetimepicker/jquery.datetimepicker.js?vr=2"></script>
+        <script src="scripts/select2.min.js?vr=2"></script>
+        <script src="scripts/plugins/combotree/comboTreePlugin.js?vr=2"></script>
+        <script src="scripts/webfont.js?vr=2"></script>
+        <script src="scripts/moment.js?vr=2"></script>
+        <script src="scripts/popper.min.js?vr=2"></script>
+        <script src="scripts/bootstrap.min.js?vr=2"></script>
+        <script src="scripts/bootstrap.bundle.min.js?vr=2"></script>
+        <script src="scripts/jquery.validate.min.js?vr=2"></script>
+        <script src="scripts/plugins/tableExtend/tableExtend.js?vr=2"></script>
+        <script src="scripts/plugins/buttonStrip/buttonstrip.js?vr=2"></script>
+        <script src="scripts/plugins/barcodescan/barcodescan.js?vr=2"></script>
+        <script src="scripts/plugins/dynamicform/dynamicform.js?vr=2"></script>
+        <script src="scripts/cart.js?vr=2"></script>
+        <script src="scripts/plugins/tagview/tagview.js?vr=2"></script>
+
+        <!-- export option datatble -->
+        <script src="scripts/plugins/datatableExport/jszip.min.js?vr=2"></script>
+        <script src="scripts/plugins/datatableExport/pdfmake.min.js?vr=2"></script>
+        <script src="scripts/plugins/datatableExport/vfs_fonts.js?vr=2"></script>
+        <script src="scripts/plugins/daterangepicker/daterangepicker.min.js?vr=2"></script>
+        <script type="text/javascript" src="scripts/plugins/barcode/labels.js?vr=2"></script>
+        <script type="text/javascript" src="scripts/plugins/jsbarcode/JsBarcode.all.min.js?vr=2"></script>
+        <script type="text/javascript" src="scripts/plugins/barcode/connectcode-javascript-code128b.js?vr=2"></script>
+        <!-- <script src="scripts/script.js?vr=2"></script> -->
+        <script>
+            WebFont.load({
+                google: {
+                    families: [
+                        "Poppins:300,400,500,600,700",
+                        "Roboto:300,400,500,600,700",
+                        "Plus Jakarta Sans:300,400,500,600,700",
+                    ],
+                },
+                active: function () {
+                    sessionStorage.fonts = true;
+                },
+            });
+        </script>
+
+        <div id="__layout_scripts"><script src="pages/_shared/header.js?js_=faa03999-bed6-45d0-ae78-8203cef54751"></script></div>
+        <div id="__view_scripts"><script src="pages/home/dashboard.js?js_=596c1727-d695-40f2-8131-bdd4d3257ffe"></script></div>
+    </div><div class="snackbarContainer"></div>
+
+
+</body><style data-source="User JavaScript and CSS">@charset "UTF-8" !important;
+/* ===== MODERNIZED USER-FRIENDLY CSS REDESIGN ===== */
+/* CSS Variables for Consistency */
+:root {
+  --primary-color: #2563eb !important;
+  --secondary-color: #64748b !important;
+  --success-color: #16a34a !important;
+  --warning-color: #f59e0b !important;
+  --error-color: #dc2626 !important;
+  --background-light: #f8fafc !important;
+  --background-white: #ffffff !important;
+  --text-primary: #1e293b !important;
+  --text-secondary: #64748b !important;
+  --text-muted: #94a3b8 !important;
+  --border-color: #e2e8f0 !important;
+  --border-focus: #3b82f6 !important;
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05) !important;
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1) !important;
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1) !important;
+  --radius-sm: 4px !important;
+  --radius-md: 6px !important;
+  --radius-lg: 8px !important;
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+}
+
+/* Base Styles */
+* {
+  box-sizing: border-box !important;
+}
+
+body {
+  font-family: var(--font-sans) !important;
+  font-size: 14px !important;
+  line-height: 1.5 !important;
+  color: var(--text-primary) !important;
+  background-color: var(--background-light) !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* Typography */
+h1, h2, h3, h4, h5, h6 {
+  margin: 0 0 1rem 0 !important;
+  font-weight: 600 !important;
+  line-height: 1.2 !important;
+  color: var(--text-primary) !important;
+}
+
+h1 {
+  font-size: 1.875rem !important;
+}
+
+h2 {
+  font-size: 1.5rem !important;
+}
+
+h3 {
+  font-size: 1.25rem !important;
+}
+
+h4 {
+  font-size: 1.125rem !important;
+}
+
+h5 {
+  font-size: 1rem !important;
+}
+
+h6 {
+  font-size: 0.875rem !important;
+}
+
+/* Form Elements - Completely Redesigned */
+.form-group {
+  margin-bottom: 1.5rem !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+.form-group-inline {
+  display: grid !important;
+  grid-template-columns: 180px 1fr !important;
+  gap: 1rem !important;
+  align-items: start !important;
+  margin-bottom: 1.5rem !important;
+}
+
+label {
+  font-size: 0.875rem !important;
+  font-weight: 500 !important;
+  color: var(--text-primary) !important;
+  margin-bottom: 0.5rem !important;
+  display: block !important;
+}
+
+.form-group-inline label {
+  margin-bottom: 0 !important;
+  padding-top: 0.625rem !important;
+  align-self: start !important;
+}
+
+.form-control {
+  width: 100% !important;
+  padding: 0.75rem 1rem !important;
+  font-size: 0.875rem !important;
+  border: 1px solid var(--border-color) !important;
+  border-radius: var(--radius-md) !important;
+  background-color: var(--background-white) !important;
+  transition: all 0.2s ease-in-out !important;
+  font-family: inherit !important;
+}
+
+.form-control:focus {
+  outline: none !important;
+  border-color: var(--border-focus) !important;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
+}
+
+.form-control::placeholder {
+  color: var(--text-muted) !important;
+}
+
+.form-control:disabled {
+  background-color: var(--background-light) !important;
+  color: var(--text-muted) !important;
+  cursor: not-allowed !important;
+}
+
+/* Select Elements */
+select.form-control {
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e") !important;
+  background-position: right 0.75rem center !important;
+  background-repeat: no-repeat !important;
+  background-size: 16px 16px !important;
+  padding-right: 2.5rem !important;
+  appearance: none !important;
+}
+
+/* Textarea */
+textarea.form-control {
+  min-height: 80px !important;
+  resize: vertical !important;
+}
+
+/* Buttons - Modern Design */
+.btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 0.75rem 1.5rem !important;
+  font-size: 0.875rem !important;
+  font-weight: 500 !important;
+  border-radius: var(--radius-md) !important;
+  border: none !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease-in-out !important;
+  text-decoration: none !important;
+  gap: 0.5rem !important;
+  min-height: 44px; /* Touch-friendly */
+}
+
+.btn:focus {
+  outline: none !important;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3) !important;
+}
+
+.btn:disabled {
+  opacity: 0.6 !important;
+  cursor: not-allowed !important;
+}
+
+.btn-primary {
+  background-color: var(--primary-color) !important;
+  color: white !important;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background-color: #1d4ed8 !important;
+}
+
+.btn-secondary {
+  background-color: var(--background-white) !important;
+  color: var(--secondary-color) !important;
+  border: 1px solid var(--border-color) !important;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background-color: var(--background-light) !important;
+}
+
+.btn-success {
+  background-color: var(--success-color) !important;
+  color: white !important;
+}
+
+.btn-success:hover:not(:disabled) {
+  background-color: #15803d !important;
+}
+
+.btn-danger {
+  background-color: var(--error-color) !important;
+  color: white !important;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background-color: #b91c1c !important;
+}
+
+.btn-sm {
+  padding: 0.5rem 1rem !important;
+  font-size: 0.8125rem !important;
+  min-height: 36px !important;
+}
+
+.btn-lg {
+  padding: 1rem 2rem !important;
+  font-size: 1rem !important;
+  min-height: 52px !important;
+}
+
+/* Cards and Panels */
+.panel, .panel-box, .card {
+  background-color: var(--background-white) !important;
+  border-radius: var(--radius-lg) !important;
+  box-shadow: var(--shadow-sm) !important;
+  border: 1px solid var(--border-color) !important;
+  margin-bottom: 1.5rem !important;
+}
+
+.card-body, .panel-body {
+  padding: 1.5rem !important;
+}
+
+.card-header, .panel-header {
+  padding: 1rem 1.5rem !important;
+  border-bottom: 1px solid var(--border-color) !important;
+  background-color: var(--background-light) !important;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0 !important;
+}
+
+.panel-title {
+  margin: 0 !important;
+  font-size: 1.125rem !important;
+  font-weight: 600 !important;
+  color: var(--text-primary) !important;
+}
+
+/* Tables - Completely Redesigned */
+.table-container {
+  background: var(--background-white) !important;
+  border-radius: var(--radius-lg) !important;
+  overflow: hidden !important;
+  box-shadow: var(--shadow-sm) !important;
+  border: 1px solid var(--border-color) !important;
+}
+
+table {
+  width: 100% !important;
+  border-collapse: collapse !important;
+  font-size: 0.875rem !important;
+}
+
+table thead {
+  background-color: var(--background-light) !important;
+}
+
+table th {
+  padding: 1rem 0.75rem !important;
+  text-align: left !important;
+  font-weight: 600 !important;
+  color: var(--text-primary) !important;
+  border-bottom: 1px solid var(--border-color) !important;
+  font-size: 0.8125rem !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.025em !important;
+}
+
+table td {
+  padding: 0.875rem 0.75rem !important;
+  border-bottom: 1px solid var(--border-color) !important;
+  color: var(--text-primary) !important;
+}
+
+table tbody tr:hover {
+  background-color: #f1f5f9 !important;
+}
+
+table tbody tr:last-child td {
+  border-bottom: none !important;
+}
+
+/* DataTables Wrapper */
+.dataTables_wrapper {
+  margin-top: 1rem !important;
+}
+
+.dataTables_wrapper .datatable-header {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  margin-bottom: 1rem !important;
+  flex-wrap: wrap !important;
+  gap: 1rem !important;
+}
+
+.dataTables_wrapper .datatable-content {
+  background: var(--background-white) !important;
+  border-radius: var(--radius-lg) !important;
+  overflow: hidden !important;
+  box-shadow: var(--shadow-sm) !important;
+  border: 1px solid var(--border-color) !important;
+  max-height: 70vh !important;
+  overflow-y: auto !important;
+}
+
+.dataTables_wrapper .datatable-footer {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  margin-top: 1rem !important;
+  padding: 1rem !important;
+  background: var(--background-white) !important;
+  border-radius: var(--radius-lg) !important;
+  border: 1px solid var(--border-color) !important;
+}
+
+/* Search and Filter Controls */
+.search-container {
+  position: relative !important;
+  display: inline-block !important;
+  min-width: 250px !important;
+}
+
+.search-container input {
+  padding-left: 2.5rem !important;
+}
+
+.search-container::before {
+  content: "🔍" !important;
+  position: absolute !important;
+  left: 0.75rem !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  color: var(--text-muted) !important;
+  font-size: 0.875rem !important;
+  z-index: 1 !important;
+}
+
+/* Navigation */
+.navbar {
+  background-color: var(--background-white) !important;
+  border-bottom: 1px solid var(--border-color) !important;
+  padding: 1rem 0 !important;
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 1000 !important;
+  box-shadow: var(--shadow-sm) !important;
+}
+
+.navbar-brand {
+  font-size: 1.25rem !important;
+  font-weight: 700 !important;
+  color: var(--primary-color) !important;
+  text-decoration: none !important;
+}
+
+.navbar-nav {
+  display: flex !important;
+  align-items: center !important;
+  gap: 2rem !important;
+  list-style: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.navbar-nav a {
+  color: var(--text-secondary) !important;
+  text-decoration: none !important;
+  font-weight: 500 !important;
+  font-size: 0.875rem !important;
+  transition: color 0.2s ease-in-out !important;
+}
+
+.navbar-nav a:hover {
+  color: var(--primary-color) !important;
+}
+
+/* Sidebar - Collapsible Design */
+.sidebar {
+  background-color: var(--background-white) !important;
+  border-right: 1px solid var(--border-color) !important;
+  height: 100vh !important;
+  width: 250px !important;
+  position: fixed !important;
+  left: 0 !important;
+  top: 0 !important;
+  overflow-y: auto !important;
+  z-index: 999 !important;
+  box-shadow: var(--shadow-sm) !important;
+  transition: transform 0.3s ease-in-out, width 0.3s ease-in-out !important;
+}
+
+/* Collapsed sidebar state */
+.sidebar.collapsed {
+  width: 60px !important;
+}
+
+.sidebar.collapsed .menu-text {
+  opacity: 0 !important;
+  width: 0 !important;
+  overflow: hidden !important;
+}
+
+.sidebar.collapsed .sub-menu {
+  position: absolute !important;
+  left: 60px !important;
+  top: 0 !important;
+  background: var(--background-white) !important;
+  border: 1px solid var(--border-color) !important;
+  border-radius: var(--radius-md) !important;
+  box-shadow: var(--shadow-lg) !important;
+  min-width: 200px !important;
+  z-index: 1000 !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  transform: translateX(-10px) !important;
+  transition: all 0.2s ease-in-out !important;
+}
+
+.sidebar.collapsed .menu-item.has-sub:hover .sub-menu {
+  opacity: 1 !important;
+  visibility: visible !important;
+  transform: translateX(0) !important;
+}
+
+/* Hidden sidebar state (for mobile or complete hide) */
+.sidebar.hidden {
+  transform: translateX(-100%) !important;
+}
+
+/* Sidebar toggle button */
+.sidebar-toggle {
+  position: fixed !important;
+  top: 20px !important;
+  left: 20px !important;
+  z-index: 1001 !important;
+  background: var(--primary-color) !important;
+  color: white !important;
+  border: none !important;
+  border-radius: var(--radius-md) !important;
+  width: 40px !important;
+  height: 40px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  font-size: 1rem !important;
+  transition: all 0.2s ease-in-out !important;
+  box-shadow: var(--shadow-md) !important;
+}
+
+.sidebar-toggle:hover {
+  background: #1d4ed8 !important;
+  transform: scale(1.05) !important;
+}
+
+.sidebar-toggle.collapsed {
+  left: 80px !important;
+}
+
+.sidebar-toggle.hidden {
+  left: 20px !important;
+}
+
+/* Sidebar header with collapse button */
+.sidebar-header {
+  padding: 1rem !important;
+  border-bottom: 1px solid var(--border-color) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+}
+
+.sidebar-brand {
+  font-weight: 600 !important;
+  color: var(--primary-color) !important;
+  font-size: 1.125rem !important;
+}
+
+.sidebar.collapsed .sidebar-brand {
+  opacity: 0 !important;
+  width: 0 !important;
+  overflow: hidden !important;
+}
+
+/* Menu styles */
+.sidebar-menu {
+  list-style: none !important;
+  margin: 0 !important;
+  padding: 1rem 0 !important;
+}
+
+.sidebar-menu .menu-item {
+  margin-bottom: 0.25rem !important;
+  position: relative !important;
+}
+
+.sidebar-menu a {
+  display: flex !important;
+  align-items: center !important;
+  padding: 0.75rem 1rem !important;
+  color: var(--text-secondary) !important;
+  text-decoration: none !important;
+  font-size: 0.875rem !important;
+  font-weight: 500 !important;
+  transition: all 0.2s ease-in-out !important;
+  gap: 0.75rem !important;
+  border-radius: 0 25px 25px 0 !important;
+  margin-right: 1rem !important;
+}
+
+.sidebar-menu a:hover {
+  background-color: var(--background-light) !important;
+  color: var(--primary-color) !important;
+}
+
+.sidebar-menu a.active {
+  background-color: #eff6ff !important;
+  color: var(--primary-color) !important;
+  font-weight: 600 !important;
+}
+
+.sidebar-menu .menu-icon {
+  width: 20px !important;
+  height: 20px !important;
+  min-width: 20px !important;
+  fill: currentColor !important;
+}
+
+.sidebar-menu .menu-text {
+  transition: all 0.3s ease-in-out !important;
+  white-space: nowrap !important;
+}
+
+/* Submenu styles - Enhanced with better animations and multiple states */
+.sidebar-menu .sub-menu,
+.sidebar-menu ul,
+.sidebar-menu .dropdown-menu {
+  list-style: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  max-height: 0 !important;
+  opacity: 0 !important;
+  overflow: hidden !important;
+  transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease-in-out, padding 0.3s ease-in-out !important;
+  background: linear-gradient(90deg, transparent 0%, rgba(37, 99, 235, 0.05) 50%, transparent 100%) !important;
+  border-left: 2px solid transparent !important;
+  margin-left: 1rem !important;
+}
+
+.sidebar-menu .has-sub.open .sub-menu,
+.sidebar-menu .has-sub.active .sub-menu,
+.sidebar-menu .open .sub-menu,
+.sidebar-menu .active .sub-menu,
+.sidebar-menu li.open > ul,
+.sidebar-menu li.active > ul {
+  max-height: 800px !important;
+  opacity: 1 !important;
+  padding: 0.5rem 0 !important;
+  border-left-color: var(--primary-color, #2563eb) !important;
+}
+
+.sidebar-menu .sub-menu a,
+.sidebar-menu ul a {
+  padding: 0.5rem 1rem 0.5rem 2rem !important;
+  font-size: 0.8125rem !important;
+  margin-right: 0.5rem !important;
+  position: relative !important;
+  border-radius: 0 20px 20px 0 !important;
+  transition: all 0.2s ease-in-out !important;
+}
+
+.sidebar-menu .sub-menu a::before,
+.sidebar-menu ul a::before {
+  content: "•" !important;
+  position: absolute !important;
+  left: 1rem !important;
+  color: var(--primary-color, #2563eb) !important;
+  font-size: 1rem !important;
+  opacity: 0.6 !important;
+}
+
+.sidebar-menu .sub-menu a:hover,
+.sidebar-menu ul a:hover {
+  background: rgba(37, 99, 235, 0.1) !important;
+  padding-left: 2.5rem !important;
+}
+
+.sidebar.collapsed .sub-menu a,
+.sidebar.collapsed ul a {
+  padding-left: 1rem !important;
+}
+
+/* Submenu toggle indicator - Enhanced with multiple patterns */
+.sidebar-menu .has-sub > a::after,
+.sidebar-menu li:has(ul) > a::after,
+.sidebar-menu li:has(.sub-menu) > a::after,
+.dropdown-indicator {
+  content: "▶" !important;
+  margin-left: auto !important;
+  font-size: 0.75rem !important;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), color 0.2s ease-in-out !important;
+  color: var(--text-muted, #94a3b8) !important;
+  display: inline-block !important;
+  width: 12px !important;
+  text-align: center !important;
+}
+
+.sidebar-menu .has-sub.open > a::after,
+.sidebar-menu .has-sub.active > a::after,
+.sidebar-menu .open > a::after,
+.sidebar-menu .active > a::after,
+.sidebar-menu li.open > a .dropdown-indicator,
+.sidebar-menu li.active > a .dropdown-indicator,
+.dropdown-indicator.open {
+  transform: rotate(90deg) !important;
+  color: var(--primary-color, #2563eb) !important;
+}
+
+.sidebar.collapsed .has-sub > a::after,
+.sidebar.collapsed .dropdown-indicator {
+  opacity: 0 !important;
+  transform: scale(0) !important;
+}
+
+/* Additional dropdown indicators for different structures */
+.sidebar-menu a[aria-expanded=true]::after,
+.sidebar-menu a.expanded::after {
+  transform: rotate(90deg) !important;
+  color: var(--primary-color, #2563eb) !important;
+}
+
+/* Hover states for better interactivity */
+.sidebar-menu .has-sub > a:hover::after,
+.sidebar-menu li:has(ul) > a:hover::after {
+  color: var(--primary-color, #2563eb) !important;
+  transform: scale(1.1) !important;
+}
+
+/* Page Layout - Dynamic with sidebar states */
+.page-wrapper {
+  margin-left: 250px !important;
+  min-height: 100vh !important;
+  transition: margin-left 0.3s ease-in-out !important;
+}
+
+.page-wrapper.sidebar-collapsed {
+  margin-left: 60px !important;
+}
+
+.page-wrapper.sidebar-hidden {
+  margin-left: 0 !important;
+}
+
+.page-header {
+  background-color: var(--background-white) !important;
+  border-bottom: 1px solid var(--border-color) !important;
+  padding: 1.5rem !important;
+  margin-bottom: 1.5rem !important;
+}
+
+.page-title {
+  margin: 0 !important;
+  font-size: 1.5rem !important;
+  font-weight: 600 !important;
+  color: var(--text-primary) !important;
+}
+
+.page-content {
+  padding: 0 1.5rem 1.5rem !important;
+}
+
+/* Utility Classes */
+.text-center {
+  text-align: center !important;
+}
+
+.text-left {
+  text-align: left !important;
+}
+
+.text-right {
+  text-align: right !important;
+}
+
+.text-primary {
+  color: var(--primary-color) !important;
+}
+
+.text-secondary {
+  color: var(--text-secondary) !important;
+}
+
+.text-muted {
+  color: var(--text-muted) !important;
+}
+
+.text-success {
+  color: var(--success-color) !important;
+}
+
+.text-warning {
+  color: var(--warning-color) !important;
+}
+
+.text-danger {
+  color: var(--error-color) !important;
+}
+
+.bg-primary {
+  background-color: var(--primary-color) !important;
+}
+
+.bg-light {
+  background-color: var(--background-light) !important;
+}
+
+.bg-white {
+  background-color: var(--background-white) !important;
+}
+
+.d-none {
+  display: none !important;
+}
+
+.d-block {
+  display: block !important;
+}
+
+.d-flex {
+  display: flex !important;
+}
+
+.d-grid {
+  display: grid !important;
+}
+
+.mb-0 {
+  margin-bottom: 0 !important;
+}
+
+.mb-1 {
+  margin-bottom: 0.5rem !important;
+}
+
+.mb-2 {
+  margin-bottom: 1rem !important;
+}
+
+.mb-3 {
+  margin-bottom: 1.5rem !important;
+}
+
+.mb-4 {
+  margin-bottom: 2rem !important;
+}
+
+.mt-0 {
+  margin-top: 0 !important;
+}
+
+.mt-1 {
+  margin-top: 0.5rem !important;
+}
+
+.mt-2 {
+  margin-top: 1rem !important;
+}
+
+.mt-3 {
+  margin-top: 1.5rem !important;
+}
+
+.mt-4 {
+  margin-top: 2rem !important;
+}
+
+.p-0 {
+  padding: 0 !important;
+}
+
+.p-1 {
+  padding: 0.5rem !important;
+}
+
+.p-2 {
+  padding: 1rem !important;
+}
+
+.p-3 {
+  padding: 1.5rem !important;
+}
+
+.p-4 {
+  padding: 2rem !important;
+}
+
+/* Validation Styles */
+.form-control.is-invalid {
+  border-color: var(--error-color) !important;
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1) !important;
+}
+
+.invalid-feedback {
+  display: block !important;
+  color: var(--error-color) !important;
+  font-size: 0.8125rem !important;
+  margin-top: 0.25rem !important;
+  font-weight: 500 !important;
+}
+
+.form-control.is-valid {
+  border-color: var(--success-color) !important;
+  box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.1) !important;
+}
+
+.valid-feedback {
+  display: block !important;
+  color: var(--success-color) !important;
+  font-size: 0.8125rem !important;
+  margin-top: 0.25rem !important;
+  font-weight: 500 !important;
+}
+
+/* Modal Redesign */
+.modal {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  background-color: rgba(0, 0, 0, 0.5) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  z-index: 1050 !important;
+}
+
+.modal-content {
+  background: var(--background-white) !important;
+  border-radius: var(--radius-lg) !important;
+  box-shadow: var(--shadow-lg) !important;
+  width: 90% !important;
+  max-width: 500px !important;
+  max-height: 90vh !important;
+  overflow: hidden !important;
+}
+
+.modal-header {
+  padding: 1.5rem !important;
+  border-bottom: 1px solid var(--border-color) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+}
+
+.modal-title {
+  margin: 0 !important;
+  font-size: 1.25rem !important;
+  font-weight: 600 !important;
+  color: var(--text-primary) !important;
+}
+
+.modal-body {
+  padding: 1.5rem !important;
+  max-height: calc(90vh - 140px) !important;
+  overflow-y: auto !important;
+}
+
+.modal-footer {
+  padding: 1rem 1.5rem !important;
+  border-top: 1px solid var(--border-color) !important;
+  display: flex !important;
+  justify-content: flex-end !important;
+  gap: 0.75rem !important;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .page-wrapper {
+    margin-left: 0 !important;
+  }
+  .sidebar {
+    transform: translateX(-100%) !important;
+    transition: transform 0.3s ease-in-out !important;
+  }
+  .sidebar.open {
+    transform: translateX(0) !important;
+  }
+  .form-group-inline {
+    grid-template-columns: 1fr !important;
+    gap: 0.5rem !important;
+  }
+  .form-group-inline label {
+    padding-top: 0 !important;
+    margin-bottom: 0.5rem !important;
+  }
+  .dataTables_wrapper .datatable-header {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+  .search-container {
+    min-width: auto !important;
+    width: 100% !important;
+  }
+  .btn {
+    width: 100% !important;
+    margin-bottom: 0.5rem !important;
+  }
+  .modal-content {
+    width: 95% !important;
+    margin: 1rem !important;
+  }
+  .page-content {
+    padding: 1rem !important;
+  }
+  .card-body, .panel-body {
+    padding: 1rem !important;
+  }
+  table {
+    font-size: 0.8125rem !important;
+  }
+  table th,
+  table td {
+    padding: 0.5rem !important;
+  }
+}
+@media (max-width: 480px) {
+  .btn {
+    padding: 0.625rem 1rem !important;
+    font-size: 0.8125rem !important;
+  }
+  .form-control {
+    padding: 0.625rem 0.75rem !important;
+    font-size: 0.8125rem !important;
+  }
+  .card-header, .panel-header {
+    padding: 0.75rem 1rem !important;
+  }
+  .page-header {
+    padding: 1rem !important;
+  }
+  .page-title {
+    font-size: 1.25rem !important;
+  }
+}
+/* Focus Management for Accessibility */
+:focus-visible {
+  outline: 2px solid var(--primary-color) !important;
+  outline-offset: 2px !important;
+}
+
+/* Print Styles */
+@media print {
+  .sidebar,
+  .btn,
+  .navbar,
+  .modal {
+    display: none  !important;
+  }
+  .page-wrapper {
+    margin-left: 0 !important;
+  }
+  .page-content {
+    padding: 0 !important;
+  }
+  table {
+    page-break-inside: auto !important;
+  }
+  tr {
+    page-break-inside: avoid !important;
+    page-break-after: auto !important;
+  }
+}
+/* Animation for Better UX */
+.form-control,
+.btn,
+.card,
+.panel {
+  transition: all 0.2s ease-in-out !important;
+}
+
+/* Loading States */
+.btn.loading {
+  position: relative !important;
+  color: transparent !important;
+}
+
+.btn.loading::after {
+  content: "" !important;
+  position: absolute !important;
+  width: 16px !important;
+  height: 16px !important;
+  border: 2px solid transparent !important;
+  border-top: 2px solid currentColor !important;
+  border-radius: 50% !important;
+  animation: spin 1s linear infinite !important;
+  left: 50% !important;
+  top: 50% !important;
+  transform: translate(-50%, -50%) !important;
+}
+
+@keyframes spin {
+  to {
+    transform: translate(-50%, -50%) rotate(360deg) !important;
+  }
+}</style><style data-source="User JavaScript and CSS">
+@charset "UTF-8" !important;
+/* ===== MODERNIZED USER-FRIENDLY CSS REDESIGN ===== */
+/* CSS Variables for Consistency */
+:root {
+  --primary-color: #2563eb !important;
+  --secondary-color: #64748b !important;
+  --success-color: #16a34a !important;
+  --warning-color: #f59e0b !important;
+  --error-color: #dc2626 !important;
+  --background-light: #f8fafc !important;
+  --background-white: #ffffff !important;
+  --text-primary: #1e293b !important;
+  --text-secondary: #64748b !important;
+  --text-muted: #94a3b8 !important;
+  --border-color: #e2e8f0 !important;
+  --border-focus: #3b82f6 !important;
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05) !important;
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1) !important;
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1) !important;
+  --radius-sm: 4px !important;
+  --radius-md: 6px !important;
+  --radius-lg: 8px !important;
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+}
+
+/* Base Styles */
+* {
+  box-sizing: border-box !important;
+}
+
+body {
+  font-family: var(--font-sans) !important;
+  font-size: 14px !important;
+  line-height: 1.5 !important;
+  color: var(--text-primary) !important;
+  background-color: var(--background-light) !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* Typography */
+h1, h2, h3, h4, h5, h6 {
+  margin: 0 0 1rem 0 !important;
+  font-weight: 600 !important;
+  line-height: 1.2 !important;
+  color: var(--text-primary) !important;
+}
+
+h1 {
+  font-size: 1.875rem !important;
+}
+
+h2 {
+  font-size: 1.5rem !important;
+}
+
+h3 {
+  font-size: 1.25rem !important;
+}
+
+h4 {
+  font-size: 1.125rem !important;
+}
+
+h5 {
+  font-size: 1rem !important;
+}
+
+h6 {
+  font-size: 0.875rem !important;
+}
+
+/* Form Elements - Completely Redesigned */
+.form-group {
+  margin-bottom: 1.5rem !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+.form-group-inline {
+  display: grid !important;
+  grid-template-columns: 180px 1fr !important;
+  gap: 1rem !important;
+  align-items: start !important;
+  margin-bottom: 1.5rem !important;
+}
+
+label {
+  font-size: 0.875rem !important;
+  font-weight: 500 !important;
+  color: var(--text-primary) !important;
+  margin-bottom: 0.5rem !important;
+  display: block !important;
+}
+
+.form-group-inline label {
+  margin-bottom: 0 !important;
+  padding-top: 0.625rem !important;
+  align-self: start !important;
+}
+
+.form-control {
+  width: 100% !important;
+  padding: 0.75rem 1rem !important;
+  font-size: 0.875rem !important;
+  border: 1px solid var(--border-color) !important;
+  border-radius: var(--radius-md) !important;
+  background-color: var(--background-white) !important;
+  transition: all 0.2s ease-in-out !important;
+  font-family: inherit !important;
+}
+
+.form-control:focus {
+  outline: none !important;
+  border-color: var(--border-focus) !important;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
+}
+
+.form-control::placeholder {
+  color: var(--text-muted) !important;
+}
+
+.form-control:disabled {
+  background-color: var(--background-light) !important;
+  color: var(--text-muted) !important;
+  cursor: not-allowed !important;
+}
+
+/* Select Elements */
+select.form-control {
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e") !important;
+  background-position: right 0.75rem center !important;
+  background-repeat: no-repeat !important;
+  background-size: 16px 16px !important;
+  padding-right: 2.5rem !important;
+  appearance: none !important;
+}
+
+/* Textarea */
+textarea.form-control {
+  min-height: 80px !important;
+  resize: vertical !important;
+}
+
+/* Buttons - Modern Design */
+.btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 0.75rem 1.5rem !important;
+  font-size: 0.875rem !important;
+  font-weight: 500 !important;
+  border-radius: var(--radius-md) !important;
+  border: none !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease-in-out !important;
+  text-decoration: none !important;
+  gap: 0.5rem !important;
+  min-height: 44px; /* Touch-friendly */
+}
+
+.btn:focus {
+  outline: none !important;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3) !important;
+}
+
+.btn:disabled {
+  opacity: 0.6 !important;
+  cursor: not-allowed !important;
+}
+
+.btn-primary {
+  background-color: var(--primary-color) !important;
+  color: white !important;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background-color: #1d4ed8 !important;
+}
+
+.btn-secondary {
+  background-color: var(--background-white) !important;
+  color: var(--secondary-color) !important;
+  border: 1px solid var(--border-color) !important;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background-color: var(--background-light) !important;
+}
+
+.btn-success {
+  background-color: var(--success-color) !important;
+  color: white !important;
+}
+
+.btn-success:hover:not(:disabled) {
+  background-color: #15803d !important;
+}
+
+.btn-danger {
+  background-color: var(--error-color) !important;
+  color: white !important;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background-color: #b91c1c !important;
+}
+
+.btn-sm {
+  padding: 0.5rem 1rem !important;
+  font-size: 0.8125rem !important;
+  min-height: 36px !important;
+}
+
+.btn-lg {
+  padding: 1rem 2rem !important;
+  font-size: 1rem !important;
+  min-height: 52px !important;
+}
+
+/* Cards and Panels */
+.panel, .panel-box, .card {
+  background-color: var(--background-white) !important;
+  border-radius: var(--radius-lg) !important;
+  box-shadow: var(--shadow-sm) !important;
+  border: 1px solid var(--border-color) !important;
+  margin-bottom: 1.5rem !important;
+}
+
+.card-body, .panel-body {
+  padding: 1.5rem !important;
+}
+
+.card-header, .panel-header {
+  padding: 1rem 1.5rem !important;
+  border-bottom: 1px solid var(--border-color) !important;
+  background-color: var(--background-light) !important;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0 !important;
+}
+
+.panel-title {
+  margin: 0 !important;
+  font-size: 1.125rem !important;
+  font-weight: 600 !important;
+  color: var(--text-primary) !important;
+}
+
+/* Tables - Completely Redesigned */
+.table-container {
+  background: var(--background-white) !important;
+  border-radius: var(--radius-lg) !important;
+  overflow: hidden !important;
+  box-shadow: var(--shadow-sm) !important;
+  border: 1px solid var(--border-color) !important;
+}
+
+table {
+  width: 100% !important;
+  border-collapse: collapse !important;
+  font-size: 0.875rem !important;
+}
+
+table thead {
+  background-color: var(--background-light) !important;
+}
+
+table th {
+  padding: 1rem 0.75rem !important;
+  text-align: left !important;
+  font-weight: 600 !important;
+  color: var(--text-primary) !important;
+  border-bottom: 1px solid var(--border-color) !important;
+  font-size: 0.8125rem !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.025em !important;
+}
+
+table td {
+  padding: 0.875rem 0.75rem !important;
+  border-bottom: 1px solid var(--border-color) !important;
+  color: var(--text-primary) !important;
+}
+
+table tbody tr:hover {
+  background-color: #f1f5f9 !important;
+}
+
+table tbody tr:last-child td {
+  border-bottom: none !important;
+}
+
+/* DataTables Wrapper */
+.dataTables_wrapper {
+  margin-top: 1rem !important;
+}
+
+.dataTables_wrapper .datatable-header {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  margin-bottom: 1rem !important;
+  flex-wrap: wrap !important;
+  gap: 1rem !important;
+}
+
+.dataTables_wrapper .datatable-content {
+  background: var(--background-white) !important;
+  border-radius: var(--radius-lg) !important;
+  overflow: hidden !important;
+  box-shadow: var(--shadow-sm) !important;
+  border: 1px solid var(--border-color) !important;
+  max-height: 70vh !important;
+  overflow-y: auto !important;
+}
+
+.dataTables_wrapper .datatable-footer {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  margin-top: 1rem !important;
+  padding: 1rem !important;
+  background: var(--background-white) !important;
+  border-radius: var(--radius-lg) !important;
+  border: 1px solid var(--border-color) !important;
+}
+
+/* Search and Filter Controls */
+.search-container {
+  position: relative !important;
+  display: inline-block !important;
+  min-width: 250px !important;
+}
+
+.search-container input {
+  padding-left: 2.5rem !important;
+}
+
+.search-container::before {
+  content: "🔍" !important;
+  position: absolute !important;
+  left: 0.75rem !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  color: var(--text-muted) !important;
+  font-size: 0.875rem !important;
+  z-index: 1 !important;
+}
+
+/* Navigation */
+.navbar {
+  background-color: var(--background-white) !important;
+  border-bottom: 1px solid var(--border-color) !important;
+  padding: 1rem 0 !important;
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 1000 !important;
+  box-shadow: var(--shadow-sm) !important;
+}
+
+.navbar-brand {
+  font-size: 1.25rem !important;
+  font-weight: 700 !important;
+  color: var(--primary-color) !important;
+  text-decoration: none !important;
+}
+
+.navbar-nav {
+  display: flex !important;
+  align-items: center !important;
+  gap: 2rem !important;
+  list-style: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.navbar-nav a {
+  color: var(--text-secondary) !important;
+  text-decoration: none !important;
+  font-weight: 500 !important;
+  font-size: 0.875rem !important;
+  transition: color 0.2s ease-in-out !important;
+}
+
+.navbar-nav a:hover {
+  color: var(--primary-color) !important;
+}
+
+/* Sidebar - Collapsible Design */
+.sidebar {
+  background-color: var(--background-white) !important;
+  border-right: 1px solid var(--border-color) !important;
+  height: 100vh !important;
+  width: 250px !important;
+  position: fixed !important;
+  left: 0 !important;
+  top: 0 !important;
+  overflow-y: auto !important;
+  z-index: 999 !important;
+  box-shadow: var(--shadow-sm) !important;
+  transition: transform 0.3s ease-in-out, width 0.3s ease-in-out !important;
+}
+
+/* Collapsed sidebar state */
+.sidebar.collapsed {
+  width: 60px !important;
+}
+
+.sidebar.collapsed .menu-text {
+  opacity: 0 !important;
+  width: 0 !important;
+  overflow: hidden !important;
+}
+
+.sidebar.collapsed .sub-menu {
+  position: absolute !important;
+  left: 60px !important;
+  top: 0 !important;
+  background: var(--background-white) !important;
+  border: 1px solid var(--border-color) !important;
+  border-radius: var(--radius-md) !important;
+  box-shadow: var(--shadow-lg) !important;
+  min-width: 200px !important;
+  z-index: 1000 !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  transform: translateX(-10px) !important;
+  transition: all 0.2s ease-in-out !important;
+}
+
+.sidebar.collapsed .menu-item.has-sub:hover .sub-menu {
+  opacity: 1 !important;
+  visibility: visible !important;
+  transform: translateX(0) !important;
+}
+
+/* Hidden sidebar state (for mobile or complete hide) */
+.sidebar.hidden {
+  transform: translateX(-100%) !important;
+}
+
+/* Sidebar toggle button */
+.sidebar-toggle {
+  position: fixed !important;
+  top: 20px !important;
+  left: 20px !important;
+  z-index: 1001 !important;
+  background: var(--primary-color) !important;
+  color: white !important;
+  border: none !important;
+  border-radius: var(--radius-md) !important;
+  width: 40px !important;
+  height: 40px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  font-size: 1rem !important;
+  transition: all 0.2s ease-in-out !important;
+  box-shadow: var(--shadow-md) !important;
+}
+
+.sidebar-toggle:hover {
+  background: #1d4ed8 !important;
+  transform: scale(1.05) !important;
+}
+
+.sidebar-toggle.collapsed {
+  left: 80px !important;
+}
+
+.sidebar-toggle.hidden {
+  left: 20px !important;
+}
+
+/* Sidebar header with collapse button */
+.sidebar-header {
+  padding: 1rem !important;
+  border-bottom: 1px solid var(--border-color) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+}
+
+.sidebar-brand {
+  font-weight: 600 !important;
+  color: var(--primary-color) !important;
+  font-size: 1.125rem !important;
+}
+
+.sidebar.collapsed .sidebar-brand {
+  opacity: 0 !important;
+  width: 0 !important;
+  overflow: hidden !important;
+}
+
+/* Menu styles */
+.sidebar-menu {
+  list-style: none !important;
+  margin: 0 !important;
+  padding: 1rem 0 !important;
+}
+
+.sidebar-menu .menu-item {
+  margin-bottom: 0.25rem !important;
+  position: relative !important;
+}
+
+.sidebar-menu a {
+  display: flex !important;
+  align-items: center !important;
+  padding: 0.75rem 1rem !important;
+  color: var(--text-secondary) !important;
+  text-decoration: none !important;
+  font-size: 0.875rem !important;
+  font-weight: 500 !important;
+  transition: all 0.2s ease-in-out !important;
+  gap: 0.75rem !important;
+  border-radius: 0 25px 25px 0 !important;
+  margin-right: 1rem !important;
+}
+
+.sidebar-menu a:hover {
+  background-color: var(--background-light) !important;
+  color: var(--primary-color) !important;
+}
+
+.sidebar-menu a.active {
+  background-color: #eff6ff !important;
+  color: var(--primary-color) !important;
+  font-weight: 600 !important;
+}
+
+.sidebar-menu .menu-icon {
+  width: 20px !important;
+  height: 20px !important;
+  min-width: 20px !important;
+  fill: currentColor !important;
+}
+
+.sidebar-menu .menu-text {
+  transition: all 0.3s ease-in-out !important;
+  white-space: nowrap !important;
+}
+
+/* Submenu styles - Enhanced with better animations and multiple states */
+.sidebar-menu .sub-menu,
+.sidebar-menu ul,
+.sidebar-menu .dropdown-menu {
+  list-style: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  max-height: 0 !important;
+  opacity: 0 !important;
+  overflow: hidden !important;
+  transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease-in-out, padding 0.3s ease-in-out !important;
+  background: linear-gradient(90deg, transparent 0%, rgba(37, 99, 235, 0.05) 50%, transparent 100%) !important;
+  border-left: 2px solid transparent !important;
+  margin-left: 1rem !important;
+}
+
+.sidebar-menu .has-sub.open .sub-menu,
+.sidebar-menu .has-sub.active .sub-menu,
+.sidebar-menu .open .sub-menu,
+.sidebar-menu .active .sub-menu,
+.sidebar-menu li.open > ul,
+.sidebar-menu li.active > ul {
+  max-height: 800px !important;
+  opacity: 1 !important;
+  padding: 0.5rem 0 !important;
+  border-left-color: var(--primary-color, #2563eb) !important;
+}
+
+.sidebar-menu .sub-menu a,
+.sidebar-menu ul a {
+  padding: 0.5rem 1rem 0.5rem 2rem !important;
+  font-size: 0.8125rem !important;
+  margin-right: 0.5rem !important;
+  position: relative !important;
+  border-radius: 0 20px 20px 0 !important;
+  transition: all 0.2s ease-in-out !important;
+}
+
+.sidebar-menu .sub-menu a::before,
+.sidebar-menu ul a::before {
+  content: "•" !important;
+  position: absolute !important;
+  left: 1rem !important;
+  color: var(--primary-color, #2563eb) !important;
+  font-size: 1rem !important;
+  opacity: 0.6 !important;
+}
+
+.sidebar-menu .sub-menu a:hover,
+.sidebar-menu ul a:hover {
+  background: rgba(37, 99, 235, 0.1) !important;
+  padding-left: 2.5rem !important;
+}
+
+.sidebar.collapsed .sub-menu a,
+.sidebar.collapsed ul a {
+  padding-left: 1rem !important;
+}
+
+/* Submenu toggle indicator - Enhanced with multiple patterns */
+.sidebar-menu .has-sub > a::after,
+.sidebar-menu li:has(ul) > a::after,
+.sidebar-menu li:has(.sub-menu) > a::after,
+.dropdown-indicator {
+  content: "▶" !important;
+  margin-left: auto !important;
+  font-size: 0.75rem !important;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), color 0.2s ease-in-out !important;
+  color: var(--text-muted, #94a3b8) !important;
+  display: inline-block !important;
+  width: 12px !important;
+  text-align: center !important;
+}
+
+.sidebar-menu .has-sub.open > a::after,
+.sidebar-menu .has-sub.active > a::after,
+.sidebar-menu .open > a::after,
+.sidebar-menu .active > a::after,
+.sidebar-menu li.open > a .dropdown-indicator,
+.sidebar-menu li.active > a .dropdown-indicator,
+.dropdown-indicator.open {
+  transform: rotate(90deg) !important;
+  color: var(--primary-color, #2563eb) !important;
+}
+
+.sidebar.collapsed .has-sub > a::after,
+.sidebar.collapsed .dropdown-indicator {
+  opacity: 0 !important;
+  transform: scale(0) !important;
+}
+
+/* Additional dropdown indicators for different structures */
+.sidebar-menu a[aria-expanded=true]::after,
+.sidebar-menu a.expanded::after {
+  transform: rotate(90deg) !important;
+  color: var(--primary-color, #2563eb) !important;
+}
+
+/* Hover states for better interactivity */
+.sidebar-menu .has-sub > a:hover::after,
+.sidebar-menu li:has(ul) > a:hover::after {
+  color: var(--primary-color, #2563eb) !important;
+  transform: scale(1.1) !important;
+}
+
+/* Page Layout - Dynamic with sidebar states */
+.page-wrapper {
+  margin-left: 250px !important;
+  min-height: 100vh !important;
+  transition: margin-left 0.3s ease-in-out !important;
+}
+
+.page-wrapper.sidebar-collapsed {
+  margin-left: 60px !important;
+}
+
+.page-wrapper.sidebar-hidden {
+  margin-left: 0 !important;
+}
+
+.page-header {
+  background-color: var(--background-white) !important;
+  border-bottom: 1px solid var(--border-color) !important;
+  padding: 1.5rem !important;
+  margin-bottom: 1.5rem !important;
+}
+
+.page-title {
+  margin: 0 !important;
+  font-size: 1.5rem !important;
+  font-weight: 600 !important;
+  color: var(--text-primary) !important;
+}
+
+.page-content {
+  padding: 0 1.5rem 1.5rem !important;
+}
+
+/* Utility Classes */
+.text-center {
+  text-align: center !important;
+}
+
+.text-left {
+  text-align: left !important;
+}
+
+.text-right {
+  text-align: right !important;
+}
+
+.text-primary {
+  color: var(--primary-color) !important;
+}
+
+.text-secondary {
+  color: var(--text-secondary) !important;
+}
+
+.text-muted {
+  color: var(--text-muted) !important;
+}
+
+.text-success {
+  color: var(--success-color) !important;
+}
+
+.text-warning {
+  color: var(--warning-color) !important;
+}
+
+.text-danger {
+  color: var(--error-color) !important;
+}
+
+.bg-primary {
+  background-color: var(--primary-color) !important;
+}
+
+.bg-light {
+  background-color: var(--background-light) !important;
+}
+
+.bg-white {
+  background-color: var(--background-white) !important;
+}
+
+.d-none {
+  display: none !important;
+}
+
+.d-block {
+  display: block !important;
+}
+
+.d-flex {
+  display: flex !important;
+}
+
+.d-grid {
+  display: grid !important;
+}
+
+.mb-0 {
+  margin-bottom: 0 !important;
+}
+
+.mb-1 {
+  margin-bottom: 0.5rem !important;
+}
+
+.mb-2 {
+  margin-bottom: 1rem !important;
+}
+
+.mb-3 {
+  margin-bottom: 1.5rem !important;
+}
+
+.mb-4 {
+  margin-bottom: 2rem !important;
+}
+
+.mt-0 {
+  margin-top: 0 !important;
+}
+
+.mt-1 {
+  margin-top: 0.5rem !important;
+}
+
+.mt-2 {
+  margin-top: 1rem !important;
+}
+
+.mt-3 {
+  margin-top: 1.5rem !important;
+}
+
+.mt-4 {
+  margin-top: 2rem !important;
+}
+
+.p-0 {
+  padding: 0 !important;
+}
+
+.p-1 {
+  padding: 0.5rem !important;
+}
+
+.p-2 {
+  padding: 1rem !important;
+}
+
+.p-3 {
+  padding: 1.5rem !important;
+}
+
+.p-4 {
+  padding: 2rem !important;
+}
+
+/* Validation Styles */
+.form-control.is-invalid {
+  border-color: var(--error-color) !important;
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1) !important;
+}
+
+.invalid-feedback {
+  display: block !important;
+  color: var(--error-color) !important;
+  font-size: 0.8125rem !important;
+  margin-top: 0.25rem !important;
+  font-weight: 500 !important;
+}
+
+.form-control.is-valid {
+  border-color: var(--success-color) !important;
+  box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.1) !important;
+}
+
+.valid-feedback {
+  display: block !important;
+  color: var(--success-color) !important;
+  font-size: 0.8125rem !important;
+  margin-top: 0.25rem !important;
+  font-weight: 500 !important;
+}
+
+/* Modal Redesign */
+.modal {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  background-color: rgba(0, 0, 0, 0.5) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  z-index: 1050 !important;
+}
+
+.modal-content {
+  background: var(--background-white) !important;
+  border-radius: var(--radius-lg) !important;
+  box-shadow: var(--shadow-lg) !important;
+  width: 90% !important;
+  max-width: 500px !important;
+  max-height: 90vh !important;
+  overflow: hidden !important;
+}
+
+.modal-header {
+  padding: 1.5rem !important;
+  border-bottom: 1px solid var(--border-color) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+}
+
+.modal-title {
+  margin: 0 !important;
+  font-size: 1.25rem !important;
+  font-weight: 600 !important;
+  color: var(--text-primary) !important;
+}
+
+.modal-body {
+  padding: 1.5rem !important;
+  max-height: calc(90vh - 140px) !important;
+  overflow-y: auto !important;
+}
+
+.modal-footer {
+  padding: 1rem 1.5rem !important;
+  border-top: 1px solid var(--border-color) !important;
+  display: flex !important;
+  justify-content: flex-end !important;
+  gap: 0.75rem !important;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .page-wrapper {
+    margin-left: 0 !important;
+  }
+  .sidebar {
+    transform: translateX(-100%) !important;
+    transition: transform 0.3s ease-in-out !important;
+  }
+  .sidebar.open {
+    transform: translateX(0) !important;
+  }
+  .form-group-inline {
+    grid-template-columns: 1fr !important;
+    gap: 0.5rem !important;
+  }
+  .form-group-inline label {
+    padding-top: 0 !important;
+    margin-bottom: 0.5rem !important;
+  }
+  .dataTables_wrapper .datatable-header {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+  .search-container {
+    min-width: auto !important;
+    width: 100% !important;
+  }
+  .btn {
+    width: 100% !important;
+    margin-bottom: 0.5rem !important;
+  }
+  .modal-content {
+    width: 95% !important;
+    margin: 1rem !important;
+  }
+  .page-content {
+    padding: 1rem !important;
+  }
+  .card-body, .panel-body {
+    padding: 1rem !important;
+  }
+  table {
+    font-size: 0.8125rem !important;
+  }
+  table th,
+  table td {
+    padding: 0.5rem !important;
+  }
+}
+@media (max-width: 480px) {
+  .btn {
+    padding: 0.625rem 1rem !important;
+    font-size: 0.8125rem !important;
+  }
+  .form-control {
+    padding: 0.625rem 0.75rem !important;
+    font-size: 0.8125rem !important;
+  }
+  .card-header, .panel-header {
+    padding: 0.75rem 1rem !important;
+  }
+  .page-header {
+    padding: 1rem !important;
+  }
+  .page-title {
+    font-size: 1.25rem !important;
+  }
+}
+/* Focus Management for Accessibility */
+:focus-visible {
+  outline: 2px solid var(--primary-color) !important;
+  outline-offset: 2px !important;
+}
+
+/* Print Styles */
+@media print {
+  .sidebar,
+  .btn,
+  .navbar,
+  .modal {
+    display: none  !important;
+  }
+  .page-wrapper {
+    margin-left: 0 !important;
+  }
+  .page-content {
+    padding: 0 !important;
+  }
+  table {
+    page-break-inside: auto !important;
+  }
+  tr {
+    page-break-inside: avoid !important;
+    page-break-after: auto !important;
+  }
+}
+/* Animation for Better UX */
+.form-control,
+.btn,
+.card,
+.panel {
+  transition: all 0.2s ease-in-out !important;
+}
+
+/* Loading States */
+.btn.loading {
+  position: relative !important;
+  color: transparent !important;
+}
+
+.btn.loading::after {
+  content: "" !important;
+  position: absolute !important;
+  width: 16px !important;
+  height: 16px !important;
+  border: 2px solid transparent !important;
+  border-top: 2px solid currentColor !important;
+  border-radius: 50% !important;
+  animation: spin 1s linear infinite !important;
+  left: 50% !important;
+  top: 50% !important;
+  transform: translate(-50%, -50%) !important;
+}
+
+@keyframes spin {
+  to {
+    transform: translate(-50%, -50%) rotate(360deg) !important;
+  }
+}
+/*
+ * Clean table styling for natural heights and horizontal checkboxes
+ */
+/* Basic table structure - ensure full width with no empty space */
+#so-items-table {
+  width: 100%  !important;
+  table-layout: fixed  !important;
+  border-collapse: collapse  !important;
+  margin: 0  !important;
+  border-spacing: 0  !important;
+}
+
+/* Compact row heights - minimal padding for tight layout */
+#so-items-table thead tr,
+#so-items-table tbody tr {
+  height: auto  !important;
+  min-height: auto  !important;
+  max-height: none  !important;
+  margin: 0  !important;
+  padding: 0  !important;
+  line-height: 1.2  !important;
+}
+
+#so-items-table thead th,
+#so-items-table tbody td {
+  height: auto  !important;
+  min-height: auto  !important;
+  max-height: none  !important;
+  padding: 4px 6px ; /* Reduced padding for tighter rows */
+  margin: 0  !important;
+  vertical-align: middle  !important;
+  overflow: hidden  !important;
+  text-overflow: ellipsis  !important;
+  white-space: nowrap  !important;
+  line-height: 1.2  !important;
+}
+
+/* Header styling - compact */
+#so-items-table thead th {
+  font-weight: bold  !important;
+  font-size: 11px ; /* Smaller font for compact header */
+  text-align: center  !important;
+  border-bottom: 1px solid #ddd  !important;
+  padding: 4px 6px ; /* Match body cell padding */
+}
+
+/* Horizontal checkbox layout - force horizontal not vertical */
+#so-items-table thead th[class=text-center],
+#so-items-table tbody td.handed-over-column {
+  display: flex  !important;
+  flex-direction: row  !important;
+  flex-wrap: nowrap  !important;
+  align-items: center  !important;
+  justify-content: center  !important;
+  gap: 8px  !important;
+  white-space: nowrap  !important;
+}
+
+#so-items-table thead th[class=text-center] .checkbox-cs,
+#so-items-table tbody td.handed-over-column .checkbox-cs {
+  display: inline-flex  !important;
+  align-items: center  !important;
+  justify-content: center  !important;
+  gap: 4px  !important;
+  margin: 0  !important;
+  padding: 0  !important;
+}
+
+#so-items-table tbody td.handed-over-column .checkbox-cs input,
+#so-items-table thead th[class=text-center] .checkbox-cs input {
+  width: 16px  !important;
+  height: 16px  !important;
+  margin: 0  !important;
+}
+
+#so-items-table tbody td.handed-over-column .checkbox-cs i,
+#so-items-table thead th[class=text-center] .checkbox-cs i {
+  font-size: 12px  !important;
+  line-height: 1  !important;
+}
+
+/* Column visibility toggle */
+#so-items-table.columns-hidden thead th:nth-child(5),
+#so-items-table.columns-hidden tbody td:nth-child(5),
+#so-items-table.columns-hidden thead th:nth-child(8),
+#so-items-table.columns-hidden tbody td:nth-child(8),
+#so-items-table.columns-hidden thead th:nth-child(9),
+#so-items-table.columns-hidden tbody td:nth-child(9),
+#so-items-table.columns-hidden thead th:nth-child(10),
+#so-items-table.columns-hidden tbody td:nth-child(10) {
+  display: none  !important;
+}
+
+/* Ultra-compact form controls to fit tight rows */
+#so-items-table tbody .form-control,
+#so-items-table tbody input,
+#so-items-table tbody select,
+#so-items-table tbody button {
+  height: 20px ; /* Fixed small height */
+  min-height: 20px  !important;
+  max-height: 20px  !important;
+  padding: 1px 4px ; /* Minimal padding */
+  font-size: 11px ; /* Smaller font */
+  margin: 0  !important;
+  line-height: 18px ; /* Match height */
+  border-radius: 2px  !important;
+}
+
+/* SKU/Title column layout */
+#so-items-table tbody tr td:nth-child(2) {
+  display: flex  !important;
+  align-items: center  !important;
+  gap: 6px  !important;
+  min-width: 0  !important;
+}
+
+#so-items-table tbody tr td:nth-child(2) br {
+  display: none  !important;
+}
+
+#so-items-table tbody tr td:nth-child(2) .img-wrapper img {
+  max-height: 20px ; /* Smaller images */
+  max-width: 20px  !important;
+  object-fit: contain  !important;
+  flex-shrink: 0  !important;
+}
+
+/* Quantity column layout - ultra compact */
+#so-items-table tbody tr td:nth-child(3) {
+  display: flex  !important;
+  align-items: center  !important;
+  justify-content: center  !important;
+  gap: 1px ; /* Tighter gap */
+}
+
+#so-items-table tbody tr td:nth-child(3) .btn {
+  width: 18px ; /* Smaller buttons */
+  height: 18px  !important;
+  padding: 0  !important;
+  font-size: 10px  !important;
+  line-height: 16px  !important;
+  flex-shrink: 0  !important;
+}
+
+#so-items-table tbody tr td:nth-child(3) .item-qty {
+  width: 30px ; /* Smaller input */
+  height: 18px  !important;
+  padding: 0 2px  !important;
+  font-size: 10px  !important;
+  text-align: center  !important;
+  flex-shrink: 0  !important;
+}
+
+/* Right-aligned columns */
+#so-items-table tbody tr td.alignright {
+  text-align: right  !important;
+}
+
+#so-items-table tbody tr td.alignright input {
+  text-align: right  !important;
+}
+
+/* Form column layout - compact */
+#so-items-table tbody tr td.personalized-column {
+  display: flex  !important;
+  align-items: center  !important;
+  gap: 2px ; /* Tighter gap */
+  min-width: 0  !important;
+}
+
+#so-items-table tbody tr td.personalized-column select {
+  font-size: 10px ; /* Smaller font */
+  height: 20px ; /* Match other controls */
+  padding: 0 3px ; /* Less padding */
+  flex-shrink: 1  !important;
+  min-width: 0  !important;
+}
+
+#so-items-table tbody tr td.personalized-column h6 {
+  margin: 0  !important;
+  white-space: nowrap  !important;
+  font-size: 10px ; /* Smaller font */
+  flex-shrink: 0  !important;
+}
+
+#so-items-table tbody tr td.personalized-column .fa {
+  font-size: 10px  !important;
+  flex-shrink: 0  !important;
+}
+
+/* Action column layout - compact */
+#so-items-table tbody tr td:last-child {
+  display: flex  !important;
+  align-items: center  !important;
+  justify-content: space-around  !important;
+  gap: 1px ; /* Tighter gap */
+}
+
+#so-items-table tbody tr td:last-child .fa,
+#so-items-table tbody tr td:last-child .close-icon {
+  font-size: 10px ; /* Smaller icons */
+  margin: 0  !important;
+  padding: 0  !important;
+  flex-shrink: 0  !important;
+}
+
+/* Ensure proper table display and alignment */
+#so-items-table thead {
+  display: table-header-group  !important;
+  width: 100%  !important;
+}
+
+#so-items-table tbody {
+  display: table-row-group  !important;
+  width: 100%  !important;
+}
+
+#so-items-table thead tr,
+#so-items-table tbody tr {
+  display: table-row  !important;
+  width: 100%  !important;
+}
+
+#so-items-table thead th,
+#so-items-table tbody td {
+  display: table-cell  !important;
+}
+
+/* Ensure table container takes full width without empty space */
+#so-items-scroll {
+  width: 100%  !important;
+  overflow-x: auto  !important;
+  margin: 0  !important;
+  padding: 0  !important;
+}
+
+/* Ensure the table wrapper takes full width */
+#so-items-table {
+  width: 100%  !important;
+  margin: 0 auto  !important;
+}
+
+/* Fix any container that might be constraining the table */
+#so-items-scroll,
+#so-items-table,
+#so-items-table thead,
+#so-items-table tbody {
+  box-sizing: border-box  !important;
+}
+
+/* Box-sizing for consistent layout */
+#so-items-table,
+#so-items-table *,
+#so-items-table *:before,
+#so-items-table *:after {
+  box-sizing: border-box  !important;
+}
+
+/* Reset margins and padding on inner elements */
+#so-items-table tbody td img,
+#so-items-table tbody td .fa,
+#so-items-table tbody td i,
+#so-items-table tbody td h6,
+#so-items-table tbody td span,
+#so-items-table tbody td label,
+#so-items-table tbody td .text-block,
+#so-items-table tbody td .close-icon {
+  margin: 0  !important;
+  padding: 0  !important;
+  line-height: 1.2  !important;
+}
+
+/* Column width distribution to prevent empty space */
+#so-items-table thead th:nth-child(1),
+#so-items-table tbody td:nth-child(1) {
+  width: 40px  !important;
+  min-width: 40px  !important;
+  max-width: 40px  !important;
+}
+
+#so-items-table thead th:nth-child(2),
+#so-items-table tbody td:nth-child(2) {
+  width: 150px  !important;
+  min-width: 150px  !important;
+}
+
+#so-items-table thead th:nth-child(3),
+#so-items-table tbody td:nth-child(3) {
+  width: 80px  !important;
+  min-width: 80px  !important;
+  max-width: 80px  !important;
+}
+
+#so-items-table thead th:nth-child(4),
+#so-items-table tbody td:nth-child(4) {
+  width: 70px  !important;
+  min-width: 70px  !important;
+}
+
+#so-items-table thead th:nth-child(5),
+#so-items-table tbody td:nth-child(5) {
+  width: 65px  !important;
+  min-width: 65px  !important;
+}
+
+#so-items-table thead th:nth-child(6),
+#so-items-table tbody td:nth-child(6) {
+  width: 65px  !important;
+  min-width: 65px  !important;
+}
+
+#so-items-table thead th:nth-child(7),
+#so-items-table tbody td:nth-child(7) {
+  width: 65px  !important;
+  min-width: 65px  !important;
+}
+
+#so-items-table thead th:nth-child(8),
+#so-items-table tbody td:nth-child(8) {
+  width: 65px  !important;
+  min-width: 65px  !important;
+}
+
+#so-items-table thead th:nth-child(9),
+#so-items-table tbody td:nth-child(9) {
+  width: 65px  !important;
+  min-width: 65px  !important;
+}
+
+#so-items-table thead th:nth-child(10),
+#so-items-table tbody td:nth-child(10) {
+  width: 65px  !important;
+  min-width: 65px  !important;
+}
+
+#so-items-table thead th:nth-child(11),
+#so-items-table tbody td:nth-child(11) {
+  width: 65px  !important;
+  min-width: 65px  !important;
+}
+
+#so-items-table thead th:nth-child(12),
+#so-items-table tbody td:nth-child(12) {
+  width: 100px  !important;
+  min-width: 100px  !important;
+}
+
+#so-items-table thead th:nth-child(13),
+#so-items-table tbody td:nth-child(13) {
+  width: 120px  !important;
+  min-width: 120px  !important;
+}
+
+#so-items-table thead th:nth-child(14),
+#so-items-table tbody td:nth-child(14) {
+  width: 70px  !important;
+  min-width: 70px  !important;
+}</style></html>
