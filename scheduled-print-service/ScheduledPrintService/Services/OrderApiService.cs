@@ -250,6 +250,8 @@ public class OrderApiService : IOrderApiService
             var responsePreview = responseBody.Length > 500 ? responseBody.Substring(0, 500) + "..." : responseBody;
             _logger.LogDebug("API #{ApiNumber}: Response body: {Body}", apiConfig.ApiNumber, responsePreview);
 
+            _logger.LogInformation("API #{ApiNumber}: About to parse JSON response...", apiConfig.ApiNumber);
+
             // Parse JSON and extract order records
             var orders = ParseOrderRecords(responseBody, apiConfig);
             _logger.LogInformation("API #{ApiNumber}: Extracted {Count} order records", apiConfig.ApiNumber, orders.Count);
@@ -341,8 +343,12 @@ public class OrderApiService : IOrderApiService
 
         try
         {
+            _logger.LogDebug("ParseOrderRecords: Starting JSON parsing, IdJsonPath={IdPath}", config.IdJsonPath);
+
             using var doc = JsonDocument.Parse(jsonResponse);
             var root = doc.RootElement;
+
+            _logger.LogDebug("ParseOrderRecords: JSON parsed, root kind={Kind}", root.ValueKind);
 
             // Support both shapes:
             // 1) { "data": [ ... ] }
@@ -350,13 +356,17 @@ public class OrderApiService : IOrderApiService
             JsonElement dataElement;
             if (root.TryGetProperty("data", out var topData))
             {
+                _logger.LogDebug("ParseOrderRecords: Found 'data' property, kind={Kind}", topData.ValueKind);
+
                 if (topData.ValueKind == JsonValueKind.Array)
                 {
                     dataElement = topData;
+                    _logger.LogDebug("ParseOrderRecords: Data is array, length={Length}", topData.GetArrayLength());
                 }
                 else if (topData.ValueKind == JsonValueKind.Object && topData.TryGetProperty("data", out var nestedData) && nestedData.ValueKind == JsonValueKind.Array)
                 {
                     dataElement = nestedData;
+                    _logger.LogDebug("ParseOrderRecords: Data is nested array, length={Length}", nestedData.GetArrayLength());
                 }
                 else
                 {
@@ -401,17 +411,29 @@ public class OrderApiService : IOrderApiService
                             Id = id,
                             RawData = item.Clone()
                         });
+
+                        if (totalItems <= 3)
+                        {
+                            _logger.LogDebug("ParseOrderRecords: Extracted ID={Id} from item #{Num}", id, totalItems);
+                        }
                     }
                     else
                     {
-                        _logger.LogWarning("Could not extract ID from record using path: {Path}", config.IdJsonPath);
+                        if (totalItems <= 3)
+                        {
+                            _logger.LogWarning("Could not extract ID from record #{Num} using path: {Path}. Item properties: {Props}",
+                                totalItems, config.IdJsonPath, string.Join(", ", item.EnumerateObject().Select(p => p.Name)));
+                        }
                     }
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex, "Failed to parse individual record");
+                    _logger.LogWarning(ex, "Failed to parse individual record #{Num}", totalItems);
                 }
             }
+
+            _logger.LogDebug("ParseOrderRecords: Processed {Total} items, filtered out {Filtered}, extracted {Extracted} records",
+                totalItems, filteredOutItems, records.Count);
 
             if (filteredOutItems > 0)
             {
@@ -422,6 +444,10 @@ public class OrderApiService : IOrderApiService
         catch (JsonException ex)
         {
             _logger.LogError(ex, "Failed to parse JSON response");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unexpected error in ParseOrderRecords");
         }
 
         return records;
