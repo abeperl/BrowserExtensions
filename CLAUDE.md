@@ -163,6 +163,17 @@ BrowserExtensions/
 - Build script creates packages for Chrome Web Store and Edge Add-ons
 - Extension IDs and native host names are hardcoded in configuration files
 
+## Documentation Standards
+
+**IMPORTANT: All documentation files must be created in the `docs` folder within each project.**
+
+- **Scheduled Print Service**: All `.md` documentation files should be placed in `scheduled-print-service/docs/`
+- **Word Template Extension**: All `.md` documentation files should be placed in `word-template-extension/docs/`
+- **Scan Overlay Extension**: All `.md` documentation files should be placed in `scan-overlay-extension/docs/`
+- **CSS-JS-ToInject**: All `.md` documentation files should be placed in `css-js-toinject/docs/`
+
+Exception: Project root files like `README.md` and `CLAUDE.md` should remain in the root directory.
+
 ## Testing
 
 ### Word Template Extension
@@ -220,3 +231,22 @@ window.autoPrintButtons.config
 - Doubles text sizes on shipping placards
 - Makes all text bold for better readability
 - Works in iframes and main document
+
+#### Production Status Column (`#SO/orderdetails`)
+- Adds "Production Status" column to order items table
+- Intercepts API responses to get ItemStatusId for each item
+- Looks up status names from session storage
+- Updates dynamically as table loads
+- See `docs/PRODUCTION-STATUS-COLUMN.md` for full documentation
+
+**Testing:**
+```javascript
+// Refresh the column manually
+window.productionStatusAPI.refreshColumn();
+
+// View stored API data
+console.log(window.productionStatusAPI.store.data);
+
+// Get status list
+console.log(window.productionStatusAPI.getStatusList());
+```
