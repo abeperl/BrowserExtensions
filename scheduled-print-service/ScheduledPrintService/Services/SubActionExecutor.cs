@@ -46,13 +46,15 @@ public class SubActionExecutor : ISubActionExecutor
         PdfBrowserManager browserManager,
         ITokenRenewalService tokenRenewal)
     {
-        _logger = logger;
         _httpClient = httpClient;
         _config = apiConfig.Value;
         _pdfConfig = pdfConfig.Value;
         _printer = printer;
         _browserManager = browserManager;
         _tokenRenewal = tokenRenewal;
+
+        // Wrap logger with prefix provider that adds API number
+        _logger = new PrefixedLogger<SubActionExecutor>(logger, () => $"[API #{GetActiveConfig().ApiNumber}]");
 
         ConfigureHttpClient();
     }
@@ -2110,6 +2112,29 @@ public class SubActionExecutor : ISubActionExecutor
                     _logger.LogWarning(ex, "Failed to capture navigation diagnostic HTML");
                 }
         } // End of SPA navigation path
+
+        // Inject picklist response into page context for Production Status column
+        if (!string.IsNullOrWhiteSpace(_lastInterceptedPicklistJson))
+        {
+            try
+            {
+                _logger.LogInformation("Injecting picklist response into page context for Production Status column");
+                await page.EvaluateFunctionAsync(@"(picklistJson) => {
+                    try {
+                        window.__picklistResponse = JSON.parse(picklistJson);
+                        sessionStorage.setItem('__picklistResponse', picklistJson);
+                        console.log('✅ Picklist response injected into page context');
+                        console.log('   - PickListItems count:', window.__picklistResponse?.data?.PickListItems?.length || 0);
+                    } catch(e) {
+                        console.error('❌ Error injecting picklist response:', e);
+                    }
+                }", _lastInterceptedPicklistJson);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to inject picklist response into page (non-fatal)");
+            }
+        }
 
         // Perform HTML injection if configured
         await PerformHtmlInjectionsAsync(page, action, fieldValues);
