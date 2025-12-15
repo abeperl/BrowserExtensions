@@ -228,7 +228,7 @@ public class DatabaseSchedulerService : BackgroundService
         var tracker = new DatabaseOrderTracker(apiNumber, _logger);
 
         // Fetch orders from API
-        _logger.LogInformation("Calling API #{ApiNumber}: {Endpoint}", apiNumber, apiConfig.PrimaryEndpoint);
+        _logger.LogInformation("API #{ApiNumber}: Calling {Endpoint}", apiNumber, apiConfig.PrimaryEndpoint);
         var orders = await apiService.GetOrdersListAsync(apiConfig, cancellationToken);
 
         if (orders.Count == 0)

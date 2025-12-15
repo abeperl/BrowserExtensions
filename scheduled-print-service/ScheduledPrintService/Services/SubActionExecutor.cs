@@ -90,7 +90,6 @@ public class SubActionExecutor : ISubActionExecutor
         {
             _httpClient.DefaultRequestHeaders.Authorization =
                 new AuthenticationHeaderValue("Bearer", token);
-            _logger.LogDebug("Updated Authorization header with Bearer token (length: {Length})", token.Length);
         }
 
         // Update cookies
@@ -104,18 +103,14 @@ public class SubActionExecutor : ISubActionExecutor
             var cookieToken = cookies.ContainsKey("token") ? cookies["token"] : null;
             if (!string.IsNullOrEmpty(cookieToken))
             {
-                _logger.LogDebug("Updated Cookie header with token (cookie token length: {CookieLength}, matches auth: {Matches})",
-                    cookieToken.Length,
-                    cookieToken == token);
+                // _logger.LogDebug("Updated Cookie header with token (cookie token length: {CookieLength}, matches auth: {Matches})",
+                //     cookieToken.Length,
+                //     cookieToken == token);
             }
             else
             {
                 _logger.LogWarning("Cookie header updated but 'token' cookie is missing or empty!");
             }
-        }
-        else
-        {
-            _logger.LogWarning("No cookies available to set in Cookie header");
         }
     }
 
@@ -197,11 +192,11 @@ public class SubActionExecutor : ISubActionExecutor
                     var orderDict = JsonElementToDictionary(orderData);
                     if (!ApplyChainedFilter(orderDict, action))
                     {
-                        var filterTarget = action.ChainedFilterArrayIndex.HasValue
-                            ? $"array index {action.ChainedFilterArrayIndex.Value}"
-                            : $"field {action.ChainedFilterField}";
-                        _logger.LogInformation("[{Num}/{Total}] {ActionName} skipped for order {OrderId} due to filter: {FilterType} on {Target}",
-                            actionNum, activeConfig.SubActions.Count, action.Name, orderId, action.ChainedFilterType, filterTarget);
+                        // var filterTarget = action.ChainedFilterArrayIndex.HasValue
+                        //     ? $"array index {action.ChainedFilterArrayIndex.Value}"
+                        //     : $"field {action.ChainedFilterField}";
+                        // _logger.LogInformation("[{Num}/{Total}] {ActionName} skipped for order {OrderId} due to filter: {FilterType} on {Target}",
+                        //     actionNum, activeConfig.SubActions.Count, action.Name, orderId, action.ChainedFilterType, filterTarget);
                         continue; // Skip this action for this order
                     }
                 }
@@ -2872,12 +2867,12 @@ public class SubActionExecutor : ISubActionExecutor
             // Recursively flatten the entire JSON structure
             FlattenJsonElement(orderData, string.Empty, fieldValues);
 
-            _logger.LogInformation("Extracted {Count} field(s) from order data for placeholder replacement", fieldValues.Count);
+            // _logger.LogInformation("Extracted {Count} field(s) from order data for placeholder replacement", fieldValues.Count);
             
-            // Log first few fields for debugging (limit to avoid log spam)
-            var sampleFields = fieldValues.Take(10).Select(kvp => 
-                $"{kvp.Key}={kvp.Value.Substring(0, Math.Min(30, kvp.Value.Length))}{(kvp.Value.Length > 30 ? "..." : "")}");
-            _logger.LogDebug("Sample fields: {Fields}", string.Join(", ", sampleFields));
+            // // Log first few fields for debugging (limit to avoid log spam)
+            // var sampleFields = fieldValues.Take(10).Select(kvp => 
+            //     $"{kvp.Key}={kvp.Value.Substring(0, Math.Min(30, kvp.Value.Length))}{(kvp.Value.Length > 30 ? "..." : "")}");
+            // _logger.LogDebug("Sample fields: {Fields}", string.Join(", ", sampleFields));
         }
         catch (Exception ex)
         {

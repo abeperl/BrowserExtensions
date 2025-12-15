@@ -17,7 +17,7 @@ This repository contains two browser extensions:
 
 ```bash
 cd scheduled-print-service
-powershell -ExecutionPolicy Bypass -File scripts/publish.ps1 -SelfContained
+powershell -ExecutionPolicy Bypass -File scripts/publish.ps1
 ```
 
 **NEVER create new publish folders. ALWAYS use the publish script.**
@@ -26,7 +26,7 @@ powershell -ExecutionPolicy Bypass -File scripts/publish.ps1 -SelfContained
 - Wrong: Any other location
 
 After any code modification:
-1. Run the publish script: `powershell -ExecutionPolicy Bypass -File scripts/publish.ps1 -SelfContained`
+1. Run the publish script: `powershell -ExecutionPolicy Bypass -File scripts/publish.ps1`
 2. Verify files are in `scheduled-print-service/publish/`
 3. The script automatically builds and publishes with self-contained deployment
 

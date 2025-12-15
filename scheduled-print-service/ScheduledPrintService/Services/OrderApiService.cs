@@ -71,7 +71,6 @@ public class OrderApiService : IOrderApiService
         {
             _httpClient.DefaultRequestHeaders.Authorization =
                 new AuthenticationHeaderValue("Bearer", token);
-            _logger.LogDebug("Updated Authorization header with Bearer token (length: {Length})", token.Length);
         }
 
         // Update cookies
@@ -85,18 +84,14 @@ public class OrderApiService : IOrderApiService
             var cookieToken = cookies.ContainsKey("token") ? cookies["token"] : null;
             if (!string.IsNullOrEmpty(cookieToken))
             {
-                _logger.LogDebug("Updated Cookie header with token (cookie token length: {CookieLength}, matches auth: {Matches})",
-                    cookieToken.Length,
-                    cookieToken == token);
+                // _logger.LogDebug("Updated Cookie header with token (cookie token length: {CookieLength}, matches auth: {Matches})",
+                //     cookieToken.Length,
+                //     cookieToken == token);
             }
             else
             {
                 _logger.LogWarning("Cookie header updated but 'token' cookie is missing or empty!");
             }
-        }
-        else
-        {
-            _logger.LogWarning("No cookies available to set in Cookie header");
         }
     }
 
@@ -232,8 +227,8 @@ public class OrderApiService : IOrderApiService
                 });
             }
 
-            _logger.LogInformation("Calling primary endpoint {Endpoint} ({Method})...", endpoint, httpMethod);
-            _logger.LogDebug("Request payload: {Payload}", jsonContent);
+            _logger.LogInformation("API #{ApiNumber}: Calling primary endpoint {Endpoint} ({Method})...", apiConfig.ApiNumber, endpoint, httpMethod);
+            _logger.LogDebug("API #{ApiNumber}: Request payload: {Payload}", apiConfig.ApiNumber, jsonContent);
 
             Func<HttpRequestMessage> factory = () =>
             {
@@ -249,20 +244,19 @@ public class OrderApiService : IOrderApiService
             response.EnsureSuccessStatusCode();
 
             var responseBody = await response.Content.ReadAsStringAsync(ct);
-            _logger.LogInformation("API call successful. Response length: {Length}", responseBody.Length);
-            _logger.LogDebug("Response body: {Body}", responseBody);
+            _logger.LogInformation("API #{ApiNumber}: API call successful. Response length: {Length}", apiConfig.ApiNumber, responseBody.Length);
 
-            // Log first 500 chars of response for debugging
-            var preview = responseBody.Length > 500 ? responseBody.Substring(0, 500) : responseBody;
-            _logger.LogInformation("Response preview: {Preview}...", preview);
+            // Log first 500 chars of response for debugging (truncate to avoid log bloat)
+            var responsePreview = responseBody.Length > 500 ? responseBody.Substring(0, 500) + "..." : responseBody;
+            _logger.LogDebug("API #{ApiNumber}: Response body: {Body}", apiConfig.ApiNumber, responsePreview);
 
             // Parse JSON and extract order records
             var orders = ParseOrderRecords(responseBody, apiConfig);
-            _logger.LogInformation("Extracted {Count} order records", orders.Count);
+            _logger.LogInformation("API #{ApiNumber}: Extracted {Count} order records", apiConfig.ApiNumber, orders.Count);
 
             if (orders.Count > 0)
             {
-                _logger.LogInformation("First record ID: {Id}", orders[0].Id);
+                _logger.LogInformation("API #{ApiNumber}: First record ID: {Id}", apiConfig.ApiNumber, orders[0].Id);
             }
 
             return orders;

@@ -75,7 +75,7 @@ public class DatabaseApiConfigService : IDatabaseApiConfigService
         {
             config.BearerToken = cachedToken;
             usedCachedToken = true;
-            _logger.LogDebug("Using cached token from ApiAuth table, expires at {ExpiresAt}", tokenExpiresAt);
+            _logger.LogDebug("API #{ApiNumber}: Using cached token from ApiAuth table, expires at {ExpiresAt}", apiNumber, tokenExpiresAt);
         }
         // Otherwise, fall back to token from Headers JSON (static/placeholder token)
         else if (headersDoc.RootElement.TryGetProperty("Authorization", out var authElement))
@@ -84,7 +84,7 @@ public class DatabaseApiConfigService : IDatabaseApiConfigService
             if (authValue.StartsWith("Bearer "))
             {
                 config.BearerToken = authValue.Substring(7);
-                _logger.LogDebug("Using token from Headers JSON (cached token unavailable or expired)");
+                _logger.LogDebug("API #{ApiNumber}: Using token from Headers JSON (cached token unavailable or expired)", apiNumber);
             }
         }
 
@@ -108,7 +108,7 @@ public class DatabaseApiConfigService : IDatabaseApiConfigService
         if (usedCachedToken && !string.IsNullOrEmpty(config.BearerToken))
         {
             config.Cookies["token"] = config.BearerToken;
-            _logger.LogDebug("Updated cookies with cached token for Puppeteer browser");
+            _logger.LogDebug("API #{ApiNumber}: Updated cookies with cached token for Puppeteer browser", apiNumber);
         }
 
         if (headersDoc.RootElement.TryGetProperty("WarehouseId", out var warehouseElement))
@@ -203,11 +203,11 @@ public class DatabaseApiConfigService : IDatabaseApiConfigService
                                 config.PrimaryApiFieldMap[prop.Name] = value;
                             }
                         }
-                        _logger.LogInformation("Loaded {Count} field mappings for placeholder replacement", config.PrimaryApiFieldMap.Count);
+                        _logger.LogInformation("API #{ApiNumber}: Loaded {Count} field mappings for placeholder replacement", apiNumber, config.PrimaryApiFieldMap.Count);
                     }
 
-                    _logger.LogInformation("Loaded primary API filter configuration: Type={FilterType}, ArrayIndex={ArrayIndex}, Value={FilterValue}",
-                        config.PrimaryFilterType, config.PrimaryFilterArrayIndex, config.PrimaryFilterValue);
+                    _logger.LogInformation("API #{ApiNumber}: Loaded primary API filter configuration: Type={FilterType}, ArrayIndex={ArrayIndex}, Value={FilterValue}",
+                        apiNumber, config.PrimaryFilterType, config.PrimaryFilterArrayIndex, config.PrimaryFilterValue);
                 }
                 catch (JsonException ex)
                 {
@@ -250,7 +250,8 @@ public class DatabaseApiConfigService : IDatabaseApiConfigService
             config.SubActions.Add(subAction);
         }
 
-        _logger.LogInformation("Loaded API configuration: {Count} sub-actions ({Enabled} enabled)",
+        _logger.LogInformation("API #{ApiNumber}: Loaded API configuration: {Count} sub-actions ({Enabled} enabled)",
+            apiNumber,
             config.SubActions.Count,
             config.SubActions.Count(a => a.Enabled));
 
