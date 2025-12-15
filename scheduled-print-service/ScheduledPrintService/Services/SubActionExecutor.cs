@@ -545,6 +545,54 @@ public class SubActionExecutor : ISubActionExecutor
 
         var responseBody = await response.Content.ReadAsStringAsync(ct);
         _logger.LogDebug("Sub-action API response: {Body}", Truncate(responseBody, 100));
+
+        // IMPORTANT: Save API response to browser memory (NOT navigate away)
+        // This allows chained actions and future script executions to access the JSON data
+        // Use OutputVariableName to determine where to store it (defaults to action type + "Response")
+        if (_capturedPage != null && !string.IsNullOrWhiteSpace(responseBody))
+        {
+            try
+            {
+                // Determine the variable name for storing this response
+                var variableName = !string.IsNullOrEmpty(action.OutputVariableName) 
+                    ? action.OutputVariableName 
+                    : $"__{action.Type}Response"; // e.g., "__CallApiResponse" or "__orderDetailsResponse"
+
+                _logger.LogInformation("Injecting API response into page memory as '{VarName}' (length: {Length})", variableName, responseBody.Length);
+
+                // Inject the JSON response into the captured page's memory (window and sessionStorage)
+                // This makes it available to:
+                // 1. Chained actions that read from memory
+                // 2. JavaScript injections (HTML scripts) that need the data
+                // 3. Subsequent page interactions and rendering
+                await _capturedPage.EvaluateFunctionAsync(@"(varName, jsonString) => {
+                    try {
+                        const data = JSON.parse(jsonString);
+                        
+                        // Store in window global
+                        window[varName] = data;
+                        
+                        // Also store in sessionStorage for persistence across page reloads
+                        sessionStorage.setItem(varName, jsonString);
+                        
+                        console.log('✅ API response injected into page memory:', varName, 'length:', jsonString.length);
+                    } catch(e) {
+                        console.error('❌ Error injecting API response:', e);
+                        throw e;
+                    }
+                }", variableName, responseBody);
+
+                _logger.LogDebug("Successfully injected API response into page memory");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to inject API response into page memory (non-fatal - chaining may fail)");
+            }
+        }
+        else if (_capturedPage == null)
+        {
+            _logger.LogDebug("No captured page available - API response not injected to memory (subsequent navigations will not have access to this data)");
+        }
     }
 
     private async Task ExecuteGetHtmlAndPrintAsync(SubAction action, string orderId, CancellationToken ct)
