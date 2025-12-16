@@ -178,7 +178,7 @@ css-js-toinject/
     <!-- Your content -->
 
     <!-- Dependencies (load in order) -->
-    <script src="css-js-toinject/overlay-manager.js"></script>
+   <script src="css-js-toinject/ui-feedback.js"></script>
     <script src="css-js-toinject/tab-manager.js"></script>
     <script src="css-js-toinject/auto-print-buttons.js"></script>
 

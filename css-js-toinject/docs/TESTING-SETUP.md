@@ -90,7 +90,7 @@ If you have a browser extension that loads these scripts:
     "matches": ["*://your-3pl-site.com/*"],
     "js": [
       "JSPrintManager.js",
-      "overlay-manager.js",
+      "ui-feedback.js",
       "box-label-only-silent.js",
       "router.js"
     ]

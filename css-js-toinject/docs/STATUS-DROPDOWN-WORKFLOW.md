@@ -488,4 +488,4 @@ Possible improvements:
 
 - **Source Code**: `css-js-toinject/status-dropdown.js`
 - **Router Integration**: `css-js-toinject/router.js` (lines 186-222)
-- **Related**: `overlay-manager.js` (for error notifications)
+- **Related**: `ui-feedback.js` (OverlayManager for error notifications)

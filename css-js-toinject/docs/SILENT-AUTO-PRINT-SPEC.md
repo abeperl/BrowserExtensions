@@ -1003,7 +1003,7 @@ To find exact name:
 
 - `auto-print-buttons.js` - Original window-based auto-print
 - `router.js` - Main router with modal detection
-- `overlay-manager.js` - UI notification system
+- `ui-feedback.js` - UI notification system (OverlayManager + PopupController)
 - `popup-controller.js` - Popup control interface
 - `tab-manager.js` - Tab management utilities
 

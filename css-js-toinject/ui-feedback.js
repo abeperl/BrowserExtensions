@@ -14,8 +14,7 @@ const OverlayManager = (() => {
     audioEnabled: true,
     volume: 0.3, // Volume level (0.0 to 1.0)
     dismissKey: 'Escape',
-    useMp3Files: true, // Try MP3 files first, fallback to synthesized
-    soundsPath: './audio/' // Path to MP3 files
+    useMp3Files: true // Try CDN MP3 files first, fallback to synthesized
   };
 
   // Audio cache for MP3 files
@@ -26,31 +25,34 @@ const OverlayManager = (() => {
     info: null
   };
 
-  // Preload MP3 files
+  // CDN-hosted sounds (ion-sound library from Cloudflare CDN)
+  // Source: https://cdnjs.com/libraries/ion-sound
+  const soundCdnUrls = {
+    success: 'https://cdnjs.cloudflare.com/ajax/libs/ion-sound/3.0.7/sounds/button_click.mp3',
+    error: 'https://cdnjs.cloudflare.com/ajax/libs/ion-sound/3.0.7/sounds/computer_error.mp3',
+    warning: 'https://cdnjs.cloudflare.com/ajax/libs/ion-sound/3.0.7/sounds/door_bell.mp3',
+    info: 'https://cdnjs.cloudflare.com/ajax/libs/ion-sound/3.0.7/sounds/bell_ring.mp3'
+  };
+
+  // Preload MP3 files from CDN
   function preloadAudioFiles() {
     if (!settings.useMp3Files) return;
 
-    const soundFiles = {
-      success: 'success.mp3',
-      error: 'error.mp3',
-      warning: 'warning.mp3',
-      info: 'info.mp3'
-    };
-
-    Object.keys(soundFiles).forEach(type => {
+    Object.keys(soundCdnUrls).forEach(type => {
       const audio = new Audio();
       audio.volume = settings.volume;
       audio.preload = 'auto';
-      audio.src = settings.soundsPath + soundFiles[type];
+      audio.src = soundCdnUrls[type];
 
       // Handle load success
       audio.addEventListener('canplaythrough', () => {
         audioCache[type] = audio;
+        console.log(`Loaded ${type} sound from CDN`);
       }, { once: true });
 
-      // Handle load failure silently
+      // Handle load failure - fallback to synthesized
       audio.addEventListener('error', () => {
-        console.warn(`Failed to load ${type} sound, will use synthesized fallback`);
+        console.warn(`Failed to load ${type} sound from CDN, will use synthesized fallback`);
         audioCache[type] = null;
       }, { once: true });
     });

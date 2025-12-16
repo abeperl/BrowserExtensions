@@ -12,7 +12,7 @@ Quick setup guide for integrating `silent-auto-print-buttons.js` into your proje
 
 3. **Existing dependencies** must be loaded:
    - jQuery
-   - `overlay-manager.js` (for notifications)
+    - `ui-feedback.js` (OverlayManager + PopupController)
    - `auto-print-buttons.js` (for window fallback)
 
 ---
@@ -36,7 +36,7 @@ Add the script after JSPrintManager and other dependencies:
 
 ```html
 <!-- Dependencies (should already be loaded) -->
-<script src="css-js-toinject/overlay-manager.js"></script>
+<script src="css-js-toinject/ui-feedback.js"></script>
 <script src="css-js-toinject/auto-print-buttons.js"></script>
 
 <!-- JSPrintManager -->

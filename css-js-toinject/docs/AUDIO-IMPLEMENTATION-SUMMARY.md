@@ -6,7 +6,7 @@ Successfully implemented comprehensive audio feedback system for overlay notific
 
 ## Files Modified
 
-### 1. **overlay-manager.js** ✅
+### 1. **ui-feedback.js** ✅
 Enhanced with full audio system:
 - MP3 file loading and caching
 - Enhanced Web Audio API synthesized sounds
@@ -15,10 +15,10 @@ Enhanced with full audio system:
 - Audio testing utilities
 
 **Lines Modified**: ~200 lines added
-**Location**: `css-js-toinject/overlay-manager.js`
+**Location**: `css-js-toinject/ui-feedback.js`
 
 ### 2. **ui-feedback.js** ✅
-Synchronized with same audio enhancements as overlay-manager.js:
+Synchronized with same audio enhancements consolidated in ui-feedback.js:
 - Identical audio system implementation
 - Same configuration options
 - Consistent API across both files
@@ -427,7 +427,7 @@ Potential improvements for future versions:
 
 ```
 css-js-toinject/
-├── overlay-manager.js         (Enhanced with audio)
+├── ui-feedback.js             (Enhanced with audio)
 ├── ui-feedback.js             (Enhanced with audio)
 ├── audio-test-demo.html       (Interactive demo)
 ├── AUDIO-SETUP.md            (Full documentation)
@@ -461,7 +461,7 @@ css-js-toinject/
 **Optional**: Download 4 free MP3 files for best quality.
 
 ### Lines of Code Added
-- **overlay-manager.js**: ~200 lines
+- **ui-feedback.js**: includes OverlayManager + PopupController
 - **ui-feedback.js**: ~200 lines
 - **Demo page**: ~400 lines
 - **Documentation**: ~1500 lines

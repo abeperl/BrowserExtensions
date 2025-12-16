@@ -134,7 +134,7 @@ BrowserExtensions/
 └── css-js-toinject/           # Injectable scripts for website enhancement
     ├── router.js              # Main routing logic
     ├── auto-print-buttons.js  # Auto print buttons feature
-    ├── overlay-manager.js     # Overlay system
+    ├── ui-feedback.js         # Overlay system + popup controller (replaces overlay-manager.js)
     ├── status-dropdown.js     # Status dropdown controls
     ├── table-item-linker.js   # SKU/Qty clickable items
     ├── item-line-id.js        # Item line ID column

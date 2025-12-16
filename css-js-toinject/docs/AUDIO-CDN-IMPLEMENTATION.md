@@ -70,7 +70,7 @@ audio.onerror = () => {
 
 ### Modified Files
 
-1. **[overlay-manager.js](../overlay-manager.js)** - Added CDN URLs and fallback logic
+1. **[ui-feedback.js](../ui-feedback.js)** - Consolidated OverlayManager + PopupController with CDN URLs and fallback logic
 2. **[ui-feedback.js](../ui-feedback.js)** - Added CDN URLs and fallback logic
 3. **[sound-cdn-config.js](../sound-cdn-config.js)** - CDN configuration reference
 
@@ -250,7 +250,7 @@ OverlayManager.configure({ audioEnabled: false });
 - `audio/sound-constants.js` - Base64 embedded sounds (optional)
 
 **Modified Files:**
-- `overlay-manager.js` - Added CDN fallback logic
+- `ui-feedback.js` - Added CDN fallback logic
 - `ui-feedback.js` - Added CDN fallback logic
 
 ### Quick Start

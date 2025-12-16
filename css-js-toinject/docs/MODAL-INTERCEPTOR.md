@@ -186,7 +186,7 @@ For browser extension injection, add to your content script manifest:
   "content_scripts": [{
     "matches": ["https://mj.3plnext.com/*"],
     "js": [
-      "overlay-manager.js",      // Load first
+      "ui-feedback.js",          // Load first (provides OverlayManager)
       "modal-interceptor.js",    // Load second
       "router.js"                // Load last
     ]

@@ -33,7 +33,7 @@ Located in `css-js-toinject/audio/`:
 ### 4. Updated Code Files
 
 **Modified:**
-- ✅ [overlay-manager.js](overlay-manager.js) - CDN fallback integrated
+- ✅ [ui-feedback.js](ui-feedback.js) - CDN fallback integrated
 - ✅ [ui-feedback.js](ui-feedback.js) - CDN fallback integrated
 
 **Created:**
@@ -106,7 +106,7 @@ If you need **complete offline mode** without any external requests:
 
 ```
 css-js-toinject/
-├── overlay-manager.js          (UPDATED - CDN fallback)
+├── ui-feedback.js              (UPDATED - CDN fallback)
 ├── ui-feedback.js              (UPDATED - CDN fallback)
 ├── sound-cdn-config.js         (NEW - CDN URLs reference)
 ├── AUDIO-CDN-SUMMARY.md        (THIS FILE)

@@ -457,7 +457,7 @@ window.silentAutoPrint.setPrintMode('jsprintmanager');
 **Fix:**
 ```html
 <!-- Correct load order -->
-<script src="css-js-toinject/overlay-manager.js"></script>
+<script src="css-js-toinject/ui-feedback.js"></script>
 <script src="css-js-toinject/auto-print-buttons.js"></script>
 <script src="https://cdn.neodynamic.com/jsprintmanager/8.0/JSPrintManager.js"></script>
 <script src="css-js-toinject/silent-auto-print-buttons.js"></script>

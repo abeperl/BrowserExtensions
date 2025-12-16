@@ -181,7 +181,7 @@ console.assert(document.activeElement.id === 'product-scan', 'Focus not on produ
 
 - **Auto-Submit**: [AUTO-SUBMIT-FEATURE.md](AUTO-SUBMIT-FEATURE.md)
 - **Status Dropdown**: [status-dropdown.js](status-dropdown.js)
-- **Overlay Manager**: [overlay-manager.js](overlay-manager.js)
+- **Overlay Manager**: [ui-feedback.js](ui-feedback.js)
 
 ## Future Enhancements
 
