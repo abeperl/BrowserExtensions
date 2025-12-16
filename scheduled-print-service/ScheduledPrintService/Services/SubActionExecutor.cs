@@ -23,6 +23,7 @@ public class SubActionExecutor : ISubActionExecutor
     private readonly HttpClient _httpClient;
     private readonly ApiConfig _config;
     private readonly PdfConfig _pdfConfig;
+    private readonly PrinterConfig _printerConfig;
     private readonly PdfPrintService _printer;
     private readonly PdfBrowserManager _browserManager;
     private readonly ITokenRenewalService _tokenRenewal;
@@ -42,6 +43,7 @@ public class SubActionExecutor : ISubActionExecutor
         HttpClient httpClient,
         IOptions<ApiConfig> apiConfig,
         IOptions<PdfConfig> pdfConfig,
+        IOptions<PrinterConfig> printerConfig,
         PdfPrintService printer,
         PdfBrowserManager browserManager,
         ITokenRenewalService tokenRenewal)
@@ -49,6 +51,7 @@ public class SubActionExecutor : ISubActionExecutor
         _httpClient = httpClient;
         _config = apiConfig.Value;
         _pdfConfig = pdfConfig.Value;
+        _printerConfig = printerConfig.Value;
         _printer = printer;
         _browserManager = browserManager;
         _tokenRenewal = tokenRenewal;
@@ -192,12 +195,15 @@ public class SubActionExecutor : ISubActionExecutor
                     var orderDict = JsonElementToDictionary(orderData);
                     if (!ApplyChainedFilter(orderDict, action))
                     {
-                        // var filterTarget = action.ChainedFilterArrayIndex.HasValue
-                        //     ? $"array index {action.ChainedFilterArrayIndex.Value}"
-                        //     : $"field {action.ChainedFilterField}";
-                        // _logger.LogInformation("[{Num}/{Total}] {ActionName} skipped for order {OrderId} due to filter: {FilterType} on {Target}",
-                        //     actionNum, activeConfig.SubActions.Count, action.Name, orderId, action.ChainedFilterType, filterTarget);
-                        continue; // Skip this action for this order
+                        var filterTarget = action.ChainedFilterArrayIndex.HasValue
+                            ? $"array index {action.ChainedFilterArrayIndex.Value}"
+                            : $"field {action.ChainedFilterField}";
+                        _logger.LogInformation("[{Num}/{Total}] {ActionName} skipped for order {OrderId} due to filter: {FilterType} on {Target}. Skipping all subsequent chained actions.",
+                            actionNum, activeConfig.SubActions.Count, action.Name, orderId, action.ChainedFilterType, filterTarget);
+
+                        // Break the chain - when a filtered action is skipped, all subsequent actions must also be skipped
+                        // This prevents downstream actions (like SaveCapturedHtml, PrintSavedPdf) from running without their prerequisites
+                        break;
                     }
                 }
 
@@ -2362,7 +2368,7 @@ public class SubActionExecutor : ISubActionExecutor
         var pdfBytes = await CreatePdfFromPageAsync(_capturedPage, ct);
 
         // Save the PDF to disk (MUST succeed)
-        var outputDir = DataPaths.EnsureDir("out");
+        var outputDir = DataPaths.EnsureDir(_printerConfig.OutputDirectory);
         var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmssfff");
         // Use OutputFilePrefix if specified, otherwise use job name
         var filePrefix = !string.IsNullOrWhiteSpace(action.OutputFilePrefix) ? action.OutputFilePrefix : jobName;
@@ -2540,7 +2546,7 @@ public class SubActionExecutor : ISubActionExecutor
         var pdfBytes = await CreatePdfFromPageAsync(_capturedPage, ct);
 
         // Save the PDF to disk (MUST succeed)
-        var outputDir = DataPaths.EnsureDir("out");
+        var outputDir = DataPaths.EnsureDir(_printerConfig.OutputDirectory);
         var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmssfff");
         // Use OutputFilePrefix if specified, otherwise use job name
         var filePrefix = !string.IsNullOrWhiteSpace(action.OutputFilePrefix) ? action.OutputFilePrefix : jobName;
