@@ -7,6 +7,7 @@ namespace ScheduledPrintService.Services;
 
 public interface IDatabaseApiConfigService
 {
+    bool IsApiEnabled(int apiNumber);
     ApiConfig LoadApiConfig(int apiNumber);
     List<Schedule> LoadEnabledSchedules();
     List<int> LoadScheduleApiNumbers(int scheduleId);
@@ -23,11 +24,24 @@ public class DatabaseApiConfigService : IDatabaseApiConfigService
     {
         _logger = logger;
         _dbPath = Path.Combine(AppContext.BaseDirectory, "api_config.db");
-        
+
         if (!File.Exists(_dbPath))
         {
             throw new FileNotFoundException($"Database file not found: {_dbPath}");
         }
+    }
+
+    public bool IsApiEnabled(int apiNumber)
+    {
+        using var connection = new SqliteConnection($"Data Source={_dbPath}");
+        connection.Open();
+
+        var cmd = connection.CreateCommand();
+        cmd.CommandText = "SELECT IsEnabled FROM PrimaryApi WHERE ApiNumber = @ApiNumber";
+        cmd.Parameters.AddWithValue("@ApiNumber", apiNumber);
+
+        var result = cmd.ExecuteScalar();
+        return result != null && Convert.ToBoolean(result);
     }
 
     public ApiConfig LoadApiConfig(int apiNumber)

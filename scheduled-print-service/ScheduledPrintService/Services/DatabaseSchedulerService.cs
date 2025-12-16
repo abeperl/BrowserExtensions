@@ -205,14 +205,15 @@ public class DatabaseSchedulerService : BackgroundService
 
     private async Task ExecuteApiAsync(int apiNumber, CancellationToken cancellationToken)
     {
-        // Load API configuration from database
-        var apiConfig = _dbConfigService.LoadApiConfig(apiNumber);
-
-        if (!apiConfig.Enabled)
+        // Check if API is enabled BEFORE loading full configuration
+        if (!_dbConfigService.IsApiEnabled(apiNumber))
         {
             _logger.LogWarning("API #{ApiNumber} is disabled - skipping", apiNumber);
             return;
         }
+
+        // Load API configuration from database
+        var apiConfig = _dbConfigService.LoadApiConfig(apiNumber);
 
         _logger.LogInformation("API #{ApiNumber} loaded: {SubActions} sub-actions configured ({Enabled} enabled)",
             apiNumber,

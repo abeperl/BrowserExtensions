@@ -343,12 +343,8 @@ public class OrderApiService : IOrderApiService
 
         try
         {
-            _logger.LogDebug("ParseOrderRecords: Starting JSON parsing, IdJsonPath={IdPath}", config.IdJsonPath);
-
             using var doc = JsonDocument.Parse(jsonResponse);
             var root = doc.RootElement;
-
-            _logger.LogDebug("ParseOrderRecords: JSON parsed, root kind={Kind}", root.ValueKind);
 
             // Support both shapes:
             // 1) { "data": [ ... ] }
@@ -356,17 +352,13 @@ public class OrderApiService : IOrderApiService
             JsonElement dataElement;
             if (root.TryGetProperty("data", out var topData))
             {
-                _logger.LogDebug("ParseOrderRecords: Found 'data' property, kind={Kind}", topData.ValueKind);
-
                 if (topData.ValueKind == JsonValueKind.Array)
                 {
                     dataElement = topData;
-                    _logger.LogDebug("ParseOrderRecords: Data is array, length={Length}", topData.GetArrayLength());
                 }
                 else if (topData.ValueKind == JsonValueKind.Object && topData.TryGetProperty("data", out var nestedData) && nestedData.ValueKind == JsonValueKind.Array)
                 {
                     dataElement = nestedData;
-                    _logger.LogDebug("ParseOrderRecords: Data is nested array, length={Length}", nestedData.GetArrayLength());
                 }
                 else
                 {
@@ -396,7 +388,6 @@ public class OrderApiService : IOrderApiService
                         if (!ApplyPrimaryFilter(item, config))
                         {
                             filteredOutItems++;
-                            // Removed debug log to reduce log clutter
                             continue; // Skip this item
                         }
                     }
@@ -432,13 +423,17 @@ public class OrderApiService : IOrderApiService
                 }
             }
 
-            _logger.LogDebug("ParseOrderRecords: Processed {Total} items, filtered out {Filtered}, extracted {Extracted} records",
-                totalItems, filteredOutItems, records.Count);
-
-            if (filteredOutItems > 0)
+            // Only log parsing details if there were items to process
+            if (totalItems > 0 || filteredOutItems > 0)
             {
-                _logger.LogInformation("Primary API filter applied: {Total} total items, {Filtered} filtered out, {Kept} kept",
+                _logger.LogDebug("ParseOrderRecords: Processed {Total} items, filtered out {Filtered}, extracted {Extracted} records",
                     totalItems, filteredOutItems, records.Count);
+
+                if (filteredOutItems > 0)
+                {
+                    _logger.LogInformation("Primary API filter applied: {Total} total items, {Filtered} filtered out, {Kept} kept",
+                        totalItems, filteredOutItems, records.Count);
+                }
             }
         }
         catch (JsonException ex)
