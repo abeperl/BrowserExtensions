@@ -895,75 +895,166 @@
                     const style = document.createElement('style');
                     style.id = 'manual-picking-print-styles';
                     style.textContent = `
-                        /* Hide specific fields when printing - using class .hideprint that already exists */
-                        @media print {
-                            /* Hide fields that have hideprint class */
-                            .hideprint {
-                                display: none !important;
-                            }
-
-                            /* Hide the SKU column header and cells */
-                            th[locale-res="Sku"],
-                            td.sku-replaced {
-                                display: none !important;
-                            }
-
-                            /* Show both SKU text and barcode in Order# column when printing */
-                            td.order-cell-modified .order-no-text {
-                                display: none !important;
-                            }
-
-                            td.order-cell-modified .sku-text {
-                                display: block !important;
-                                font-size: 16px !important;
-                                font-weight: 600 !important;
-                                margin-bottom: 5px !important;
-                                text-align: center !important;
-                            }
-
-                            td.order-cell-modified .sku-barcode {
-                                display: block !important;
-                            }
+                        /* Collapse Order# and Customer Note columns - use width collapse instead of display:none */
+                        th[locale-res="OrderNo"],
+                        th[locale-res="CustomerNote"],
+                        td.order-no-hidden,
+                        td.customer-note-hidden {
+                            width: 0 !important;
+                            min-width: 0 !important;
+                            max-width: 0 !important;
+                            padding: 0 !important;
+                            margin: 0 !important;
+                            border: 0 !important;
+                            overflow: hidden !important;
+                            visibility: collapse !important;
                         }
 
-                        /* Always hide original Order# text and show SKU text in Order# column */
-                        td.order-cell-modified .order-no-text {
-                            display: none;
+                        /* Hide Customer Note detail block (screen + print) */
+                        .remarks[column-permission="CustomerNote"],
+                        [column-permission="CustomerNote"] {
+                            display: none !important;
+                            visibility: hidden !important;
                         }
 
-                        td.order-cell-modified .sku-text {
-                            display: block;
-                            font-size: 14px;
+                        /* SKU column with barcode styling - SCREEN */
+                        td.sku-with-barcode {
+                            text-align: center !important;
+                            padding: 2px 1px !important;
+                            vertical-align: middle !important;
+                        }
+
+                        .sku-text {
+                            display: block !important;
+                            font-size: 11px;
                             font-weight: 500;
+                            margin-bottom: 2px;
                         }
 
-                        /* Hide barcode on screen, show only when printing */
-                        td.order-cell-modified .sku-barcode {
-                            display: none;
+                        .sku-barcode-container {
+                            display: block !important;
+                            text-align: center;
+                            margin-top: 2px;
+                        }
+
+                        .sku-barcode-container canvas {
+                            display: inline-block !important;
+                            max-width: 100%;
+                            height: auto;
+                        }
+
+                        /* Print styles - Canvas has excellent PDF compatibility */
+                        @media print {
+                            /* Compact entire picklist table for print (override site's 20px font) */
+                            table.picklist_table th,
+                            table.picklist_table td,
+                            table.picklist_table tfoot td {
+                                font-size: 10px !important;
+                                padding: 1px 2px !important;
+                                line-height: 1.1 !important;
+                                white-space: normal !important;
+                            }
+
+                            /* Reduce row heights */
+                            table.picklist_table tr {
+                                height: auto !important;
+                            }
+
+                            /* Force barcode visibility in print */
+                            td.sku-with-barcode {
+                                padding: 1px 2px !important;
+                                text-align: center !important;
+                                vertical-align: middle !important;
+                                min-height: 0 !important;
+                            }
+
+                            .sku-text {
+                                display: block !important;
+                                visibility: visible !important;
+                                font-size: 9px !important;
+                                font-weight: 600 !important;
+                                margin-bottom: 1px !important;
+                            }
+
+                            .sku-barcode-container {
+                                display: block !important;
+                                visibility: visible !important;
+                                text-align: center !important;
+                                margin-top: 0 !important;
+                                page-break-inside: avoid !important;
+                            }
+
+                            .sku-barcode-container canvas {
+                                display: inline-block !important;
+                                visibility: visible !important;
+                                max-width: 100% !important;
+                                height: auto !important;
+                            }
                         }
                     `;
                     document.head.appendChild(style);
                     console.log('✅ Injected Manual Picking print styles');
                 }
 
-                // Function to replace Order# column with SKU data and add barcodes
-                function replaceOrderColumnWithSku() {
-                    // Find the Order# header to get the column index
-                    const orderHeader = document.querySelector('th[locale-res="OrderNo"]');
+                // Function to hide Order# column and add barcodes to SKU column
+                function addBarcodesToSkuColumn() {
+                    // Find the main data table
+                    const table = document.querySelector('table.picklist_table');
+                    if (!table) {
+                        console.warn('⚠️ Could not find picklist table');
+                        return false;
+                    }
+
+                    // Find the Order# header
+                    const orderHeader = table.querySelector('th[locale-res="OrderNo"]');
                     if (!orderHeader) {
                         console.warn('⚠️ Could not find Order# header');
                         return false;
                     }
 
-                    // Get the column index
-                    const headerRow = orderHeader.closest('tr');
-                    const headers = Array.from(headerRow.querySelectorAll('th'));
-                    const orderColumnIndex = headers.indexOf(orderHeader);
+                    // Mark header as hidden (collapse it)
+                    orderHeader.classList.add('order-no-hidden');
+                    console.log('✅ Collapsed Order# column header');
 
-                    console.log(`🔍 Order# column is at index ${orderColumnIndex}`);
+                    // Get the header row first
+                    const headerRow = orderHeader.closest('tr');
+
+                    // Find and hide Customer Note column (by text content)
+                    const allHeaders = Array.from(headerRow.querySelectorAll('th'));
+                    const customerNoteHeader = allHeaders.find(th => {
+                        const text = th.textContent.trim().toUpperCase();
+                        return text.includes('CUSTOMER') && text.includes('NOTE');
+                    });
+                    if (customerNoteHeader) {
+                        customerNoteHeader.classList.add('customer-note-hidden');
+                        console.log('✅ Collapsed Customer Note column header:', customerNoteHeader.textContent);
+                    } else {
+                        console.log('⚠️ Customer Note column not found');
+                    }
+                    const headers = Array.from(headerRow.querySelectorAll('th:not([style*="display: none"])'));
+                    const orderColumnIndex = Array.from(headerRow.querySelectorAll('th')).indexOf(orderHeader);
+
+                    // Find SKU header
+                    let skuHeader = table.querySelector('th.sku_width');
+                    if (!skuHeader) {
+                        console.log('🔍 Trying to find SKU header by locale-res...');
+                        skuHeader = table.querySelector('th[locale-res*="SKU"]');
+                    }
+
+                    if (!skuHeader) {
+                        console.warn('⚠️ Could not find SKU header');
+                        return false;
+                    }
+
+                    const skuColumnIndex = Array.from(headerRow.querySelectorAll('th')).indexOf(skuHeader);
+                    
+                    // Get Customer Note column index (header already found above)
+                    const customerNoteColumnIndex = customerNoteHeader ? Array.from(headerRow.querySelectorAll('th')).indexOf(customerNoteHeader) : -1;
+                    
+                    console.log(`🔍 SKU column at index ${skuColumnIndex}, Order# column at index ${orderColumnIndex}, Customer Note at index ${customerNoteColumnIndex}`);
 
                     // Find all table rows
-                    const tbody = document.querySelector('tbody');
+                    const tbody = table.querySelector('tbody');
                     if (!tbody) {
                         console.warn('⚠️ Could not find table body');
                         return false;
@@ -976,47 +1067,35 @@
                         return false;
                     }
 
-                    // Find SKU column index - try multiple methods
-                    let skuHeader = document.querySelector('th[locale-res="Sku"]');
-
-                    // If not found by attribute, try finding by text content
-                    if (!skuHeader) {
-                        console.log('🔍 Trying to find SKU header by text content...');
-                        skuHeader = Array.from(headers).find(th =>
-                            th.textContent.trim().toUpperCase() === 'SKU'
-                        );
-                    }
-
-                    if (!skuHeader) {
-                        console.warn('⚠️ Could not find SKU header');
-                        console.log('📋 Available headers:', Array.from(headers).map(h => h.textContent.trim()));
-                        return false;
-                    }
-
-                    const skuColumnIndex = headers.indexOf(skuHeader);
-                    console.log(`🔍 SKU column is at index ${skuColumnIndex}`);
-
                     let processedCount = 0;
+                    let barcodeCount = 0;
 
                     rows.forEach((row, index) => {
                         const cells = row.querySelectorAll('td');
 
                         if (cells.length <= Math.max(orderColumnIndex, skuColumnIndex)) {
-                            console.warn(`⚠️ Row ${index + 1}: Not enough cells`);
+                            console.warn(`⚠️ Row ${index + 1}: Not enough cells (${cells.length})`);
                             return;
                         }
 
                         const orderCell = cells[orderColumnIndex];
                         const skuCell = cells[skuColumnIndex];
+                        const customerNoteCell = customerNoteColumnIndex >= 0 ? cells[customerNoteColumnIndex] : null;
 
                         // Skip if already processed
-                        if (orderCell.dataset.skuReplaced === 'true') {
-                            console.log(`⏭️ Row ${index + 1}: Already processed, skipping`);
+                        if (skuCell.classList.contains('sku-with-barcode')) {
                             return;
                         }
 
-                        // Get SKU text
-                        const skuText = skuCell.textContent.trim();
+                        // Get SKU text - look for span with class 'sku'
+                        let skuText = '';
+                        const skuSpan = skuCell.querySelector('span.sku');
+                        if (skuSpan) {
+                            skuText = skuSpan.textContent.trim();
+                        } else {
+                            skuText = skuCell.textContent.trim().split('/')[0].trim();
+                        }
+
                         if (!skuText) {
                             console.warn(`⚠️ Row ${index + 1}: SKU cell is empty`);
                             return;
@@ -1024,71 +1103,70 @@
 
                         console.log(`📝 Row ${index + 1}: Processing SKU "${skuText}"`);
 
-                        // Get original Order# text (for reference)
-                        const orderNoText = orderCell.textContent.trim();
-
-                        // Create new content structure
-                        const newContent = document.createElement('div');
-                        newContent.innerHTML = `
-                            <div class="order-no-text" style="display: none;">${orderNoText}</div>
-                            <div class="sku-text">${skuText}</div>
-                            <div class="sku-barcode" style="text-align: center; margin-top: 5px;">
-                                <svg class="barcode-svg"></svg>
-                            </div>
-                        `;
-
-                        // Clear and append new content
-                        orderCell.innerHTML = '';
-                        orderCell.appendChild(newContent);
-
-                        // Add class to mark this cell as modified
-                        orderCell.classList.add('order-cell-modified');
-
-                        // Add class to SKU cell so we can hide it when printing
-                        skuCell.classList.add('sku-replaced');
-
-                        // Generate barcode using Code128 if available
-                        try {
-                            const barcodeSvg = newContent.querySelector('.barcode-svg');
-                            if (typeof JsBarcode !== 'undefined' && barcodeSvg) {
-                                JsBarcode(barcodeSvg, skuText, {
-                                    format: 'CODE128',
-                                    width: 2,
-                                    height: 60,
-                                    displayValue: true,
-                                    fontSize: 14,
-                                    margin: 5
-                                });
-                                console.log(`✅ Row ${index + 1}: Generated barcode for "${skuText}"`);
-                            } else {
-                                // Fallback: just show text if JsBarcode not available
-                                barcodeSvg.textContent = skuText;
-                                console.warn('⚠️ JsBarcode not available, showing SKU as text');
-                            }
-                        } catch (error) {
-                            console.error('❌ Error generating barcode:', error);
+                        // Hide Order# cell and Customer Note cell
+                        orderCell.classList.add('order-no-hidden');
+                        if (customerNoteCell) {
+                            customerNoteCell.classList.add('customer-note-hidden');
                         }
 
-                        orderCell.dataset.skuReplaced = 'true';
+                        // Clear SKU cell content and rebuild
+                        skuCell.innerHTML = '';
+                        skuCell.classList.add('sku-with-barcode');
+
+                        // Add SKU text
+                        const skuTextDiv = document.createElement('div');
+                        skuTextDiv.className = 'sku-text';
+                        skuTextDiv.textContent = skuText;
+                        skuCell.appendChild(skuTextDiv);
+
+                        // Add barcode container with CANVAS (better PDF compatibility than SVG)
+                        const barcodeContainer = document.createElement('div');
+                        barcodeContainer.className = 'sku-barcode-container';
+                        const barcodeCanvas = document.createElement('canvas');
+                        barcodeCanvas.className = 'barcode-canvas';
+                        barcodeContainer.appendChild(barcodeCanvas);
+                        skuCell.appendChild(barcodeContainer);
+
+                        // Generate barcode using JsBarcode if available (Canvas output for PDF compatibility)
+                        try {
+                            if (typeof JsBarcode !== 'undefined') {
+                                JsBarcode(barcodeCanvas, skuText, {
+                                    format: 'CODE128',
+                                    width: 2,
+                                    height: 34,
+                                    displayValue: false,
+                                    fontSize: 9,
+                                    margin: 10,
+                                    background: '#FFFFFF',
+                                    lineColor: '#000000'
+                                });
+                                console.log(`✅ Row ${index + 1}: Generated CODE128 barcode (Canvas) for "${skuText}"`);
+                                barcodeCount++;
+                            } else {
+                                console.warn('⚠️ JsBarcode not available');
+                                barcodeCanvas.remove();
+                                const fallback = document.createElement('div');
+                                fallback.style.cssText = 'font-size:12px; color:#666; margin-top:5px;';
+                                fallback.textContent = `[${skuText}]`;
+                                barcodeContainer.appendChild(fallback);
+                            }
+                        } catch (error) {
+                            console.error(`❌ Error generating barcode for row ${index + 1}:`, error);
+                            barcodeCanvas.remove();
+                            const errorDiv = document.createElement('div');
+                            errorDiv.textContent = 'Error';
+                            barcodeContainer.appendChild(errorDiv);
+                        }
+
                         processedCount++;
                     });
 
                     if (processedCount > 0) {
-                        console.log(`✅ Replaced Order# with SKU in ${processedCount} rows`);
+                        console.log(`✅ Processed ${processedCount} rows, generated ${barcodeCount} barcodes`);
                         return true;
                     }
 
                     return false;
-                }
-
-                // Function to update table header
-                function updateTableHeader() {
-                    const orderHeader = document.querySelector('th[locale-res="OrderNo"]');
-                    if (orderHeader && !orderHeader.dataset.headerUpdated) {
-                        orderHeader.textContent = 'SKU';
-                        orderHeader.dataset.headerUpdated = 'true';
-                        console.log('✅ Updated Order# header to SKU');
-                    }
                 }
 
                 // Inject styles immediately
@@ -1097,41 +1175,44 @@
                 // Check if JsBarcode is available
                 console.log('🔍 Checking for JsBarcode library...');
                 if (typeof JsBarcode !== 'undefined') {
-                    console.log('✅ JsBarcode is available');
+                    console.log('✅ JsBarcode is available, version:', JsBarcode.VERSION || 'unknown');
                 } else {
-                    console.warn('⚠️ JsBarcode is NOT available - barcodes will not render');
-                    console.warn('💡 Add JsBarcode via: <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>');
+                    console.warn('⚠️ JsBarcode is NOT available yet');
                 }
 
-                // Try to process table immediately
+                // Try to process table with delays to ensure DOM is ready
                 setTimeout(() => {
-                    console.log('🔄 Attempting to process table...');
-                    updateTableHeader();
-                    const result = replaceOrderColumnWithSku();
+                    console.log('🔄 First attempt to process table (500ms)...');
+                    const result = addBarcodesToSkuColumn();
                     if (!result) {
-                        console.warn('⚠️ No Order# cells found yet, will try again when table loads');
+                        console.warn('⚠️ No table found yet');
                     }
                 }, 500);
+
+                // Retry after 1 second
+                setTimeout(() => {
+                    console.log('🔄 Second attempt to process table (1000ms)...');
+                    addBarcodesToSkuColumn();
+                }, 1000);
 
                 // Set up MutationObserver to watch for table changes
                 const observer = new MutationObserver((mutations) => {
                     const hasTableChanges = mutations.some(mutation => {
                         return Array.from(mutation.addedNodes).some(node => {
                             return node.nodeType === 1 && (
-                                node.matches?.('table') ||
-                                node.querySelector?.('table') ||
-                                node.matches?.('tr') ||
-                                node.querySelector?.('tr')
+                                node.classList?.contains('picklist_table') ||
+                                node.querySelector?.('table.picklist_table') ||
+                                node.matches?.('tbody tr') ||
+                                node.querySelector?.('tbody tr')
                             );
                         });
                     });
 
                     if (hasTableChanges) {
-                        console.log('🔄 Table changed, updating Order# to SKU');
+                        console.log('🔄 Table data changed, updating barcodes...');
                         setTimeout(() => {
-                            updateTableHeader();
-                            replaceOrderColumnWithSku();
-                        }, 100);
+                            addBarcodesToSkuColumn();
+                        }, 200);
                     }
                 });
 
@@ -1142,10 +1223,10 @@
                 });
 
                 console.log('✅ Manual Picking route configured');
-                console.log('💡 Fields hidden: Pallet Count, Sortable, Started Since, Waiting Since, Customer Note');
-                console.log('💡 Order# column replaced with SKU (with barcode on print)');
+                console.log('💡 Order# column: COLLAPSED (maintains header alignment)');
+                console.log('💡 SKU column: Enhanced with CODE128 barcodes');
             },
-            description: 'Print styling for manual picking page - hides fields and replaces Order# with SKU'
+            description: 'Hide Order# column and add CODE128 barcodes to SKU column for manual picking'
         }
     ];
 
