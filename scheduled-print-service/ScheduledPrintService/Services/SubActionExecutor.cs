@@ -37,6 +37,8 @@ public class SubActionExecutor : ISubActionExecutor
         private string? _lastInterceptedPicklistJson;
         // Last saved PDF path from SaveCapturedHtml action (for PrintSavedPdf action)
         private string? _lastSavedPdfPath;
+        // Last API response body (for SaveJsonToFile action)
+        private string? _lastApiResponse;
 
     public SubActionExecutor(
         ILogger<SubActionExecutor> logger,
@@ -304,6 +306,10 @@ public class SubActionExecutor : ISubActionExecutor
                 await ExecuteDelayAsync(action, ct);
                 break;
 
+            case "savejsontofile":
+                await ExecuteSaveJsonToFileAsync(action, orderId, ct);
+                break;
+
             case "createpicklistbatch":
                 // Batch action is intended to run at batch scope, not per order. Log and ignore here.
                 _logger.LogDebug("Batch action '{ActionName}' encountered in per-order context; skipping.", action.Name);
@@ -547,6 +553,9 @@ public class SubActionExecutor : ISubActionExecutor
         var responseBody = await response.Content.ReadAsStringAsync(ct);
         _logger.LogDebug("Sub-action API response: {Body}", Truncate(responseBody, 100));
 
+        // Store response for SaveJsonToFile action
+        _lastApiResponse = responseBody;
+
         // IMPORTANT: Save API response to browser memory (NOT navigate away)
         // This allows chained actions and future script executions to access the JSON data
         // Use OutputVariableName to determine where to store it (defaults to action type + "Response")
@@ -680,6 +689,63 @@ public class SubActionExecutor : ISubActionExecutor
         var delayMs = action.DelayMilliseconds ?? 1000;
         _logger.LogDebug("Delaying for {Ms}ms", delayMs);
         await Task.Delay(delayMs, ct);
+    }
+
+    private async Task ExecuteSaveJsonToFileAsync(SubAction action, string orderId, CancellationToken ct)
+    {
+        // Get JSON content from last API response
+        var jsonContent = _lastApiResponse;
+
+        if (string.IsNullOrWhiteSpace(jsonContent))
+        {
+            _logger.LogWarning("No API response available to save. Make sure a CallApi action with OutputVariableName ran before this action.");
+            return;
+        }
+
+        // Validate JSON format
+        try
+        {
+            JsonDocument.Parse(jsonContent);
+        }
+        catch (JsonException ex)
+        {
+            _logger.LogError(ex, "API response is not valid JSON. Cannot save to file.");
+            return;
+        }
+
+        // Get output directory from configuration (default to "json-exports")
+        var outputDir = action.OutputVariableName ?? "json-exports";
+
+        // Support custom directory path from configuration
+        // Check if action has a custom output directory configuration
+        if (!string.IsNullOrWhiteSpace(action.Endpoint))
+        {
+            // Reuse Endpoint field for output directory path (when not doing API calls)
+            outputDir = action.Endpoint;
+        }
+
+        // Ensure directory exists
+        var fullDirPath = Path.Combine(AppContext.BaseDirectory, outputDir);
+        if (!Directory.Exists(fullDirPath))
+        {
+            Directory.CreateDirectory(fullDirPath);
+            _logger.LogInformation("Created output directory: {Path}", fullDirPath);
+        }
+
+        // Generate filename with order ID and timestamp
+        var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+        var filename = !string.IsNullOrWhiteSpace(action.RequestBody)
+            ? ReplaceTokens(action.RequestBody, orderId) // Use RequestBody as filename template
+            : $"order-{orderId}-{timestamp}.json"; // Default filename
+
+        var filePath = Path.Combine(fullDirPath, filename);
+
+        // Save JSON to file
+        await File.WriteAllTextAsync(filePath, jsonContent, ct);
+        _logger.LogInformation("Saved JSON response to file: {Path} (size: {Size} bytes)", filePath, jsonContent.Length);
+
+        // Clear the stored response to prevent reuse
+        _lastApiResponse = null;
     }
 
     public async Task ExecuteChainedActionsAsync(SubAction sourceAction, string responseBody, CancellationToken ct = default)
