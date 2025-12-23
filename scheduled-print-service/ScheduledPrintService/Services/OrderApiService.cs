@@ -491,7 +491,14 @@ public class OrderApiService : IOrderApiService
                     // Try as property name first
                     if (element.TryGetProperty(indexStr, out var propElement))
                     {
-                        return propElement.ToString();
+                        var result = propElement.ToString();
+                        _logger.LogDebug("ExtractIdFromJsonPath: Found property '{Prop}' with value '{Value}'", indexStr, result);
+                        return result;
+                    }
+                    else
+                    {
+                        _logger.LogDebug("ExtractIdFromJsonPath: Property '{Prop}' not found in object. Element ValueKind={Kind}, First 3 properties: {Props}",
+                            indexStr, element.ValueKind, string.Join(", ", element.EnumerateObject().Take(3).Select(p => $"{p.Name}={p.Value}")));
                     }
                 }
             }
