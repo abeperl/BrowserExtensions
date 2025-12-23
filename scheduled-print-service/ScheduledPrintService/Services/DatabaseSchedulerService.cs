@@ -15,18 +15,21 @@ public class DatabaseSchedulerService : BackgroundService
     private readonly IDatabaseApiConfigService _dbConfigService;
     private readonly IServiceProvider _serviceProvider;
     private readonly IEmailNotificationService _email;
+    private readonly IPendingOrdersService _pendingOrders;
     private readonly Dictionary<int, DateTime> _nextRunTimes = new();
 
     public DatabaseSchedulerService(
         ILogger<DatabaseSchedulerService> logger,
         IDatabaseApiConfigService dbConfigService,
         IServiceProvider serviceProvider,
-        IEmailNotificationService email)
+        IEmailNotificationService email,
+        IPendingOrdersService pendingOrders)
     {
         _logger = logger;
         _dbConfigService = dbConfigService;
         _serviceProvider = serviceProvider;
         _email = email;
+        _pendingOrders = pendingOrders;
     }
 
     /// <summary>
@@ -168,7 +171,8 @@ public class DatabaseSchedulerService : BackgroundService
 
     private async Task ExecuteScheduleAsync(Schedule schedule, CancellationToken cancellationToken)
     {
-        _logger.LogInformation("Executing {Count} API(s) for schedule '{Name}'", schedule.ApiNumbers.Count, schedule.ScheduleName);
+        _logger.LogInformation("Executing {Count} API(s) for schedule '{Name}' (mode: {Mode})",
+            schedule.ApiNumbers.Count, schedule.ScheduleName, schedule.ProcessingMode);
 
         var successCount = 0;
         var failureCount = 0;
@@ -184,7 +188,14 @@ public class DatabaseSchedulerService : BackgroundService
                     schedule.ApiNumbers.IndexOf(apiNumber) + 1,
                     schedule.ApiNumbers.Count);
 
-                await ExecuteApiAsync(apiNumber, cancellationToken);
+                if (schedule.ProcessingMode.Equals("queued", StringComparison.OrdinalIgnoreCase))
+                {
+                    await ExecuteApiQueuedModeAsync(apiNumber, schedule, cancellationToken);
+                }
+                else
+                {
+                    await ExecuteApiImmediateModeAsync(apiNumber, cancellationToken);
+                }
 
                 successCount++;
                 _logger.LogInformation("API #{ApiNumber} completed successfully", apiNumber);
@@ -203,7 +214,7 @@ public class DatabaseSchedulerService : BackgroundService
             schedule.ScheduleName, successCount, failureCount);
     }
 
-    private async Task ExecuteApiAsync(int apiNumber, CancellationToken cancellationToken)
+    private async Task ExecuteApiImmediateModeAsync(int apiNumber, CancellationToken cancellationToken)
     {
         // Check if API is enabled BEFORE loading full configuration
         if (!_dbConfigService.IsApiEnabled(apiNumber))
@@ -308,5 +319,102 @@ public class DatabaseSchedulerService : BackgroundService
 
         _logger.LogInformation("API #{ApiNumber} batch complete: {Processed} processed, {Skipped} skipped, {Failed} failed",
             apiNumber, processedCount, skippedCount, failedCount);
+    }
+
+    private async Task ExecuteApiQueuedModeAsync(int apiNumber, Schedule schedule, CancellationToken cancellationToken)
+    {
+        // Check if API is enabled BEFORE loading full configuration
+        if (!_dbConfigService.IsApiEnabled(apiNumber))
+        {
+            _logger.LogWarning("API #{ApiNumber} is disabled - skipping", apiNumber);
+            return;
+        }
+
+        // Load API configuration from database
+        var apiConfig = _dbConfigService.LoadApiConfig(apiNumber);
+
+        _logger.LogInformation("API #{ApiNumber} [QUEUED MODE]: Batch size: {BatchSize}, Enqueue new: {EnqueueNew}",
+            apiNumber, schedule.BatchSize, schedule.EnqueueNewOrders);
+
+        // Create scoped services for this API execution
+        using var scope = _serviceProvider.CreateScope();
+        var apiService = scope.ServiceProvider.GetRequiredService<IOrderApiService>();
+        var actionExecutor = scope.ServiceProvider.GetRequiredService<ISubActionExecutor>();
+
+        // Step 1: Enqueue new orders if configured
+        if (schedule.EnqueueNewOrders)
+        {
+            _logger.LogInformation("API #{ApiNumber}: Fetching primary API to enqueue new orders", apiNumber);
+
+            await _pendingOrders.EnqueueNewOrdersAsync(
+                apiNumber,
+                async () =>
+                {
+                    var orders = await apiService.GetOrdersListAsync(apiConfig, cancellationToken);
+                    return orders.Select(o => (o.Id, o.RawData.GetRawText())).ToList();
+                },
+                cancellationToken);
+        }
+
+        // Step 2: Get queue statistics
+        var stats = _pendingOrders.GetStats(apiNumber);
+        _logger.LogInformation("API #{ApiNumber} queue stats: {Pending} pending, {Processing} processing, {Failed} failed, {Processed} total processed",
+            apiNumber, stats.pending, stats.processing, stats.failed, stats.processed);
+
+        if (stats.pending == 0)
+        {
+            _logger.LogInformation("API #{ApiNumber}: No pending orders to process", apiNumber);
+            return;
+        }
+
+        // Step 3: Process batch
+        var batch = _pendingOrders.GetNextBatch(apiNumber, schedule.BatchSize);
+
+        if (batch.Count == 0)
+        {
+            _logger.LogInformation("API #{ApiNumber}: No orders in batch (may be in processing state)", apiNumber);
+            return;
+        }
+
+        _logger.LogInformation("API #{ApiNumber}: Processing batch of {Count} orders", apiNumber, batch.Count);
+
+        var processedCount = 0;
+        var failedCount = 0;
+
+        foreach (var pendingOrder in batch)
+        {
+            if (cancellationToken.IsCancellationRequested) break;
+
+            try
+            {
+                _logger.LogDebug("Processing order: {OrderId}", pendingOrder.OrderId);
+
+                // Parse raw data back into JsonElement
+                var orderData = System.Text.Json.JsonDocument.Parse(pendingOrder.RawData).RootElement;
+
+                // Execute sub-actions for this order
+                await actionExecutor.ExecuteActionsForOrderAsync(pendingOrder.OrderId, orderData, apiConfig, cancellationToken);
+
+                // Mark as processed
+                _pendingOrders.MarkProcessed(apiNumber, pendingOrder.OrderId);
+                processedCount++;
+
+                _logger.LogDebug("Successfully processed order: {OrderId}", pendingOrder.OrderId);
+            }
+            catch (Exception ex)
+            {
+                failedCount++;
+                _logger.LogError(ex, "Failed to process order {OrderId}: {Message}", pendingOrder.OrderId, ex.Message);
+
+                // Mark as failed
+                _pendingOrders.MarkFailed(apiNumber, pendingOrder.OrderId, ex.Message);
+            }
+        }
+
+        // Get updated stats after processing
+        var updatedStats = _pendingOrders.GetStats(apiNumber);
+
+        _logger.LogInformation("API #{ApiNumber} batch complete: {Processed} processed, {Failed} failed. Queue: {Pending} pending, {QueueFailed} failed",
+            apiNumber, processedCount, failedCount, updatedStats.pending, updatedStats.failed);
     }
 }

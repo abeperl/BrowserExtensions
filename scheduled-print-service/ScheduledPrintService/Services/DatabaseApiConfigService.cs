@@ -281,9 +281,13 @@ public class DatabaseApiConfigService : IDatabaseApiConfigService
         using var connection = new SqliteConnection($"Data Source={_dbPath}");
         connection.Open();
 
+        // First ensure the columns exist (backwards compatibility)
+        EnsureScheduleColumnsExist(connection);
+
         var cmd = connection.CreateCommand();
         cmd.CommandText = @"
-            SELECT Id, ScheduleName, CronExpression, IsEnabled, CreatedAt, UpdatedAt
+            SELECT Id, ScheduleName, CronExpression, IsEnabled, CreatedAt, UpdatedAt,
+                   ProcessingMode, BatchSize, EnqueueNewOrders
             FROM Schedule
             WHERE IsEnabled = 1
             ORDER BY Id";
@@ -298,7 +302,10 @@ public class DatabaseApiConfigService : IDatabaseApiConfigService
                 CronExpression = reader.GetString(reader.GetOrdinal("CronExpression")),
                 IsEnabled = reader.GetBoolean(reader.GetOrdinal("IsEnabled")),
                 CreatedAt = DateTime.Parse(reader.GetString(reader.GetOrdinal("CreatedAt"))),
-                UpdatedAt = DateTime.Parse(reader.GetString(reader.GetOrdinal("UpdatedAt")))
+                UpdatedAt = DateTime.Parse(reader.GetString(reader.GetOrdinal("UpdatedAt"))),
+                ProcessingMode = !reader.IsDBNull(reader.GetOrdinal("ProcessingMode")) ? reader.GetString(reader.GetOrdinal("ProcessingMode")) : "immediate",
+                BatchSize = !reader.IsDBNull(reader.GetOrdinal("BatchSize")) ? reader.GetInt32(reader.GetOrdinal("BatchSize")) : 10,
+                EnqueueNewOrders = !reader.IsDBNull(reader.GetOrdinal("EnqueueNewOrders")) ? reader.GetBoolean(reader.GetOrdinal("EnqueueNewOrders")) : true
             };
 
             schedules.Add(schedule);
@@ -306,6 +313,47 @@ public class DatabaseApiConfigService : IDatabaseApiConfigService
 
         _logger.LogInformation("Loaded {Count} enabled schedule(s)", schedules.Count);
         return schedules;
+    }
+
+    private void EnsureScheduleColumnsExist(SqliteConnection connection)
+    {
+        // Check if ProcessingMode column exists
+        var checkCmd = connection.CreateCommand();
+        checkCmd.CommandText = "PRAGMA table_info(Schedule)";
+        var columns = new List<string>();
+
+        using (var reader = checkCmd.ExecuteReader())
+        {
+            while (reader.Read())
+            {
+                columns.Add(reader.GetString(1)); // Column name is in index 1
+            }
+        }
+
+        // Add missing columns if needed
+        if (!columns.Contains("ProcessingMode"))
+        {
+            var alterCmd = connection.CreateCommand();
+            alterCmd.CommandText = "ALTER TABLE Schedule ADD COLUMN ProcessingMode TEXT DEFAULT 'immediate'";
+            alterCmd.ExecuteNonQuery();
+            _logger.LogInformation("Added ProcessingMode column to Schedule table");
+        }
+
+        if (!columns.Contains("BatchSize"))
+        {
+            var alterCmd = connection.CreateCommand();
+            alterCmd.CommandText = "ALTER TABLE Schedule ADD COLUMN BatchSize INTEGER DEFAULT 10";
+            alterCmd.ExecuteNonQuery();
+            _logger.LogInformation("Added BatchSize column to Schedule table");
+        }
+
+        if (!columns.Contains("EnqueueNewOrders"))
+        {
+            var alterCmd = connection.CreateCommand();
+            alterCmd.CommandText = "ALTER TABLE Schedule ADD COLUMN EnqueueNewOrders INTEGER DEFAULT 1";
+            alterCmd.ExecuteNonQuery();
+            _logger.LogInformation("Added EnqueueNewOrders column to Schedule table");
+        }
     }
 
     public List<int> LoadScheduleApiNumbers(int scheduleId)

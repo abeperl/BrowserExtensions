@@ -121,6 +121,9 @@ builder.Services.AddSingleton<IEmailNotificationService, EmailNotificationServic
 // Token renewal service (singleton to maintain state)
 builder.Services.AddSingleton<ITokenRenewalService, TokenRenewalService>();
 
+// Pending orders service for queue-based processing
+builder.Services.AddSingleton<IPendingOrdersService, PendingOrdersService>();
+
 // API services
 builder.Services.AddHttpClient<IOrderApiService, OrderApiService>();
 builder.Services.AddHttpClient<ISubActionExecutor, SubActionExecutor>();
