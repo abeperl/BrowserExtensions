@@ -13,6 +13,7 @@ public interface IDatabaseApiConfigService
     List<int> LoadScheduleApiNumbers(int scheduleId);
     (string? username, string? password, string? token, DateTime? tokenExpiresAt) LoadAuthCredentials(string baseUrl);
     void UpdateAuthToken(string baseUrl, string token, DateTime expiresAt);
+    Dictionary<string, string> LoadCustomHeaders(string baseUrl);
 }
 
 public class DatabaseApiConfigService : IDatabaseApiConfigService
@@ -123,6 +124,13 @@ public class DatabaseApiConfigService : IDatabaseApiConfigService
         {
             config.Cookies["token"] = config.BearerToken;
             _logger.LogDebug("API #{ApiNumber}: Updated cookies with cached token for Puppeteer browser", apiNumber);
+        }
+
+        // Load custom headers from ApiHeaders table (replaces hardcoded header logic)
+        config.CustomHeaders = LoadCustomHeaders(config.BaseUrl);
+        if (config.CustomHeaders.Count > 0)
+        {
+            _logger.LogDebug("API #{ApiNumber}: Loaded {Count} custom header(s) from database", apiNumber, config.CustomHeaders.Count);
         }
 
         if (headersDoc.RootElement.TryGetProperty("WarehouseId", out var warehouseElement))
@@ -451,5 +459,31 @@ public class DatabaseApiConfigService : IDatabaseApiConfigService
         {
             _logger.LogInformation("Updated auth token for BaseUrl={BaseUrl}", baseUrl);
         }
+    }
+
+    public Dictionary<string, string> LoadCustomHeaders(string baseUrl)
+    {
+        var headers = new Dictionary<string, string>();
+
+        using var connection = new SqliteConnection($"Data Source={_dbPath}");
+        connection.Open();
+
+        var cmd = connection.CreateCommand();
+        cmd.CommandText = @"
+            SELECT h.HeaderName, h.HeaderValue
+            FROM ApiHeaders h
+            INNER JOIN ApiAuth a ON h.ApiAuthId = a.Id
+            WHERE a.BaseUrl = @BaseUrl AND h.IsEnabled = 1";
+        cmd.Parameters.AddWithValue("@BaseUrl", baseUrl);
+
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
+        {
+            var headerName = reader.GetString(reader.GetOrdinal("HeaderName"));
+            var headerValue = reader.GetString(reader.GetOrdinal("HeaderValue"));
+            headers[headerName] = headerValue;
+        }
+
+        return headers;
     }
 }

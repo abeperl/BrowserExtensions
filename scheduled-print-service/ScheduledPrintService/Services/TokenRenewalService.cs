@@ -9,7 +9,7 @@ namespace ScheduledPrintService.Services;
 
 public interface ITokenRenewalService
 {
-    Task<bool> RenewTokenAsync(CancellationToken ct = default, bool forceRefresh = false);
+    Task<bool> RenewTokenAsync(string baseUrl, CancellationToken ct = default, bool forceRefresh = false);
     string GetCurrentToken();
     Dictionary<string, string> GetCurrentCookies();
 }
@@ -58,10 +58,10 @@ public class TokenRenewalService : ITokenRenewalService
         }
     }
 
-    public async Task<bool> RenewTokenAsync(CancellationToken ct = default, bool forceRefresh = false)
+    public async Task<bool> RenewTokenAsync(string baseUrl, CancellationToken ct = default, bool forceRefresh = false)
     {
-        // Load credentials from database
-        var (username, password, cachedToken, tokenExpiresAt) = _dbConfigService.LoadAuthCredentials(_config.BaseUrl);
+        // Load credentials from database using the provided baseUrl (not _config.BaseUrl which may be wrong in multi-API scenarios)
+        var (username, password, cachedToken, tokenExpiresAt) = _dbConfigService.LoadAuthCredentials(baseUrl);
 
         // Check if cached token is still valid (but skip cache if forceRefresh is true)
         if (!forceRefresh && !string.IsNullOrEmpty(cachedToken) && tokenExpiresAt.HasValue && tokenExpiresAt.Value > DateTime.UtcNow.AddMinutes(5))
@@ -81,7 +81,7 @@ public class TokenRenewalService : ITokenRenewalService
 
         if (string.IsNullOrEmpty(username) || string.IsNullOrEmpty(password))
         {
-            _logger.LogWarning("Cannot renew token: Username or Password not found in database for BaseUrl={BaseUrl}", _config.BaseUrl);
+            _logger.LogWarning("Cannot renew token: Username or Password not found in database for BaseUrl={BaseUrl}", baseUrl);
             return false;
         }
 
@@ -89,40 +89,70 @@ public class TokenRenewalService : ITokenRenewalService
 
         try
         {
-            var loginPayload = new
+            // Different sites use different payload field names
+            // malchus.3plnext.com uses: UserName, UserPassword
+            // mj.3plnext.com uses: userEmail, Password
+            object loginPayload;
+            if (baseUrl.Contains("malchus.3plnext.com", StringComparison.OrdinalIgnoreCase))
             {
-                userEmail = username,
-                Password = password
-            };
+                loginPayload = new
+                {
+                    UserName = username,
+                    UserPassword = password
+                };
+            }
+            else
+            {
+                loginPayload = new
+                {
+                    userEmail = username,
+                    Password = password
+                };
+            }
 
             var requestContent = new StringContent(
                 JsonSerializer.Serialize(loginPayload),
                 Encoding.UTF8,
                 "application/json");
 
-            using var request = new HttpRequestMessage(HttpMethod.Post, "/api/account/login")
+            // Create request with absolute URL (baseUrl parameter may differ from _httpClient.BaseAddress)
+            var loginUrl = new Uri(new Uri(baseUrl), "/api/account/login");
+            using var request = new HttpRequestMessage(HttpMethod.Post, loginUrl)
             {
                 Content = requestContent
             };
 
             // Add headers as per the curl command
             request.Headers.Clear();
-            request.Headers.Add("Accept", "*/*");
+            request.Headers.Add("Accept", "application/json");
             request.Headers.Add("Accept-Language", "en-US,en;q=0.9");
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", "null");
             request.Headers.Add("Cache-Control", "no-cache");
-            request.Headers.Add("Origin", _config.BaseUrl);
+            request.Headers.Add("Origin", baseUrl);
             request.Headers.Add("Pragma", "no-cache");
-            request.Headers.Add("Referer", $"{_config.BaseUrl}/");
+            request.Headers.Add("Referer", $"{baseUrl}/");
             request.Headers.Add("X-Requested-With", "XMLHttpRequest");
-            request.Headers.Add("WarehouseId", _config.WarehouseId.ToString());
+
+            // Add custom headers from database (replaces hardcoded logic)
+            var customHeaders = _dbConfigService.LoadCustomHeaders(baseUrl);
+            foreach (var header in customHeaders)
+            {
+                request.Headers.Add(header.Key, header.Value);
+            }
+
+            // Fallback: Add WarehouseId if not in custom headers (backward compatibility)
+            if (!customHeaders.ContainsKey("WarehouseId") && _config.WarehouseId > 0)
+            {
+                request.Headers.Add("WarehouseId", _config.WarehouseId.ToString());
+            }
+
             request.Headers.Add("User-Agent",
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36");
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36 Edg/145.0.0.0");
 
             // Add cookie for isRefreshedToken
-            request.Headers.Add("Cookie", "isRefreshedToken=false");
+            request.Headers.Add("Cookie", "isRefreshedToken=false; chargingCard=; paymentinprocess=");
 
-            _logger.LogDebug("Sending login request to /api/account/login");
+            _logger.LogDebug("Sending login request to {LoginUrl}", loginUrl);
 
             var response = await _httpClient.SendAsync(request, ct);
             var responseBody = await response.Content.ReadAsStringAsync(ct);
@@ -144,9 +174,27 @@ public class TokenRenewalService : ITokenRenewalService
             Dictionary<string, string>? newCookies = null;
             string? userDataJson = null;
 
-            // Try to extract token from response
-            // Expected format: {"data": {"token": "...", "userInfo": {...}}}
-            if (root.TryGetProperty("data", out var dataElement))
+            // Try to extract token from response - different APIs use different formats
+
+            // Format 1: malchus.3plnext.com - {"response": {"result": {"token": "...", "userInfo": {...}}}}
+            if (root.TryGetProperty("response", out var responseElement))
+            {
+                if (responseElement.TryGetProperty("result", out var resultElement))
+                {
+                    if (resultElement.TryGetProperty("token", out var tokenElement))
+                    {
+                        newToken = tokenElement.GetString();
+                    }
+
+                    // Extract userInfo if available for cookie
+                    if (resultElement.TryGetProperty("userInfo", out var userInfoElement))
+                    {
+                        userDataJson = userInfoElement.GetRawText();
+                    }
+                }
+            }
+            // Format 2: mj.3plnext.com - {"data": {"token": "...", "userInfo": {...}}}
+            else if (root.TryGetProperty("data", out var dataElement))
             {
                 if (dataElement.TryGetProperty("token", out var tokenElement))
                 {
@@ -159,7 +207,7 @@ public class TokenRenewalService : ITokenRenewalService
                     userDataJson = userInfoElement.GetRawText();
                 }
             }
-            // Fallback: try root level for backward compatibility
+            // Format 3: Fallback - try root level for backward compatibility
             else if (root.TryGetProperty("token", out var tokenElement))
             {
                 newToken = tokenElement.GetString();
@@ -198,7 +246,7 @@ public class TokenRenewalService : ITokenRenewalService
 
             // Save token to database (expires in 24 hours - adjust as needed)
             var expiresAt = DateTime.UtcNow.AddHours(24);
-            _dbConfigService.UpdateAuthToken(_config.BaseUrl, newToken, expiresAt);
+            _dbConfigService.UpdateAuthToken(baseUrl, newToken, expiresAt);
 
             return true;
         }

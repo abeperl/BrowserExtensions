@@ -10,6 +10,10 @@ public class ApiConfig
     public int WarehouseId { get; set; } = 1;
     public Dictionary<string, string> Cookies { get; set; } = new();
 
+    // Custom HTTP headers for this API (loaded from ApiHeaders table)
+    // Replaces hardcoded logic for ClientId, StoreId, WarehouseId, etc.
+    public Dictionary<string, string> CustomHeaders { get; set; } = new();
+
     // Primary API request definition (from database PrimaryApi row)
     public string PrimaryEndpoint { get; set; } = "/api/order/GetOrdersList";
     public string PrimaryHttpMethod { get; set; } = "POST";

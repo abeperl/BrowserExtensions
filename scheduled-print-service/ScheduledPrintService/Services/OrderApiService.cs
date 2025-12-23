@@ -95,7 +95,7 @@ public class OrderApiService : IOrderApiService
         }
     }
 
-    private async Task<HttpResponseMessage> SendWithRetryAsync(Func<HttpRequestMessage> requestFactory, CancellationToken ct)
+    private async Task<HttpResponseMessage> SendWithRetryAsync(Func<HttpRequestMessage> requestFactory, ApiConfig apiConfig, CancellationToken ct)
     {
         var attempts = Math.Max(1, _config.RetryMaxAttempts);
         var baseDelay = Math.Max(50, _config.RetryBaseDelayMs);
@@ -123,7 +123,8 @@ public class OrderApiService : IOrderApiService
                     {
                         _logger.LogInformation("Attempting to renew authentication token (forcing fresh token from server)");
                         // Force refresh to bypass cached token since server rejected it with 401
-                        tokenRenewed = await _tokenRenewal.RenewTokenAsync(ct, forceRefresh: true);
+                        // CRITICAL: Pass the correct baseUrl for this API (apiConfig.BaseUrl, not _config.BaseUrl)
+                        tokenRenewed = await _tokenRenewal.RenewTokenAsync(apiConfig.BaseUrl, ct, forceRefresh: true);
 
                         if (tokenRenewed)
                         {
@@ -194,8 +195,14 @@ public class OrderApiService : IOrderApiService
                 _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiConfig.BearerToken);
             }
 
-            // Add warehouse ID header if present
-            if (apiConfig.WarehouseId > 0)
+            // Add custom headers from database configuration (replaces hardcoded logic)
+            foreach (var header in apiConfig.CustomHeaders)
+            {
+                _httpClient.DefaultRequestHeaders.Add(header.Key, header.Value);
+            }
+
+            // Fallback: Add WarehouseId if present and not in custom headers (backward compatibility)
+            if (apiConfig.WarehouseId > 0 && !apiConfig.CustomHeaders.ContainsKey("WarehouseId"))
             {
                 _httpClient.DefaultRequestHeaders.Add("WarehouseId", apiConfig.WarehouseId.ToString());
             }
@@ -240,7 +247,7 @@ public class OrderApiService : IOrderApiService
                 return req;
             };
 
-            var response = await SendWithRetryAsync(factory, ct);
+            var response = await SendWithRetryAsync(factory, apiConfig, ct);
             response.EnsureSuccessStatusCode();
 
             var responseBody = await response.Content.ReadAsStringAsync(ct);

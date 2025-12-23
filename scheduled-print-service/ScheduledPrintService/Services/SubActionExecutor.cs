@@ -457,7 +457,8 @@ public class SubActionExecutor : ISubActionExecutor
                     {
                         _logger.LogInformation("Attempting to renew authentication token (forcing fresh token from server)");
                         // Force refresh to bypass cached token since server rejected it with 401
-                        tokenRenewed = await _tokenRenewal.RenewTokenAsync(ct, forceRefresh: true);
+                        // CRITICAL: Pass the correct baseUrl for this API (activeConfig.BaseUrl, not _config.BaseUrl)
+                        tokenRenewed = await _tokenRenewal.RenewTokenAsync(activeConfig.BaseUrl, ct, forceRefresh: true);
 
                         if (tokenRenewed)
                         {
@@ -1559,7 +1560,7 @@ public class SubActionExecutor : ISubActionExecutor
                         _logger.LogWarning("Detected redirect to login page - attempting token renewal");
 
                         // Attempt token renewal (force fresh token from server)
-                        bool tokenRenewed = await _tokenRenewal.RenewTokenAsync(ct, forceRefresh: true);
+                        bool tokenRenewed = await _tokenRenewal.RenewTokenAsync(activeConfig.BaseUrl, ct, forceRefresh: true);
 
                         if (tokenRenewed)
                         {
