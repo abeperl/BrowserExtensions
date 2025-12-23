@@ -35,7 +35,7 @@ INSERT INTO PrimaryApi (
     0,     -- IsEnabled = 0 (disabled by default)
     NULL,  -- PrinterName (not needed for JSON export)
     json_object(
-        'IdJsonPath', '[0]',  -- Extract order ID from property "0" (e.g., "14856")
+        'IdJsonPath', '[5]',  -- Extract SaleOrderId from property "5" (e.g., "16712")
         'ChainedArrayJsonPath', 'response.result.data'  -- Response contains array under "response.result.data" property
     )
 );

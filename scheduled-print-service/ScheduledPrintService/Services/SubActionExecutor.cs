@@ -371,6 +371,13 @@ public class SubActionExecutor : ISubActionExecutor
                 {
                     Content = new StringContent(json, Encoding.UTF8, "application/json")
                 };
+
+                // Add global custom headers from API configuration (e.g., ClientId, StoreId)
+                foreach (var header in activeConfig.CustomHeaders)
+                {
+                    req.Headers.TryAddWithoutValidation(header.Key, header.Value);
+                }
+
                 return req;
             };
 
@@ -532,7 +539,14 @@ public class SubActionExecutor : ISubActionExecutor
         {
             var req = new HttpRequestMessage(new HttpMethod(action.Method), endpoint);
 
-            // Add custom headers
+            // Add global custom headers from API configuration (e.g., ClientId, StoreId)
+            var activeConfig = GetActiveConfig();
+            foreach (var header in activeConfig.CustomHeaders)
+            {
+                req.Headers.TryAddWithoutValidation(header.Key, header.Value);
+            }
+
+            // Add action-specific custom headers (can override global headers)
             foreach (var header in action.Headers)
             {
                 req.Headers.TryAddWithoutValidation(header.Key, ReplaceTokens(header.Value, orderId));
@@ -615,7 +629,14 @@ public class SubActionExecutor : ISubActionExecutor
         {
             var req = new HttpRequestMessage(new HttpMethod(action.Method), endpoint);
 
-            // Add custom headers
+            // Add global custom headers from API configuration (e.g., ClientId, StoreId)
+            var activeConfig = GetActiveConfig();
+            foreach (var header in activeConfig.CustomHeaders)
+            {
+                req.Headers.TryAddWithoutValidation(header.Key, header.Value);
+            }
+
+            // Add action-specific custom headers (can override global headers)
             foreach (var header in action.Headers)
             {
                 req.Headers.TryAddWithoutValidation(header.Key, ReplaceTokens(header.Value, orderId));
@@ -2745,7 +2766,14 @@ public class SubActionExecutor : ISubActionExecutor
         {
             var req = new HttpRequestMessage(new HttpMethod(action.Method), endpoint);
 
-            // Add custom headers
+            // Add global custom headers from API configuration (e.g., ClientId, StoreId)
+            var activeConfig = GetActiveConfig();
+            foreach (var header in activeConfig.CustomHeaders)
+            {
+                req.Headers.TryAddWithoutValidation(header.Key, header.Value);
+            }
+
+            // Add action-specific custom headers (can override global headers)
             foreach (var header in action.Headers)
             {
                 req.Headers.TryAddWithoutValidation(header.Key, ReplaceTokensWithContext(header.Value, string.Empty, context));

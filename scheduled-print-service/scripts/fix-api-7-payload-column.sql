@@ -2,7 +2,7 @@
 -- Date: 2025-12-23
 -- Issue 1: The original create-api-7-sales-orders.sql had Params and Payload columns swapped
 -- Issue 2: ChainedArrayJsonPath was set to 'data' but should be 'response.result.data'
--- Issue 3: IdJsonPath was set to '[22]' but should be '[0]' (property "0" contains the order ID)
+-- Issue 3: IdJsonPath was set to '[22]' but should be '[5]' (property "5" contains the SaleOrderId)
 -- This script fixes existing database installations by moving the data to the correct column
 
 -- Move Params data to Payload column for API #7
@@ -27,16 +27,16 @@ SET
 WHERE ApiNumber = 7
   AND json_extract(Configuration, '$.ChainedArrayJsonPath') = 'data';
 
--- Fix the IdJsonPath to use property "0" instead of "[22]"
+-- Fix the IdJsonPath to use property "5" (SaleOrderId) instead of "[22]" or "[0]"
 UPDATE PrimaryApi
 SET
     Configuration = json_object(
-        'IdJsonPath', '[0]',
+        'IdJsonPath', '[5]',
         'ChainedArrayJsonPath', json_extract(Configuration, '$.ChainedArrayJsonPath')
     ),
     UpdatedAt = CURRENT_TIMESTAMP
 WHERE ApiNumber = 7
-  AND json_extract(Configuration, '$.IdJsonPath') = '[22]';
+  AND (json_extract(Configuration, '$.IdJsonPath') = '[22]' OR json_extract(Configuration, '$.IdJsonPath') = '[0]');
 
 -- Verify the fix
 SELECT
