@@ -353,29 +353,37 @@ public class OrderApiService : IOrderApiService
             using var doc = JsonDocument.Parse(jsonResponse);
             var root = doc.RootElement;
 
-            // Support both shapes:
-            // 1) { "data": [ ... ] }
-            // 2) { "data": { "data": [ ... ] } }
-            JsonElement dataElement;
-            if (root.TryGetProperty("data", out var topData))
+            // Navigate to the array based on PrimaryFilterArrayJsonPath configuration
+            // If not configured, default to "data" for backward compatibility
+            JsonElement dataElement = root;
+            var arrayPath = !string.IsNullOrEmpty(config.PrimaryFilterArrayJsonPath)
+                ? config.PrimaryFilterArrayJsonPath
+                : "data";
+
+            if (!string.IsNullOrEmpty(arrayPath))
             {
-                if (topData.ValueKind == JsonValueKind.Array)
+                var parts = arrayPath.Split('.');
+                foreach (var part in parts)
                 {
-                    dataElement = topData;
-                }
-                else if (topData.ValueKind == JsonValueKind.Object && topData.TryGetProperty("data", out var nestedData) && nestedData.ValueKind == JsonValueKind.Array)
-                {
-                    dataElement = nestedData;
-                }
-                else
-                {
-                    _logger.LogWarning("Response 'data' property found but not an array. Kind={Kind}", topData.ValueKind);
-                    return records;
+                    if (dataElement.TryGetProperty(part, out var element))
+                    {
+                        dataElement = element;
+                    }
+                    else
+                    {
+                        _logger.LogWarning("JSON path '{Path}' not found in response. Sample: {Sample}",
+                            arrayPath,
+                            jsonResponse.Length > 300 ? jsonResponse.Substring(0, 300) + "..." : jsonResponse);
+                        return records;
+                    }
                 }
             }
-            else
+
+            if (dataElement.ValueKind != JsonValueKind.Array)
             {
-                _logger.LogWarning("Response does not contain 'data' property at root. Sample: {Sample}",
+                _logger.LogWarning("Expected array at path '{Path}', got {Kind}. Sample: {Sample}",
+                    arrayPath ?? "root",
+                    dataElement.ValueKind,
                     jsonResponse.Length > 300 ? jsonResponse.Substring(0, 300) + "..." : jsonResponse);
                 return records;
             }
@@ -462,14 +470,28 @@ public class OrderApiService : IOrderApiService
             // Simple JSON path parser (supports array indices like "[0]" or property names)
             if (jsonPath.StartsWith("[") && jsonPath.EndsWith("]"))
             {
-                // Array index
+                // Array index or numeric property name
                 var indexStr = jsonPath.Trim('[', ']');
-                if (int.TryParse(indexStr, out var index) && element.ValueKind == JsonValueKind.Array)
+
+                if (element.ValueKind == JsonValueKind.Array)
                 {
-                    var array = element.EnumerateArray().ToList();
-                    if (index < array.Count)
+                    // True array - use numeric index
+                    if (int.TryParse(indexStr, out var index))
                     {
-                        return array[index].ToString();
+                        var array = element.EnumerateArray().ToList();
+                        if (index < array.Count)
+                        {
+                            return array[index].ToString();
+                        }
+                    }
+                }
+                else if (element.ValueKind == JsonValueKind.Object)
+                {
+                    // Object with numeric string properties (e.g., {"0": "value", "22": "id"})
+                    // Try as property name first
+                    if (element.TryGetProperty(indexStr, out var propElement))
+                    {
+                        return propElement.ToString();
                     }
                 }
             }

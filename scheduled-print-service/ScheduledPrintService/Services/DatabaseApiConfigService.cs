@@ -148,10 +148,18 @@ public class DatabaseApiConfigService : IDatabaseApiConfigService
             }
         }
 
-        // Parse params JSON into DefaultRequest
-        var paramsJson = reader.GetString(reader.GetOrdinal("Params"));
-        var paramsDoc = JsonDocument.Parse(paramsJson);
-        config.DefaultRequest = JsonSerializer.Deserialize<OrdersListRequest>(paramsJson) ?? new OrdersListRequest();
+        // Parse params JSON into DefaultRequest (if provided)
+        var paramsOrdinal = reader.GetOrdinal("Params");
+        if (!reader.IsDBNull(paramsOrdinal))
+        {
+            var paramsJson = reader.GetString(paramsOrdinal);
+            config.DefaultRequest = JsonSerializer.Deserialize<OrdersListRequest>(paramsJson) ?? new OrdersListRequest();
+        }
+        else
+        {
+            // No Params provided, use default empty request (will be ignored if Payload is provided)
+            config.DefaultRequest = new OrdersListRequest();
+        }
 
         // Optional raw payload for primary request (passthrough)
         if (!reader.IsDBNull(reader.GetOrdinal("Payload")))

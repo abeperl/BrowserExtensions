@@ -11,8 +11,8 @@ INSERT INTO PrimaryApi (
     Endpoint,
     HttpMethod,
     Headers,
-    Params,
     Payload,
+    Params,
     IsEnabled,
     PrinterName,
     Configuration
@@ -29,14 +29,14 @@ INSERT INTO PrimaryApi (
         'StoreId', '1',
         'WarehouseId', '1'
     ),
-    -- Payload for GetSaleOrderList POST request
+    -- Payload for GetSaleOrderList POST request (raw JSON, bypasses DefaultRequest)
     json('{"draw":1,"columns":[{"data":0,"name":"","searchable":true,"orderable":true,"search":{"value":"","regex":false}},{"data":[2],"name":"","searchable":true,"orderable":true,"search":{"value":"","regex":false}},{"data":[24],"name":"","searchable":true,"orderable":true,"search":{"value":"","regex":false}},{"data":[25],"name":"","searchable":true,"orderable":true,"search":{"value":"","regex":false}},{"data":[22],"name":"","searchable":true,"orderable":true,"search":{"value":"","regex":false}},{"data":[1],"name":"","searchable":true,"orderable":true,"search":{"value":"","regex":false}},{"data":[21],"name":"","searchable":true,"orderable":true,"search":{"value":"","regex":false}},{"data":[13],"name":"","searchable":true,"orderable":true,"search":{"value":"","regex":false}},{"data":[20],"name":"","searchable":true,"orderable":true,"search":{"value":"","regex":false}},{"data":[27],"name":"","searchable":true,"orderable":true,"search":{"value":"","regex":false}},{"data":[17],"name":"","searchable":true,"orderable":true,"search":{"value":"","regex":false}},{"data":[16],"name":"","searchable":true,"orderable":true,"search":{"value":"","regex":false}},{"data":12,"name":"","searchable":true,"orderable":false,"search":{"value":"","regex":false}}],"order":[{"column":5,"dir":"asc"}],"start":0,"length":50,"search":{"value":"","regex":false},"dateFrom":null,"dateTo":null,"status":1,"OrderStatusId":-1,"orderType":-1,"CustomStatusId":"0","StoreId":"1"}'),
-    NULL,  -- Use Payload instead of Params
+    NULL,  -- Params (not used when Payload is provided)
     0,     -- IsEnabled = 0 (disabled by default)
     NULL,  -- PrinterName (not needed for JSON export)
     json_object(
-        'IdJsonPath', '[22]',  -- Extract order ID from response array at index 22
-        'ChainedArrayJsonPath', 'data'  -- Response contains array under "data" property
+        'IdJsonPath', '[0]',  -- Extract order ID from property "0" (e.g., "14856")
+        'ChainedArrayJsonPath', 'response.result.data'  -- Response contains array under "response.result.data" property
     )
 );
 
