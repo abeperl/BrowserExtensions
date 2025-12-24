@@ -35,6 +35,11 @@ public interface IPendingOrdersService
     (int pending, int processing, int failed, int processed) GetStats(int apiNumber);
 
     /// <summary>
+    /// Check if any records exist for an API (regardless of status)
+    /// </summary>
+    bool HasAnyRecords(int apiNumber);
+
+    /// <summary>
     /// Clear all pending/failed orders for an API (use with caution)
     /// </summary>
     void ClearQueue(int apiNumber);
@@ -269,6 +274,23 @@ public class PendingOrdersService : IPendingOrdersService
         }
 
         return (0, 0, 0, 0);
+    }
+
+    public bool HasAnyRecords(int apiNumber)
+    {
+        using var connection = new SqliteConnection($"Data Source={_dbPath}");
+        connection.Open();
+
+        var cmd = connection.CreateCommand();
+        cmd.CommandText = @"
+            SELECT COUNT(*)
+            FROM PendingOrders
+            WHERE ApiNumber = @ApiNumber
+        ";
+        cmd.Parameters.AddWithValue("@ApiNumber", apiNumber);
+
+        var count = (long)(cmd.ExecuteScalar() ?? 0L);
+        return count > 0;
     }
 
     public void ClearQueue(int apiNumber)

@@ -349,19 +349,30 @@ public class DatabaseSchedulerService : BackgroundService
         var apiService = scope.ServiceProvider.GetRequiredService<IOrderApiService>();
         var actionExecutor = scope.ServiceProvider.GetRequiredService<ISubActionExecutor>();
 
-        // Step 1: Enqueue new orders if configured
+        // Step 1: Enqueue new orders if configured AND no records exist yet
+        // Once any records exist (regardless of status), we skip the primary API call
+        // and only process sub-actions from the existing queue
         if (schedule.EnqueueNewOrders)
         {
-            _logger.LogInformation("API #{ApiNumber}: Fetching primary API to enqueue new orders", apiNumber);
+            var hasRecords = _pendingOrders.HasAnyRecords(apiNumber);
 
-            await _pendingOrders.EnqueueNewOrdersAsync(
-                apiNumber,
-                async () =>
-                {
-                    var orders = await apiService.GetOrdersListAsync(apiConfig, cancellationToken);
-                    return orders.Select(o => (o.Id, o.RawData.GetRawText())).ToList();
-                },
-                cancellationToken);
+            if (!hasRecords)
+            {
+                _logger.LogInformation("API #{ApiNumber}: No existing records found - fetching primary API to enqueue new orders", apiNumber);
+
+                await _pendingOrders.EnqueueNewOrdersAsync(
+                    apiNumber,
+                    async () =>
+                    {
+                        var orders = await apiService.GetOrdersListAsync(apiConfig, cancellationToken);
+                        return orders.Select(o => (o.Id, o.RawData.GetRawText())).ToList();
+                    },
+                    cancellationToken);
+            }
+            else
+            {
+                _logger.LogInformation("API #{ApiNumber}: Existing records found in queue - skipping primary API fetch, processing sub-actions only", apiNumber);
+            }
         }
 
         // Step 2: Get queue statistics
