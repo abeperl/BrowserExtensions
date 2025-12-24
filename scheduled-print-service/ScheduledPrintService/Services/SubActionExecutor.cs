@@ -10,8 +10,8 @@ namespace ScheduledPrintService.Services;
 
 public interface ISubActionExecutor
 {
-    Task ExecuteActionsForOrderAsync(string orderId, JsonElement orderData, CancellationToken ct = default);
-    Task ExecuteActionsForOrderAsync(string orderId, JsonElement orderData, ApiConfig apiConfig, CancellationToken ct = default);
+    Task<bool> ExecuteActionsForOrderAsync(string orderId, JsonElement orderData, CancellationToken ct = default);
+    Task<bool> ExecuteActionsForOrderAsync(string orderId, JsonElement orderData, ApiConfig apiConfig, CancellationToken ct = default);
     Task ExecuteBatchCreatePicklistAsync(SubAction action, IEnumerable<string> orderIds, CancellationToken ct = default);
     Task ExecuteBatchCreatePicklistAsync(SubAction action, IEnumerable<string> orderIds, ApiConfig apiConfig, CancellationToken ct = default);
     Task ExecuteChainedActionsAsync(SubAction sourceAction, string responseBody, CancellationToken ct = default);
@@ -152,6 +152,18 @@ public class SubActionExecutor : ISubActionExecutor
         _httpClient.DefaultRequestHeaders.Add("User-Agent",
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36");
 
+        // Add custom headers from config (e.g., ClientId, StoreId)
+        foreach (var header in config.CustomHeaders)
+        {
+            if (header.Key.Equals("Authorization", StringComparison.OrdinalIgnoreCase) || 
+                header.Key.Equals("Cookie", StringComparison.OrdinalIgnoreCase))
+            {
+                // Skip Authorization and Cookie - handled separately
+                continue;
+            }
+            _httpClient.DefaultRequestHeaders.TryAddWithoutValidation(header.Key, header.Value);
+        }
+
         // Add cookies
         if (config.Cookies.Count > 0)
         {
@@ -160,7 +172,7 @@ public class SubActionExecutor : ISubActionExecutor
         }
     }
 
-    public async Task ExecuteActionsForOrderAsync(string orderId, JsonElement orderData, CancellationToken ct = default)
+    public async Task<bool> ExecuteActionsForOrderAsync(string orderId, JsonElement orderData, CancellationToken ct = default)
     {
         var activeConfig = GetActiveConfig();
         _logger.LogDebug("Executing {Count} sub-actions for order {OrderId}", activeConfig.SubActions.Count, orderId);
@@ -169,6 +181,9 @@ public class SubActionExecutor : ISubActionExecutor
         // This is done fresh for each order to ensure current order data is used
         var fieldValuesDictionary = ExtractFieldValuesFromOrderData(orderData, activeConfig);
         _logger.LogDebug("Extracted {Count} fields for order {OrderId} placeholder replacement", fieldValuesDictionary.Count, orderId);
+
+        var successCount = 0;
+        var failureCount = 0;
 
         for (int i = 0; i < activeConfig.SubActions.Count; i++)
         {
@@ -214,11 +229,13 @@ public class SubActionExecutor : ISubActionExecutor
 
                 await ExecuteActionAsync(action, orderId, orderData, fieldValuesDictionary, ct);
 
+                successCount++;
                 _logger.LogInformation("[{Num}/{Total}] {ActionName} completed successfully",
                     actionNum, activeConfig.SubActions.Count, action.Name);
             }
             catch (Exception ex)
             {
+                failureCount++;
                 _logger.LogError(ex, "[{Num}/{Total}] {ActionName} failed: {Message}",
                     actionNum, activeConfig.SubActions.Count, action.Name, ex.Message);
 
@@ -232,10 +249,13 @@ public class SubActionExecutor : ISubActionExecutor
             }
         }
 
-        _logger.LogDebug("All sub-actions completed for order {OrderId}", orderId);
+        _logger.LogDebug("All sub-actions completed for order {OrderId}: {Success} succeeded, {Failed} failed",
+            orderId, successCount, failureCount);
+        
+        return successCount > 0;
     }
 
-    public async Task ExecuteActionsForOrderAsync(string orderId, JsonElement orderData, ApiConfig apiConfig, CancellationToken ct = default)
+    public async Task<bool> ExecuteActionsForOrderAsync(string orderId, JsonElement orderData, ApiConfig apiConfig, CancellationToken ct = default)
     {
         // Store previous temp config (for nested calls)
         var previousTemp = _tempApiConfig;
@@ -248,7 +268,7 @@ public class SubActionExecutor : ISubActionExecutor
             UpdateHttpClientForApiConfig(apiConfig);
 
             // Execute actions (will use GetActiveConfig() which returns apiConfig)
-            await ExecuteActionsForOrderAsync(orderId, orderData, ct);
+            return await ExecuteActionsForOrderAsync(orderId, orderData, ct);
         }
         finally
         {

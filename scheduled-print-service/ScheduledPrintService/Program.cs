@@ -142,6 +142,67 @@ builder.Services.AddWindowsService(options =>
 
 var host = builder.Build();
 
+// If manual mode with a specific API number, execute that API immediately and exit
+if (manualMode && apiNumber.HasValue)
+{
+    using var scope = host.Services.CreateScope();
+    var dbService = scope.ServiceProvider.GetRequiredService<IDatabaseApiConfigService>();
+    var apiService = scope.ServiceProvider.GetRequiredService<IOrderApiService>();
+    var actionExecutor = scope.ServiceProvider.GetRequiredService<ISubActionExecutor>();
+
+    var apiNum = apiNumber.Value;
+    Log.Information("Manual mode: Executing API #{ApiNumber} now", apiNum);
+
+    // Load API configuration
+    var apiConfig = dbService.LoadApiConfig(apiNum);
+
+    Log.Information("API #{ApiNumber} loaded: {SubActions} sub-actions configured ({Enabled} enabled)",
+        apiNum,
+        apiConfig.SubActions.Count,
+        apiConfig.SubActions.Count(a => a.Enabled));
+
+    // Fetch orders from API
+    var orders = await apiService.GetOrdersListAsync(apiConfig);
+    if (orders.Count == 0)
+    {
+        Log.Information("API #{ApiNumber} returned no orders", apiNum);
+    }
+    else
+    {
+        Log.Information("API #{ApiNumber} returned {Count} orders", apiNum, orders.Count);
+        var processed = 0;
+        var failed = 0;
+        foreach (var order in orders)
+        {
+            try
+            {
+                Log.Debug("Processing order: {OrderId}", order.Id);
+                var anyActionSucceeded = await actionExecutor.ExecuteActionsForOrderAsync(order.Id, order.RawData, apiConfig);
+                if (anyActionSucceeded)
+                {
+                    processed++;
+                    Log.Debug("Successfully processed order: {OrderId}", order.Id);
+                }
+                else
+                {
+                    failed++;
+                    Log.Warning("Order {OrderId} not marked as processed: no actions succeeded", order.Id);
+                }
+            }
+            catch (Exception ex)
+            {
+                failed++;
+                Log.Error(ex, "Failed to process order {OrderId}: {Message}", order.Id, ex.Message);
+            }
+        }
+        Log.Information("Manual mode complete for API #{ApiNumber}: {Processed} processed, {Failed} failed",
+            apiNum, processed, failed);
+    }
+
+    // Exit without starting hosted services
+    return;
+}
+
 if (OperatingSystem.IsWindows())
 {
     host.Run();

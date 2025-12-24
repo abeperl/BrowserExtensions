@@ -301,13 +301,21 @@ public class DatabaseSchedulerService : BackgroundService
                 _logger.LogDebug("Processing order: {OrderId}", order.Id);
 
                 // Execute sub-actions for this order
-                await actionExecutor.ExecuteActionsForOrderAsync(order.Id, order.RawData, apiConfig, cancellationToken);
+                var anyActionSucceeded = await actionExecutor.ExecuteActionsForOrderAsync(order.Id, order.RawData, apiConfig, cancellationToken);
 
-                // Mark as processed
-                tracker.MarkProcessed(order.Id);
-                processedCount++;
-
-                _logger.LogDebug("Successfully processed order: {OrderId}", order.Id);
+                if (anyActionSucceeded)
+                {
+                    // Mark as processed only if at least one action succeeded
+                    tracker.MarkProcessed(order.Id);
+                    processedCount++;
+                    _logger.LogDebug("Successfully processed order: {OrderId}", order.Id);
+                }
+                else
+                {
+                    // All actions failed - don't mark as processed, increment failure count
+                    failedCount++;
+                    _logger.LogWarning("Order {OrderId} not marked as processed: no actions succeeded", order.Id);
+                }
             }
             catch (Exception ex)
             {
@@ -393,13 +401,22 @@ public class DatabaseSchedulerService : BackgroundService
                 var orderData = System.Text.Json.JsonDocument.Parse(pendingOrder.RawData).RootElement;
 
                 // Execute sub-actions for this order
-                await actionExecutor.ExecuteActionsForOrderAsync(pendingOrder.OrderId, orderData, apiConfig, cancellationToken);
+                var anyActionSucceeded = await actionExecutor.ExecuteActionsForOrderAsync(pendingOrder.OrderId, orderData, apiConfig, cancellationToken);
 
-                // Mark as processed
-                _pendingOrders.MarkProcessed(apiNumber, pendingOrder.OrderId);
-                processedCount++;
-
-                _logger.LogDebug("Successfully processed order: {OrderId}", pendingOrder.OrderId);
+                if (anyActionSucceeded)
+                {
+                    // Mark as processed only if at least one action succeeded
+                    _pendingOrders.MarkProcessed(apiNumber, pendingOrder.OrderId);
+                    processedCount++;
+                    _logger.LogDebug("Successfully processed order: {OrderId}", pendingOrder.OrderId);
+                }
+                else
+                {
+                    // All actions failed - mark as failed
+                    _pendingOrders.MarkFailed(apiNumber, pendingOrder.OrderId, "All actions failed or were skipped");
+                    failedCount++;
+                    _logger.LogWarning("Order {OrderId} marked as failed: no actions succeeded", pendingOrder.OrderId);
+                }
             }
             catch (Exception ex)
             {

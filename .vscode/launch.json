@@ -25,12 +25,12 @@
       "justMyCode": false
     },
     {
-      "name": "Debug Scheduled Print Service (API #2 - Picklist)",
+      "name": "Debug Scheduled Print Service (API #7)",
       "type": "coreclr",
       "request": "launch",
       "preLaunchTask": "build-scheduled-print-service",
       "program": "${workspaceFolder}/scheduled-print-service/ScheduledPrintService/bin/Debug/net8.0-windows10.0.19041.0/ScheduledPrintService.dll",
-      "args": ["--manual", "--api-number", "2"],
+      "args": ["--manual", "--api-number", "7"],
       "cwd": "${workspaceFolder}/scheduled-print-service/ScheduledPrintService",
       "console": "internalConsole",
       "stopAtEntry": false,
