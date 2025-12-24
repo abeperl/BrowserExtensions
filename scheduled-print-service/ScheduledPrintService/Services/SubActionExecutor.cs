@@ -345,8 +345,13 @@ public class SubActionExecutor : ISubActionExecutor
     {
         var activeConfig = GetActiveConfig();
 
-        // Prepare endpoint
+        // Prepare endpoint and prepend BaseUrl if relative
         var endpoint = action.Endpoint;
+        if (!endpoint.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
+            !endpoint.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+        {
+            endpoint = activeConfig.BaseUrl.TrimEnd('/') + "/" + endpoint.TrimStart('/');
+        }
 
         // Convert order IDs to integers as required by API payload
         var idList = new List<int>();
@@ -553,6 +558,15 @@ public class SubActionExecutor : ISubActionExecutor
     private async Task ExecuteCallApiAsync(SubAction action, string orderId, CancellationToken ct)
     {
         var endpoint = ReplaceTokens(action.Endpoint, orderId);
+
+        // If endpoint is relative, prepend BaseUrl from active config to avoid HttpClient.BaseAddress limitation
+        var activeConfig = GetActiveConfig();
+        if (!endpoint.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
+            !endpoint.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+        {
+            endpoint = activeConfig.BaseUrl.TrimEnd('/') + "/" + endpoint.TrimStart('/');
+        }
+
         _logger.LogDebug("Calling API: {Method} {Endpoint}", action.Method, endpoint);
 
         Func<HttpRequestMessage> factory = () =>
@@ -643,6 +657,15 @@ public class SubActionExecutor : ISubActionExecutor
     private async Task ExecuteGetHtmlAndPrintAsync(SubAction action, string orderId, CancellationToken ct)
     {
         var endpoint = ReplaceTokens(action.Endpoint, orderId);
+
+        // If endpoint is relative, prepend BaseUrl from active config to avoid HttpClient.BaseAddress limitation
+        var activeConfig = GetActiveConfig();
+        if (!endpoint.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
+            !endpoint.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+        {
+            endpoint = activeConfig.BaseUrl.TrimEnd('/') + "/" + endpoint.TrimStart('/');
+        }
+
         _logger.LogDebug("Fetching HTML from: {Method} {Endpoint}", action.Method, endpoint);
 
         Func<HttpRequestMessage> factory = () =>
@@ -650,7 +673,7 @@ public class SubActionExecutor : ISubActionExecutor
             var req = new HttpRequestMessage(new HttpMethod(action.Method), endpoint);
 
             // Add global custom headers from API configuration (e.g., ClientId, StoreId)
-            var activeConfig = GetActiveConfig();
+            // activeConfig already retrieved above
             foreach (var header in activeConfig.CustomHeaders)
             {
                 req.Headers.TryAddWithoutValidation(header.Key, header.Value);
@@ -2780,6 +2803,15 @@ public class SubActionExecutor : ISubActionExecutor
     private async Task ExecuteCallApiWithContextAsync(SubAction action, Dictionary<string, object> context, CancellationToken ct)
     {
         var endpoint = ReplaceTokensWithContext(action.Endpoint, string.Empty, context);
+
+        // If endpoint is relative, prepend BaseUrl from active config to avoid HttpClient.BaseAddress limitation
+        var activeConfig = GetActiveConfig();
+        if (!endpoint.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
+            !endpoint.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+        {
+            endpoint = activeConfig.BaseUrl.TrimEnd('/') + "/" + endpoint.TrimStart('/');
+        }
+
         _logger.LogDebug("Calling API with context: {Method} {Endpoint}", action.Method, endpoint);
 
         Func<HttpRequestMessage> factory = () =>
@@ -2787,7 +2819,7 @@ public class SubActionExecutor : ISubActionExecutor
             var req = new HttpRequestMessage(new HttpMethod(action.Method), endpoint);
 
             // Add global custom headers from API configuration (e.g., ClientId, StoreId)
-            var activeConfig = GetActiveConfig();
+            // activeConfig already retrieved above
             foreach (var header in activeConfig.CustomHeaders)
             {
                 req.Headers.TryAddWithoutValidation(header.Key, header.Value);
