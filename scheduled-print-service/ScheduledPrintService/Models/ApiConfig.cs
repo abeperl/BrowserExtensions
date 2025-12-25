@@ -192,6 +192,10 @@ public class SubAction
     // HTML injection configurations for NavigateOnly actions
     // Injects dynamic HTML into the page with placeholder replacement
     public List<HtmlInjection>? HtmlInjections { get; set; }
+
+    // Store name for SaveJsonToFile action - appends store name to output directory path
+    // e.g., if StoreName = "Boro Park", output becomes: basePath/sales-orders/Boro Park/order-123.json
+    public string? StoreName { get; set; }
 }
 
 /// <summary>

@@ -789,8 +789,20 @@ public class SubActionExecutor : ISubActionExecutor
             outputDir = action.Endpoint;
         }
 
+        // Use DataPaths.DataRoot as the base path (defaults to C:\ProgramData\ScheduledPrintService)
+        // Then append "out" subdirectory for output files
+        var basePath = Path.Combine(DataPaths.DataRoot, "out");
+        var fullDirPath = Path.Combine(basePath, outputDir);
+
+        // If StoreName is specified, append it to the output directory path
+        // e.g., basePath/sales-orders/Boro Park/
+        if (!string.IsNullOrWhiteSpace(action.StoreName))
+        {
+            fullDirPath = Path.Combine(fullDirPath, action.StoreName);
+            _logger.LogDebug("Using store-specific output directory: {StoreName}", action.StoreName);
+        }
+
         // Ensure directory exists
-        var fullDirPath = Path.Combine(AppContext.BaseDirectory, outputDir);
         if (!Directory.Exists(fullDirPath))
         {
             Directory.CreateDirectory(fullDirPath);
