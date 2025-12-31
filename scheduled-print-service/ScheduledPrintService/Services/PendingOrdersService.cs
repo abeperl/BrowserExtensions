@@ -40,6 +40,16 @@ public interface IPendingOrdersService
     bool HasAnyRecords(int apiNumber);
 
     /// <summary>
+    /// Check if primary API should be fetched (no records exist OR it's a new day since last fetch)
+    /// </summary>
+    bool ShouldFetchPrimaryApi(int apiNumber);
+
+    /// <summary>
+    /// Update the LastFetchedAt timestamp for an API after successful fetch
+    /// </summary>
+    void UpdateLastFetchedAt(int apiNumber);
+
+    /// <summary>
     /// Clear all pending/failed orders for an API (use with caution)
     /// </summary>
     void ClearQueue(int apiNumber);
@@ -65,6 +75,7 @@ public class PendingOrdersService : IPendingOrdersService
         _dbPath = Path.Combine(AppContext.BaseDirectory, "api_config.db");
 
         EnsureTableExists();
+        EnsureLastFetchedAtColumn();
     }
 
     private void EnsureTableExists()
@@ -92,6 +103,38 @@ public class PendingOrdersService : IPendingOrdersService
             CREATE INDEX IF NOT EXISTS idx_pendingorders_enqueueat ON PendingOrders(ApiNumber, EnqueuedAt);
         ";
         cmd.ExecuteNonQuery();
+    }
+
+    private void EnsureLastFetchedAtColumn()
+    {
+        using var connection = new SqliteConnection($"Data Source={_dbPath}");
+        connection.Open();
+
+        // Check if column exists
+        var checkCmd = connection.CreateCommand();
+        checkCmd.CommandText = "PRAGMA table_info(PrimaryApi)";
+
+        var hasColumn = false;
+        using (var reader = checkCmd.ExecuteReader())
+        {
+            while (reader.Read())
+            {
+                var columnName = reader.GetString(1);
+                if (columnName.Equals("LastFetchedAt", StringComparison.OrdinalIgnoreCase))
+                {
+                    hasColumn = true;
+                    break;
+                }
+            }
+        }
+
+        if (!hasColumn)
+        {
+            _logger.LogInformation("Adding LastFetchedAt column to PrimaryApi table");
+            var alterCmd = connection.CreateCommand();
+            alterCmd.CommandText = "ALTER TABLE PrimaryApi ADD COLUMN LastFetchedAt TEXT";
+            alterCmd.ExecuteNonQuery();
+        }
     }
 
     public async Task EnqueueNewOrdersAsync(int apiNumber, Func<Task<List<(string orderId, string rawData)>>> fetchOrdersFunc, CancellationToken ct = default)
@@ -309,5 +352,80 @@ public class PendingOrdersService : IPendingOrdersService
         var rowsAffected = cmd.ExecuteNonQuery();
 
         _logger.LogWarning("API #{ApiNumber}: Cleared {Count} pending/failed orders from queue", apiNumber, rowsAffected);
+    }
+
+    public bool ShouldFetchPrimaryApi(int apiNumber)
+    {
+        // Fetch if: no records exist OR it's a new day since last fetch
+        var hasRecords = HasAnyRecords(apiNumber);
+
+        if (!hasRecords)
+        {
+            _logger.LogDebug("API #{ApiNumber}: No records exist - should fetch primary API", apiNumber);
+            return true;
+        }
+
+        // Check if it's a new day since last fetch
+        using var connection = new SqliteConnection($"Data Source={_dbPath}");
+        connection.Open();
+
+        var cmd = connection.CreateCommand();
+        cmd.CommandText = @"
+            SELECT LastFetchedAt
+            FROM PrimaryApi
+            WHERE ApiNumber = @ApiNumber
+        ";
+        cmd.Parameters.AddWithValue("@ApiNumber", apiNumber);
+
+        var result = cmd.ExecuteScalar();
+
+        if (result == null || result == DBNull.Value)
+        {
+            // Never fetched before
+            _logger.LogDebug("API #{ApiNumber}: LastFetchedAt is null - should fetch primary API", apiNumber);
+            return true;
+        }
+
+        var lastFetchedAtStr = result.ToString();
+        if (string.IsNullOrEmpty(lastFetchedAtStr) || !DateTime.TryParse(lastFetchedAtStr, out var lastFetchedAt))
+        {
+            // Invalid date - fetch
+            _logger.LogDebug("API #{ApiNumber}: LastFetchedAt is invalid - should fetch primary API", apiNumber);
+            return true;
+        }
+
+        // Check if it's a new day (compare dates only, not times)
+        var today = DateTime.Today;
+        var lastFetchDate = lastFetchedAt.Date;
+
+        if (today > lastFetchDate)
+        {
+            _logger.LogInformation("API #{ApiNumber}: New day detected (last fetch: {LastFetch}) - should fetch primary API for updates",
+                apiNumber, lastFetchDate.ToString("yyyy-MM-dd"));
+            return true;
+        }
+
+        _logger.LogDebug("API #{ApiNumber}: Already fetched today ({LastFetch}) - skip primary API fetch",
+            apiNumber, lastFetchedAt.ToString("yyyy-MM-dd HH:mm:ss"));
+        return false;
+    }
+
+    public void UpdateLastFetchedAt(int apiNumber)
+    {
+        using var connection = new SqliteConnection($"Data Source={_dbPath}");
+        connection.Open();
+
+        var cmd = connection.CreateCommand();
+        cmd.CommandText = @"
+            UPDATE PrimaryApi
+            SET LastFetchedAt = @LastFetchedAt,
+                UpdatedAt = @LastFetchedAt
+            WHERE ApiNumber = @ApiNumber
+        ";
+        cmd.Parameters.AddWithValue("@ApiNumber", apiNumber);
+        cmd.Parameters.AddWithValue("@LastFetchedAt", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+        cmd.ExecuteNonQuery();
+
+        _logger.LogDebug("API #{ApiNumber}: Updated LastFetchedAt timestamp", apiNumber);
     }
 }

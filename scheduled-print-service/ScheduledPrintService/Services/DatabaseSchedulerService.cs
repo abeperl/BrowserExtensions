@@ -349,16 +349,15 @@ public class DatabaseSchedulerService : BackgroundService
         var apiService = scope.ServiceProvider.GetRequiredService<IOrderApiService>();
         var actionExecutor = scope.ServiceProvider.GetRequiredService<ISubActionExecutor>();
 
-        // Step 1: Enqueue new orders if configured AND no records exist yet
-        // Once any records exist (regardless of status), we skip the primary API call
-        // and only process sub-actions from the existing queue
+        // Step 1: Enqueue new orders if configured
+        // Fetch primary API if: no records exist OR it's a new day (to pick up any updates)
         if (schedule.EnqueueNewOrders)
         {
-            var hasRecords = _pendingOrders.HasAnyRecords(apiNumber);
+            var shouldFetch = _pendingOrders.ShouldFetchPrimaryApi(apiNumber);
 
-            if (!hasRecords)
+            if (shouldFetch)
             {
-                _logger.LogInformation("API #{ApiNumber}: No existing records found - fetching primary API to enqueue new orders", apiNumber);
+                _logger.LogInformation("API #{ApiNumber}: Fetching primary API to enqueue new orders", apiNumber);
 
                 await _pendingOrders.EnqueueNewOrdersAsync(
                     apiNumber,
@@ -368,10 +367,13 @@ public class DatabaseSchedulerService : BackgroundService
                         return orders.Select(o => (o.Id, o.RawData.GetRawText())).ToList();
                     },
                     cancellationToken);
+
+                // Update the LastFetchedAt timestamp after successful fetch
+                _pendingOrders.UpdateLastFetchedAt(apiNumber);
             }
             else
             {
-                _logger.LogInformation("API #{ApiNumber}: Existing records found in queue - skipping primary API fetch, processing sub-actions only", apiNumber);
+                _logger.LogInformation("API #{ApiNumber}: Already fetched today - skipping primary API fetch, processing sub-actions only", apiNumber);
             }
         }
 
