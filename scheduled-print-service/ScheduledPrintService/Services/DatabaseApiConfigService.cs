@@ -383,10 +383,11 @@ public class DatabaseApiConfigService : IDatabaseApiConfigService
 
         var cmd = connection.CreateCommand();
         cmd.CommandText = @"
-            SELECT ApiNumber
-            FROM ScheduleApi
-            WHERE ScheduleId = @ScheduleId
-            ORDER BY ExecutionOrder";
+            SELECT sa.ApiNumber
+            FROM ScheduleApi sa
+            JOIN PrimaryApi pa ON sa.ApiNumber = pa.ApiNumber
+            WHERE sa.ScheduleId = @ScheduleId AND pa.IsEnabled = 1
+            ORDER BY sa.ExecutionOrder";
         cmd.Parameters.AddWithValue("@ScheduleId", scheduleId);
 
         using var reader = cmd.ExecuteReader();
@@ -395,7 +396,7 @@ public class DatabaseApiConfigService : IDatabaseApiConfigService
             apiNumbers.Add(reader.GetInt32(0));
         }
 
-        _logger.LogDebug("Schedule #{ScheduleId} has {Count} API(s) assigned", scheduleId, apiNumbers.Count);
+        _logger.LogDebug("Schedule #{ScheduleId} has {Count} enabled API(s) assigned", scheduleId, apiNumbers.Count);
         return apiNumbers;
     }
 
