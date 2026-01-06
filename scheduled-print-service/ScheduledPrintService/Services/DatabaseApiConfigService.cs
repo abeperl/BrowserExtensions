@@ -52,10 +52,13 @@ public class DatabaseApiConfigService : IDatabaseApiConfigService
         using var connection = new SqliteConnection($"Data Source={_dbPath}");
         connection.Open();
 
+        // Ensure backward compatibility with new columns
+        EnsurePrimaryApiColumnsExist(connection);
+
         // Load primary API
         var cmd = connection.CreateCommand();
         cmd.CommandText = @"
-            SELECT ApiNumber, ApiName, BaseUrl, Endpoint, HttpMethod, Headers, Params, Payload, IsEnabled, PrinterName, Configuration
+            SELECT ApiNumber, ApiName, BaseUrl, Endpoint, HttpMethod, Headers, Params, Payload, IsEnabled, PrinterName, Configuration, LocalJsonFilePath
             FROM PrimaryApi
             WHERE ApiNumber = @ApiNumber";
         cmd.Parameters.AddWithValue("@ApiNumber", apiNumber);
@@ -74,7 +77,8 @@ public class DatabaseApiConfigService : IDatabaseApiConfigService
             ApiNumber = reader.GetInt32(reader.GetOrdinal("ApiNumber")),
             PrimaryEndpoint = reader.GetString(reader.GetOrdinal("Endpoint")),
             PrimaryHttpMethod = reader.GetString(reader.GetOrdinal("HttpMethod")),
-            PrinterName = !reader.IsDBNull(reader.GetOrdinal("PrinterName")) ? reader.GetString(reader.GetOrdinal("PrinterName")) : null
+            PrinterName = !reader.IsDBNull(reader.GetOrdinal("PrinterName")) ? reader.GetString(reader.GetOrdinal("PrinterName")) : null,
+            LocalJsonFilePath = !reader.IsDBNull(reader.GetOrdinal("LocalJsonFilePath")) ? reader.GetString(reader.GetOrdinal("LocalJsonFilePath")) : null
         };
 
         // Parse headers JSON
@@ -369,6 +373,30 @@ public class DatabaseApiConfigService : IDatabaseApiConfigService
             alterCmd.CommandText = "ALTER TABLE Schedule ADD COLUMN EnqueueNewOrders INTEGER DEFAULT 1";
             alterCmd.ExecuteNonQuery();
             _logger.LogInformation("Added EnqueueNewOrders column to Schedule table");
+        }
+    }
+
+    private void EnsurePrimaryApiColumnsExist(SqliteConnection connection)
+    {
+        var checkCmd = connection.CreateCommand();
+        checkCmd.CommandText = "PRAGMA table_info(PrimaryApi)";
+        var columns = new List<string>();
+
+        using (var reader = checkCmd.ExecuteReader())
+        {
+            while (reader.Read())
+            {
+                columns.Add(reader.GetString(1)); // Column name is in index 1
+            }
+        }
+
+        // Add LocalJsonFilePath column if missing (for local JSON file as primary API source)
+        if (!columns.Contains("LocalJsonFilePath"))
+        {
+            var alterCmd = connection.CreateCommand();
+            alterCmd.CommandText = "ALTER TABLE PrimaryApi ADD COLUMN LocalJsonFilePath TEXT";
+            alterCmd.ExecuteNonQuery();
+            _logger.LogInformation("Added LocalJsonFilePath column to PrimaryApi table");
         }
     }
 

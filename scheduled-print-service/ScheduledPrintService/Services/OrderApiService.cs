@@ -182,6 +182,12 @@ public class OrderApiService : IOrderApiService
 
     public async Task<List<OrderRecord>> GetOrdersListAsync(ApiConfig apiConfig, CancellationToken ct = default)
     {
+        // Check if a local JSON file should be used instead of API call
+        if (!string.IsNullOrWhiteSpace(apiConfig.LocalJsonFilePath))
+        {
+            return await GetOrdersFromLocalJsonFileAsync(apiConfig, ct);
+        }
+
         try
         {
             // Temporarily configure HttpClient for this API config
@@ -278,6 +284,61 @@ public class OrderApiService : IOrderApiService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Unexpected error calling primary endpoint {Endpoint}", apiConfig.PrimaryEndpoint);
+            throw;
+        }
+    }
+
+    private async Task<List<OrderRecord>> GetOrdersFromLocalJsonFileAsync(ApiConfig apiConfig, CancellationToken ct)
+    {
+        var filePath = apiConfig.LocalJsonFilePath!;
+        _logger.LogInformation("API #{ApiNumber}: Reading orders from local JSON file: {FilePath}", apiConfig.ApiNumber, filePath);
+
+        try
+        {
+            // Resolve relative paths against the app's base directory
+            if (!Path.IsPathRooted(filePath))
+            {
+                filePath = Path.Combine(AppContext.BaseDirectory, filePath);
+                _logger.LogDebug("API #{ApiNumber}: Resolved relative path to: {FilePath}", apiConfig.ApiNumber, filePath);
+            }
+
+            if (!File.Exists(filePath))
+            {
+                _logger.LogWarning("API #{ApiNumber}: Local JSON file not found: {FilePath}", apiConfig.ApiNumber, filePath);
+                return new List<OrderRecord>();
+            }
+
+            var jsonContent = await File.ReadAllTextAsync(filePath, ct);
+            _logger.LogInformation("API #{ApiNumber}: Read {Length} bytes from local file", apiConfig.ApiNumber, jsonContent.Length);
+
+            // Log first 500 chars for debugging
+            var preview = jsonContent.Length > 500 ? jsonContent.Substring(0, 500) + "..." : jsonContent;
+            _logger.LogDebug("API #{ApiNumber}: File content preview: {Content}", apiConfig.ApiNumber, preview);
+
+            // Parse the JSON using the same logic as API response
+            var orders = ParseOrderRecords(jsonContent, apiConfig);
+            _logger.LogInformation("API #{ApiNumber}: Extracted {Count} order records from local file", apiConfig.ApiNumber, orders.Count);
+
+            if (orders.Count > 0)
+            {
+                _logger.LogInformation("API #{ApiNumber}: First record ID: {Id}", apiConfig.ApiNumber, orders[0].Id);
+            }
+
+            return orders;
+        }
+        catch (IOException ex)
+        {
+            _logger.LogError(ex, "API #{ApiNumber}: Failed to read local JSON file: {FilePath}", apiConfig.ApiNumber, filePath);
+            throw;
+        }
+        catch (JsonException ex)
+        {
+            _logger.LogError(ex, "API #{ApiNumber}: Failed to parse local JSON file: {FilePath}", apiConfig.ApiNumber, filePath);
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "API #{ApiNumber}: Unexpected error reading local JSON file: {FilePath}", apiConfig.ApiNumber, filePath);
             throw;
         }
     }

@@ -20,6 +20,10 @@ public class ApiConfig
     // Optional raw JSON payload to send for primary request. When null/empty, DefaultRequest is serialized instead.
     public string? PrimaryPayload { get; set; }
 
+    // Optional local JSON file path to use instead of API call
+    // When set, the service reads orders from this file instead of calling the primary API endpoint
+    public string? LocalJsonFilePath { get; set; }
+
     // Login credentials for token renewal
     public string UserEmail { get; set; } = string.Empty;
     public string Password { get; set; } = string.Empty;

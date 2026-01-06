@@ -11,6 +11,7 @@ CREATE TABLE PrimaryApi (
     Params TEXT,  -- JSON string of key-value pairs
     Payload TEXT, -- JSON string for request body
     IsEnabled INTEGER NOT NULL DEFAULT 1,
+    LocalJsonFilePath TEXT, -- Optional: path to local JSON file to use instead of API call
     CreatedAt TEXT DEFAULT CURRENT_TIMESTAMP,
     UpdatedAt TEXT DEFAULT CURRENT_TIMESTAMP
 );
