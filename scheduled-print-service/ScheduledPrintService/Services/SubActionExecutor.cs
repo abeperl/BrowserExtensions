@@ -330,6 +330,10 @@ public class SubActionExecutor : ISubActionExecutor
                 await ExecuteSaveJsonToFileAsync(action, orderId, ct);
                 break;
 
+            case "combineorderitems":
+                await ExecuteCombineOrderItemsAsync(action, orderId, orderData, ct);
+                break;
+
             case "createpicklistbatch":
                 // Batch action is intended to run at batch scope, not per order. Log and ignore here.
                 _logger.LogDebug("Batch action '{ActionName}' encountered in per-order context; skipping.", action.Name);
@@ -823,6 +827,248 @@ public class SubActionExecutor : ISubActionExecutor
 
         // Clear the stored response to prevent reuse
         _lastApiResponse = null;
+    }
+
+    /// <summary>
+    /// Combines order items from customer ledger files into consolidated invoice files.
+    /// Configuration:
+    ///   - Endpoint: Output folder name (e.g., "combine_glinvoices")
+    ///   - ChainedArrayJsonPath: JSON path to items array in customer ledger (e.g., "items")
+    ///   - ChainedFilterField: Field to filter on (e.g., "storeId")
+    ///   - ChainedFilterValues: Allowed values for filter field (e.g., ["5", "6"])
+    ///   - RequestBody: Field name containing sale order ID (e.g., "saleOrderId")
+    ///   - OrderLookupFolders: Comma-separated list of folders to search for order files
+    /// </summary>
+    private async Task ExecuteCombineOrderItemsAsync(SubAction action, string customerId, JsonElement customerData, CancellationToken ct)
+    {
+        _logger.LogInformation("CombineOrderItems: Processing customer {CustomerId}", customerId);
+
+        try
+        {
+            // Get configuration
+            var itemsArrayPath = action.ChainedArrayJsonPath ?? "items";
+            var filterField = action.ChainedFilterField ?? "storeId";
+            var filterValues = action.ChainedFilterValues ?? new List<string> { "5", "6" };
+            var saleOrderIdField = action.RequestBody ?? "saleOrderId";
+            var outputFolder = action.Endpoint ?? "combine_glinvoices";
+
+            // Parse lookup folders from configuration (comma-separated)
+            var lookupFoldersConfig = action.OutputVariableName ??
+                @"C:\ProgramData\ScheduledPrintService\out\sales-orders\Sales,C:\ProgramData\ScheduledPrintService\out\sales-orders\Office";
+            var lookupFolders = lookupFoldersConfig.Split(',').Select(f => f.Trim()).ToList();
+
+            // Navigate to items array
+            JsonElement itemsElement;
+            if (!TryGetJsonPath(customerData, itemsArrayPath, out itemsElement) || itemsElement.ValueKind != JsonValueKind.Array)
+            {
+                _logger.LogWarning("CombineOrderItems: Items array not found at path '{Path}' for customer {CustomerId}", itemsArrayPath, customerId);
+                return;
+            }
+
+            var invoiceEntries = new List<object>();
+            var processedOrderIds = new HashSet<string>();
+
+            foreach (var item in itemsElement.EnumerateArray())
+            {
+                ct.ThrowIfCancellationRequested();
+
+                // Check filter: storeId should be 5 or 6
+                if (item.TryGetProperty(filterField, out var filterFieldValue))
+                {
+                    var filterValueStr = filterFieldValue.ValueKind == JsonValueKind.Number
+                        ? filterFieldValue.GetInt32().ToString()
+                        : filterFieldValue.GetString() ?? "";
+
+                    if (!filterValues.Contains(filterValueStr))
+                    {
+                        _logger.LogDebug("CombineOrderItems: Skipping item - {FilterField}={Value} not in allowed values", filterField, filterValueStr);
+                        continue;
+                    }
+                }
+                else
+                {
+                    _logger.LogDebug("CombineOrderItems: Skipping item - {FilterField} not found", filterField);
+                    continue;
+                }
+
+                // Check saleOrderId is not null
+                if (!item.TryGetProperty(saleOrderIdField, out var saleOrderIdValue) ||
+                    saleOrderIdValue.ValueKind == JsonValueKind.Null ||
+                    (saleOrderIdValue.ValueKind == JsonValueKind.String && string.IsNullOrWhiteSpace(saleOrderIdValue.GetString())))
+                {
+                    _logger.LogDebug("CombineOrderItems: Skipping item - {SaleOrderIdField} is null or empty", saleOrderIdField);
+                    continue;
+                }
+
+                var saleOrderId = saleOrderIdValue.ValueKind == JsonValueKind.Number
+                    ? saleOrderIdValue.GetInt32().ToString()
+                    : saleOrderIdValue.GetString() ?? "";
+
+                // Skip if already processed this order
+                if (processedOrderIds.Contains(saleOrderId))
+                {
+                    _logger.LogDebug("CombineOrderItems: Skipping duplicate order {SaleOrderId}", saleOrderId);
+                    continue;
+                }
+                processedOrderIds.Add(saleOrderId);
+
+                _logger.LogDebug("CombineOrderItems: Processing sale order {SaleOrderId}", saleOrderId);
+
+                // Find order file in lookup folders
+                string? orderFilePath = null;
+                foreach (var folder in lookupFolders)
+                {
+                    var potentialPath = Path.Combine(folder, $"order-{saleOrderId}.json");
+                    if (File.Exists(potentialPath))
+                    {
+                        orderFilePath = potentialPath;
+                        break;
+                    }
+                }
+
+                if (orderFilePath == null)
+                {
+                    _logger.LogWarning("CombineOrderItems: Order file not found for saleOrderId {SaleOrderId} in any lookup folder", saleOrderId);
+                    continue;
+                }
+
+                _logger.LogDebug("CombineOrderItems: Found order file at {Path}", orderFilePath);
+
+                // Read and parse order file
+                var orderJson = await File.ReadAllTextAsync(orderFilePath, ct);
+                using var orderDoc = JsonDocument.Parse(orderJson);
+                var orderRoot = orderDoc.RootElement;
+
+                // Extract items array from order
+                JsonElement orderItems;
+                if (!TryGetJsonPath(orderRoot, "items", out orderItems) &&
+                    !TryGetJsonPath(orderRoot, "response.result.items", out orderItems) &&
+                    !TryGetJsonPath(orderRoot, "response.result.orderItems", out orderItems))
+                {
+                    _logger.LogWarning("CombineOrderItems: Items array not found in order file {Path}", orderFilePath);
+                    continue;
+                }
+
+                // Create invoice entry with order number and items
+                var entry = new
+                {
+                    orderNumber = saleOrderId,
+                    items = orderItems.Clone()
+                };
+
+                invoiceEntries.Add(entry);
+                _logger.LogDebug("CombineOrderItems: Added {ItemCount} items from order {SaleOrderId}",
+                    orderItems.GetArrayLength(), saleOrderId);
+            }
+
+            if (invoiceEntries.Count == 0)
+            {
+                _logger.LogInformation("CombineOrderItems: No matching items found for customer {CustomerId}", customerId);
+                return;
+            }
+
+            // Build output path
+            var basePath = Path.Combine(DataPaths.DataRoot, "out");
+            var fullDirPath = Path.Combine(basePath, outputFolder);
+
+            if (!Directory.Exists(fullDirPath))
+            {
+                Directory.CreateDirectory(fullDirPath);
+                _logger.LogInformation("CombineOrderItems: Created output directory: {Path}", fullDirPath);
+            }
+
+            var outputFilePath = Path.Combine(fullDirPath, $"{customerId}.json");
+
+            // Check if file exists and merge with existing data
+            List<object> existingEntries = new();
+            if (File.Exists(outputFilePath))
+            {
+                try
+                {
+                    var existingJson = await File.ReadAllTextAsync(outputFilePath, ct);
+                    using var existingDoc = JsonDocument.Parse(existingJson);
+
+                    if (existingDoc.RootElement.TryGetProperty("invoices", out var existingInvoices) &&
+                        existingInvoices.ValueKind == JsonValueKind.Array)
+                    {
+                        foreach (var existingEntry in existingInvoices.EnumerateArray())
+                        {
+                            existingEntries.Add(existingEntry.Clone());
+                        }
+                        _logger.LogDebug("CombineOrderItems: Loaded {Count} existing invoice entries from {Path}",
+                            existingEntries.Count, outputFilePath);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "CombineOrderItems: Failed to read existing file, will overwrite: {Path}", outputFilePath);
+                }
+            }
+
+            // Merge new entries (avoid duplicates by orderNumber)
+            var existingOrderNumbers = new HashSet<string>();
+            foreach (var entry in existingEntries)
+            {
+                if (entry is JsonElement je && je.TryGetProperty("orderNumber", out var on))
+                {
+                    existingOrderNumbers.Add(on.ToString());
+                }
+            }
+
+            var mergedEntries = new List<object>(existingEntries);
+            foreach (var newEntry in invoiceEntries)
+            {
+                var orderNum = newEntry.GetType().GetProperty("orderNumber")?.GetValue(newEntry)?.ToString();
+                if (orderNum != null && !existingOrderNumbers.Contains(orderNum))
+                {
+                    mergedEntries.Add(newEntry);
+                }
+            }
+
+            // Write combined output
+            var outputData = new
+            {
+                customerId = customerId,
+                generatedAt = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
+                invoices = mergedEntries
+            };
+
+            var outputJson = JsonSerializer.Serialize(outputData, new JsonSerializerOptions
+            {
+                WriteIndented = true,
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            });
+
+            await File.WriteAllTextAsync(outputFilePath, outputJson, ct);
+            _logger.LogInformation("CombineOrderItems: Saved combined invoice file for customer {CustomerId} with {Count} invoices to {Path}",
+                customerId, mergedEntries.Count, outputFilePath);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "CombineOrderItems: Failed to process customer {CustomerId}", customerId);
+        }
+    }
+
+    /// <summary>
+    /// Helper to navigate JSON path and get element
+    /// </summary>
+    private bool TryGetJsonPath(JsonElement root, string path, out JsonElement result)
+    {
+        result = root;
+        var parts = path.Split('.');
+
+        foreach (var part in parts)
+        {
+            if (result.TryGetProperty(part, out var next))
+            {
+                result = next;
+            }
+            else
+            {
+                return false;
+            }
+        }
+        return true;
     }
 
     public async Task ExecuteChainedActionsAsync(SubAction sourceAction, string responseBody, CancellationToken ct = default)
@@ -2884,6 +3130,9 @@ public class SubActionExecutor : ISubActionExecutor
                            .Replace("{orderId}", orderId, StringComparison.OrdinalIgnoreCase);
         }
 
+        // Replace date tokens
+        result = ReplaceDateTokens(result);
+
         // Replace context tokens (e.g., {pickListId}, {orderNumber})
         foreach (var kvp in context)
         {
@@ -2897,8 +3146,18 @@ public class SubActionExecutor : ISubActionExecutor
 
     private string ReplaceTokens(string input, string orderId)
     {
-        return input.Replace("{id}", orderId, StringComparison.OrdinalIgnoreCase)
-                    .Replace("{orderId}", orderId, StringComparison.OrdinalIgnoreCase);
+        var result = input.Replace("{id}", orderId, StringComparison.OrdinalIgnoreCase)
+                          .Replace("{orderId}", orderId, StringComparison.OrdinalIgnoreCase);
+        return ReplaceDateTokens(result);
+    }
+
+    private string ReplaceDateTokens(string input)
+    {
+        var now = DateTime.Now;
+        return input
+            .Replace("{currentDate}", now.ToString("MM/dd/yyyy"), StringComparison.OrdinalIgnoreCase)
+            .Replace("{currentDateIso}", now.ToString("yyyy-MM-dd"), StringComparison.OrdinalIgnoreCase)
+            .Replace("{currentDateTime}", now.ToString("MM/dd/yyyy HH:mm:ss"), StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>

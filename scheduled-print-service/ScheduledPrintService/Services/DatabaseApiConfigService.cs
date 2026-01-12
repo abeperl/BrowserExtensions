@@ -58,7 +58,7 @@ public class DatabaseApiConfigService : IDatabaseApiConfigService
         // Load primary API
         var cmd = connection.CreateCommand();
         cmd.CommandText = @"
-            SELECT ApiNumber, ApiName, BaseUrl, Endpoint, HttpMethod, Headers, Params, Payload, IsEnabled, PrinterName, Configuration, LocalJsonFilePath
+            SELECT ApiNumber, ApiName, BaseUrl, Endpoint, HttpMethod, Headers, Params, Payload, IsEnabled, PrinterName, Configuration, LocalJsonFilePath, LocalJsonFolderPath
             FROM PrimaryApi
             WHERE ApiNumber = @ApiNumber";
         cmd.Parameters.AddWithValue("@ApiNumber", apiNumber);
@@ -78,7 +78,8 @@ public class DatabaseApiConfigService : IDatabaseApiConfigService
             PrimaryEndpoint = reader.GetString(reader.GetOrdinal("Endpoint")),
             PrimaryHttpMethod = reader.GetString(reader.GetOrdinal("HttpMethod")),
             PrinterName = !reader.IsDBNull(reader.GetOrdinal("PrinterName")) ? reader.GetString(reader.GetOrdinal("PrinterName")) : null,
-            LocalJsonFilePath = !reader.IsDBNull(reader.GetOrdinal("LocalJsonFilePath")) ? reader.GetString(reader.GetOrdinal("LocalJsonFilePath")) : null
+            LocalJsonFilePath = !reader.IsDBNull(reader.GetOrdinal("LocalJsonFilePath")) ? reader.GetString(reader.GetOrdinal("LocalJsonFilePath")) : null,
+            LocalJsonFolderPath = !reader.IsDBNull(reader.GetOrdinal("LocalJsonFolderPath")) ? reader.GetString(reader.GetOrdinal("LocalJsonFolderPath")) : null
         };
 
         // Parse headers JSON
@@ -397,6 +398,15 @@ public class DatabaseApiConfigService : IDatabaseApiConfigService
             alterCmd.CommandText = "ALTER TABLE PrimaryApi ADD COLUMN LocalJsonFilePath TEXT";
             alterCmd.ExecuteNonQuery();
             _logger.LogInformation("Added LocalJsonFilePath column to PrimaryApi table");
+        }
+
+        // Add LocalJsonFolderPath column if missing (for local JSON folder as primary API source)
+        if (!columns.Contains("LocalJsonFolderPath"))
+        {
+            var alterCmd = connection.CreateCommand();
+            alterCmd.CommandText = "ALTER TABLE PrimaryApi ADD COLUMN LocalJsonFolderPath TEXT";
+            alterCmd.ExecuteNonQuery();
+            _logger.LogInformation("Added LocalJsonFolderPath column to PrimaryApi table");
         }
     }
 

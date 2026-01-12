@@ -182,6 +182,12 @@ public class OrderApiService : IOrderApiService
 
     public async Task<List<OrderRecord>> GetOrdersListAsync(ApiConfig apiConfig, CancellationToken ct = default)
     {
+        // Check if a local JSON folder should be processed (each file = one record)
+        if (!string.IsNullOrWhiteSpace(apiConfig.LocalJsonFolderPath))
+        {
+            return await GetOrdersFromLocalJsonFolderAsync(apiConfig, ct);
+        }
+
         // Check if a local JSON file should be used instead of API call
         if (!string.IsNullOrWhiteSpace(apiConfig.LocalJsonFilePath))
         {
@@ -339,6 +345,75 @@ public class OrderApiService : IOrderApiService
         catch (Exception ex)
         {
             _logger.LogError(ex, "API #{ApiNumber}: Unexpected error reading local JSON file: {FilePath}", apiConfig.ApiNumber, filePath);
+            throw;
+        }
+    }
+
+    private async Task<List<OrderRecord>> GetOrdersFromLocalJsonFolderAsync(ApiConfig apiConfig, CancellationToken ct)
+    {
+        var folderPath = apiConfig.LocalJsonFolderPath!;
+        _logger.LogInformation("API #{ApiNumber}: Reading orders from local JSON folder: {FolderPath}", apiConfig.ApiNumber, folderPath);
+
+        var records = new List<OrderRecord>();
+
+        try
+        {
+            // Resolve relative paths against the app's base directory
+            if (!Path.IsPathRooted(folderPath))
+            {
+                folderPath = Path.Combine(AppContext.BaseDirectory, folderPath);
+                _logger.LogDebug("API #{ApiNumber}: Resolved relative path to: {FolderPath}", apiConfig.ApiNumber, folderPath);
+            }
+
+            if (!Directory.Exists(folderPath))
+            {
+                _logger.LogWarning("API #{ApiNumber}: Local JSON folder not found: {FolderPath}", apiConfig.ApiNumber, folderPath);
+                return records;
+            }
+
+            var jsonFiles = Directory.GetFiles(folderPath, "*.json");
+            _logger.LogInformation("API #{ApiNumber}: Found {Count} JSON files in folder", apiConfig.ApiNumber, jsonFiles.Length);
+
+            foreach (var filePath in jsonFiles)
+            {
+                try
+                {
+                    ct.ThrowIfCancellationRequested();
+
+                    // Use filename (without extension) as the record ID
+                    var fileName = Path.GetFileNameWithoutExtension(filePath);
+                    var jsonContent = await File.ReadAllTextAsync(filePath, ct);
+
+                    _logger.LogDebug("API #{ApiNumber}: Processing file {FileName} ({Length} bytes)", apiConfig.ApiNumber, fileName, jsonContent.Length);
+
+                    // Parse the JSON content
+                    using var doc = JsonDocument.Parse(jsonContent);
+                    var rawData = doc.RootElement.Clone();
+
+                    records.Add(new OrderRecord
+                    {
+                        Id = fileName,
+                        RawData = rawData
+                    });
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "API #{ApiNumber}: Failed to process file {FilePath}", apiConfig.ApiNumber, filePath);
+                }
+            }
+
+            _logger.LogInformation("API #{ApiNumber}: Extracted {Count} order records from folder", apiConfig.ApiNumber, records.Count);
+
+            if (records.Count > 0)
+            {
+                _logger.LogInformation("API #{ApiNumber}: First record ID: {Id}", apiConfig.ApiNumber, records[0].Id);
+            }
+
+            return records;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "API #{ApiNumber}: Unexpected error reading local JSON folder: {FolderPath}", apiConfig.ApiNumber, folderPath);
             throw;
         }
     }
