@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
@@ -332,6 +333,10 @@ public class SubActionExecutor : ISubActionExecutor
 
             case "combineorderitems":
                 await ExecuteCombineOrderItemsAsync(action, orderId, orderData, ct);
+                break;
+
+            case "exportinvoicescsv":
+                await ExecuteExportInvoicesCsvAsync(action, orderId, orderData, ct);
                 break;
 
             case "createpicklistbatch":
@@ -1046,6 +1051,188 @@ public class SubActionExecutor : ISubActionExecutor
         catch (Exception ex)
         {
             _logger.LogError(ex, "CombineOrderItems: Failed to process customer {CustomerId}", customerId);
+        }
+    }
+
+    /// <summary>
+    /// Flattens combined invoice JSON files into CSV (Excel-friendly) outputs.
+    /// - Input: LocalJsonFolderPath pointing to combine_glinvoices (one file per customer)
+    /// - Output: CSV with mapped columns + Order Number column, saved alongside JSON (e.g., 43247.csv)
+    /// </summary>
+    private async Task ExecuteExportInvoicesCsvAsync(SubAction action, string customerId, JsonElement combinedData, CancellationToken ct)
+    {
+        _logger.LogInformation("ExportInvoicesCsv: Processing customer {CustomerId}", customerId);
+
+        if (!TryGetInvoicesArray(combinedData, out var invoicesElement))
+        {
+            _logger.LogWarning("ExportInvoicesCsv: 'invoices' array not found for customer {CustomerId}", customerId);
+            return;
+        }
+
+        var headers = new[]
+        {
+            "Lookup Code",
+            "Item Name",
+            "Price",
+            "Price By Case",
+            "Quantity Ordered",
+            "Quantity To Supply",
+            "Qty Ordered Case",
+            "MPQ",
+            "MSRP",
+            "Item Cost",
+            "Item Price",
+            "Item Case Price",
+            "Supplier Item Code",
+            "Order Number"
+        };
+
+        var rows = new List<string[]>();
+
+        foreach (var invoice in invoicesElement.EnumerateArray())
+        {
+            var orderNumber = GetScalar(invoice, "orderNumber");
+
+            if (!invoice.TryGetProperty("items", out var itemsElement) || itemsElement.ValueKind != JsonValueKind.Array)
+            {
+                _logger.LogDebug("ExportInvoicesCsv: Invoice missing items array for customer {CustomerId}", customerId);
+                continue;
+            }
+
+            foreach (var item in itemsElement.EnumerateArray())
+            {
+                ct.ThrowIfCancellationRequested();
+
+                var row = new[]
+                {
+                    GetScalar(item, "sku"),
+                    GetScalar(item, "title"),
+                    FirstNonEmpty(item, "salePrice", "rate"),
+                    string.Empty,
+                    FirstNonEmpty(item, "saleQty"),
+                    FirstNonEmpty(item, "shippedQty", "remainingQty"),
+                    string.Empty,
+                    string.Empty,
+                    FirstNonEmpty(item, "listPrice"),
+                    string.Empty,
+                    FirstNonEmpty(item, "discountedPrice", "amount"),
+                    string.Empty,
+                    GetScalar(item, "vendorSKU"),
+                    !string.IsNullOrWhiteSpace(orderNumber) ? orderNumber : customerId
+                };
+
+                // Only add rows that contain at least one mapped value
+                if (row.Any(v => !string.IsNullOrWhiteSpace(v)))
+                {
+                    rows.Add(row);
+                }
+            }
+        }
+
+        if (rows.Count == 0)
+        {
+            _logger.LogInformation("ExportInvoicesCsv: No rows to export for customer {CustomerId}", customerId);
+            return;
+        }
+
+        var csvBuilder = new StringBuilder();
+        AppendCsvLine(csvBuilder, headers);
+        foreach (var row in rows)
+        {
+            AppendCsvLine(csvBuilder, row);
+        }
+
+        var outputFolder = string.IsNullOrWhiteSpace(action.Endpoint) ? "combine_glinvoices" : action.Endpoint;
+        var outputDir = Path.Combine(DataPaths.DataRoot, "out", outputFolder);
+        Directory.CreateDirectory(outputDir);
+
+        var outputPath = Path.Combine(outputDir, $"{customerId}.csv");
+        await File.WriteAllTextAsync(outputPath, csvBuilder.ToString(), Encoding.UTF8, ct);
+
+        _logger.LogInformation("ExportInvoicesCsv: Saved {Count} rows to {Path}", rows.Count, outputPath);
+
+        // Local helper functions
+        static bool TryGetInvoicesArray(JsonElement root, out JsonElement invoices)
+        {
+            if (root.ValueKind == JsonValueKind.Object && root.TryGetProperty("invoices", out invoices) && invoices.ValueKind == JsonValueKind.Array)
+            {
+                return true;
+            }
+
+            if (TryNested(root, "response.result.invoices", out invoices) && invoices.ValueKind == JsonValueKind.Array)
+            {
+                return true;
+            }
+
+            invoices = default;
+            return false;
+        }
+
+        static bool TryNested(JsonElement root, string path, out JsonElement value)
+        {
+            value = root;
+            foreach (var segment in path.Split('.'))
+            {
+                if (value.TryGetProperty(segment, out var next))
+                {
+                    value = next;
+                }
+                else
+                {
+                    value = default;
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        static string GetScalar(JsonElement element, string propertyName)
+        {
+            if (!element.TryGetProperty(propertyName, out var prop))
+            {
+                return string.Empty;
+            }
+
+            return prop.ValueKind switch
+            {
+                JsonValueKind.String => prop.GetString() ?? string.Empty,
+                JsonValueKind.Number => prop.TryGetDecimal(out var dec) ? dec.ToString(CultureInfo.InvariantCulture) : prop.GetRawText(),
+                JsonValueKind.True => "true",
+                JsonValueKind.False => "false",
+                _ => string.Empty
+            };
+        }
+
+        static string FirstNonEmpty(JsonElement element, params string[] propertyNames)
+        {
+            foreach (var name in propertyNames)
+            {
+                var value = GetScalar(element, name);
+                if (!string.IsNullOrWhiteSpace(value))
+                {
+                    return value;
+                }
+            }
+
+            return string.Empty;
+        }
+
+        static void AppendCsvLine(StringBuilder sb, IEnumerable<string> values)
+        {
+            sb.AppendLine(string.Join(',', values.Select(EscapeCsv)));
+        }
+
+        static string EscapeCsv(string value)
+        {
+            if (string.IsNullOrEmpty(value)) return string.Empty;
+
+            var needsQuote = value.Contains(',') || value.Contains('"') || value.Contains('\n') || value.Contains('\r');
+            if (value.Contains('"'))
+            {
+                value = value.Replace("\"", "\"\"");
+            }
+
+            return needsQuote ? $"\"{value}\"" : value;
         }
     }
 
