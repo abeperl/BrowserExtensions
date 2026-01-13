@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using ClosedXML.Excel;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using ScheduledPrintService.Models;
@@ -982,71 +983,33 @@ public class SubActionExecutor : ISubActionExecutor
                 _logger.LogInformation("CombineOrderItems: Created output directory: {Path}", fullDirPath);
             }
 
-            var outputFilePath = Path.Combine(fullDirPath, $"{customerId}.json");
-
-            // Check if file exists and merge with existing data
-            List<object> existingEntries = new();
-            if (File.Exists(outputFilePath))
+            // Create a separate file for each order
+            foreach (var entry in invoiceEntries)
             {
-                try
-                {
-                    var existingJson = await File.ReadAllTextAsync(outputFilePath, ct);
-                    using var existingDoc = JsonDocument.Parse(existingJson);
+                ct.ThrowIfCancellationRequested();
 
-                    if (existingDoc.RootElement.TryGetProperty("invoices", out var existingInvoices) &&
-                        existingInvoices.ValueKind == JsonValueKind.Array)
-                    {
-                        foreach (var existingEntry in existingInvoices.EnumerateArray())
-                        {
-                            existingEntries.Add(existingEntry.Clone());
-                        }
-                        _logger.LogDebug("CombineOrderItems: Loaded {Count} existing invoice entries from {Path}",
-                            existingEntries.Count, outputFilePath);
-                    }
-                }
-                catch (Exception ex)
+                var orderNumber = entry.GetType().GetProperty("orderNumber")?.GetValue(entry)?.ToString() ?? "unknown";
+                var outputFilePath = Path.Combine(fullDirPath, $"{customerId}_{orderNumber}.json");
+
+                // Write individual order file
+                var outputData = new
                 {
-                    _logger.LogWarning(ex, "CombineOrderItems: Failed to read existing file, will overwrite: {Path}", outputFilePath);
-                }
+                    customerId = customerId,
+                    orderNumber = orderNumber,
+                    generatedAt = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
+                    items = entry.GetType().GetProperty("items")?.GetValue(entry)
+                };
+
+                var outputJson = JsonSerializer.Serialize(outputData, new JsonSerializerOptions
+                {
+                    WriteIndented = true,
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+                });
+
+                await File.WriteAllTextAsync(outputFilePath, outputJson, ct);
+                _logger.LogInformation("CombineOrderItems: Saved invoice file for customer {CustomerId} order {OrderNumber} to {Path}",
+                    customerId, orderNumber, outputFilePath);
             }
-
-            // Merge new entries (avoid duplicates by orderNumber)
-            var existingOrderNumbers = new HashSet<string>();
-            foreach (var entry in existingEntries)
-            {
-                if (entry is JsonElement je && je.TryGetProperty("orderNumber", out var on))
-                {
-                    existingOrderNumbers.Add(on.ToString());
-                }
-            }
-
-            var mergedEntries = new List<object>(existingEntries);
-            foreach (var newEntry in invoiceEntries)
-            {
-                var orderNum = newEntry.GetType().GetProperty("orderNumber")?.GetValue(newEntry)?.ToString();
-                if (orderNum != null && !existingOrderNumbers.Contains(orderNum))
-                {
-                    mergedEntries.Add(newEntry);
-                }
-            }
-
-            // Write combined output
-            var outputData = new
-            {
-                customerId = customerId,
-                generatedAt = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
-                invoices = mergedEntries
-            };
-
-            var outputJson = JsonSerializer.Serialize(outputData, new JsonSerializerOptions
-            {
-                WriteIndented = true,
-                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-            });
-
-            await File.WriteAllTextAsync(outputFilePath, outputJson, ct);
-            _logger.LogInformation("CombineOrderItems: Saved combined invoice file for customer {CustomerId} with {Count} invoices to {Path}",
-                customerId, mergedEntries.Count, outputFilePath);
         }
         catch (Exception ex)
         {
@@ -1135,19 +1098,12 @@ public class SubActionExecutor : ISubActionExecutor
             return;
         }
 
-        var csvBuilder = new StringBuilder();
-        AppendCsvLine(csvBuilder, headers);
-        foreach (var row in rows)
-        {
-            AppendCsvLine(csvBuilder, row);
-        }
-
         var outputFolder = string.IsNullOrWhiteSpace(action.Endpoint) ? "combine_glinvoices" : action.Endpoint;
         var outputDir = Path.Combine(DataPaths.DataRoot, "out", outputFolder);
         Directory.CreateDirectory(outputDir);
 
-        var outputPath = Path.Combine(outputDir, $"{customerId}.csv");
-        await File.WriteAllTextAsync(outputPath, csvBuilder.ToString(), Encoding.UTF8, ct);
+        var outputPath = Path.Combine(outputDir, $"{customerId}.xlsx");
+        await ExportToXlsxAsync(outputPath, headers, rows, ct);
 
         _logger.LogInformation("ExportInvoicesCsv: Saved {Count} rows to {Path}", rows.Count, outputPath);
 
@@ -1216,23 +1172,52 @@ public class SubActionExecutor : ISubActionExecutor
 
             return string.Empty;
         }
+    }
 
-        static void AppendCsvLine(StringBuilder sb, IEnumerable<string> values)
+    /// <summary>
+    /// Exports headers and rows to XLSX format using ClosedXML
+    /// </summary>
+    private async Task ExportToXlsxAsync(string outputPath, string[] headers, List<string[]> rows, CancellationToken ct)
+    {
+        try
         {
-            sb.AppendLine(string.Join(',', values.Select(EscapeCsv)));
-        }
+            using var workbook = new XLWorkbook();
+            var worksheet = workbook.Worksheets.Add("Invoice Data");
 
-        static string EscapeCsv(string value)
-        {
-            if (string.IsNullOrEmpty(value)) return string.Empty;
-
-            var needsQuote = value.Contains(',') || value.Contains('"') || value.Contains('\n') || value.Contains('\r');
-            if (value.Contains('"'))
+            // Add headers
+            for (int col = 0; col < headers.Length; col++)
             {
-                value = value.Replace("\"", "\"\"");
+                worksheet.Cell(1, col + 1).Value = headers[col];
             }
 
-            return needsQuote ? $"\"{value}\"" : value;
+            // Style header row
+            var headerRow = worksheet.Row(1);
+            headerRow.Style.Font.Bold = true;
+            headerRow.Style.Fill.BackgroundColor = XLColor.LightGray;
+
+            // Add data rows
+            for (int row = 0; row < rows.Count; row++)
+            {
+                ct.ThrowIfCancellationRequested();
+                
+                var rowData = rows[row];
+                for (int col = 0; col < rowData.Length; col++)
+                {
+                    worksheet.Cell(row + 2, col + 1).Value = rowData[col];
+                }
+            }
+
+            // Auto-fit columns
+            worksheet.Columns().AdjustToContents();
+
+            // Save file
+            await Task.Run(() => workbook.SaveAs(outputPath), ct);
+            _logger.LogDebug("ExportToXlsxAsync: Successfully exported {Count} rows to {Path}", rows.Count, outputPath);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "ExportToXlsxAsync: Failed to export to XLSX: {Message}", ex.Message);
+            throw;
         }
     }
 
