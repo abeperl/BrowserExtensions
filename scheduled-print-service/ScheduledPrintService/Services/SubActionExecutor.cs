@@ -863,9 +863,47 @@ public class SubActionExecutor : ISubActionExecutor
                 @"C:\ProgramData\ScheduledPrintService\out\sales-orders\Sales,C:\ProgramData\ScheduledPrintService\out\sales-orders\Office";
             var lookupFolders = lookupFoldersConfig.Split(',').Select(f => f.Trim()).ToList();
 
-            // Navigate to items array
+            // Extract customerName and referenceNo from customerData
+            string customerName = "";
+            string referenceNo = "";
+            
+            // Try multiple paths for customerName
+            if (customerData.TryGetProperty("customerName", out var customerNameValue))
+            {
+                customerName = customerNameValue.GetString() ?? "";
+            }
+            else if (customerData.TryGetProperty("name", out var nameValue))
+            {
+                customerName = nameValue.GetString() ?? "";
+            }
+            else if (TryGetJsonPath(customerData, "response.result.customerName", out var responseResultCustomerNameValue))
+            {
+                customerName = responseResultCustomerNameValue.GetString() ?? "";
+            }
+            else if (TryGetJsonPath(customerData, "result.customerName", out var resultCustomerNameValue))
+            {
+                customerName = resultCustomerNameValue.GetString() ?? "";
+            }
+            
+            // Extract first non-null referenceNo from items array
             JsonElement itemsElement;
-            if (!TryGetJsonPath(customerData, itemsArrayPath, out itemsElement) || itemsElement.ValueKind != JsonValueKind.Array)
+            if (TryGetJsonPath(customerData, itemsArrayPath, out itemsElement) && itemsElement.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var item in itemsElement.EnumerateArray())
+                {
+                    if (item.TryGetProperty("referenceNo", out var refNoValue) && 
+                        refNoValue.ValueKind != JsonValueKind.Null &&
+                        !string.IsNullOrWhiteSpace(refNoValue.GetString()))
+                    {
+                        referenceNo = refNoValue.GetString() ?? "";
+                        break;
+                    }
+                }
+            }
+
+            // Navigate to items array
+            JsonElement itemsElementForProcessing;
+            if (!TryGetJsonPath(customerData, itemsArrayPath, out itemsElementForProcessing) || itemsElementForProcessing.ValueKind != JsonValueKind.Array)
             {
                 _logger.LogWarning("CombineOrderItems: Items array not found at path '{Path}' for customer {CustomerId}", itemsArrayPath, customerId);
                 return;
@@ -874,7 +912,7 @@ public class SubActionExecutor : ISubActionExecutor
             var invoiceEntries = new List<object>();
             var processedOrderIds = new HashSet<string>();
 
-            foreach (var item in itemsElement.EnumerateArray())
+            foreach (var item in itemsElementForProcessing.EnumerateArray())
             {
                 ct.ThrowIfCancellationRequested();
 
@@ -995,6 +1033,8 @@ public class SubActionExecutor : ISubActionExecutor
                 var outputData = new
                 {
                     customerId = customerId,
+                    customerName = customerName,
+                    referenceNo = referenceNo,
                     orderNumber = orderNumber,
                     generatedAt = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
                     items = entry.GetType().GetProperty("items")?.GetValue(entry)
