@@ -1,7 +1,6 @@
 param(
   [string]$Configuration = "Release",
-  [string]$Runtime = "win-x64",
-  [switch]$SelfContained
+  [string]$Runtime = "win-x64"
 )
 
 $ErrorActionPreference = 'Stop'
@@ -11,7 +10,6 @@ $project = Join-Path $scriptDir 'ScheduledPrintService\ScheduledPrintService.csp
 $outDir = Join-Path $scriptDir "publish"
 
 $sc = $false
-if ($SelfContained) { $sc = $true }
 
 Write-Host "Publishing ScheduledPrintService ($Configuration, $Runtime, SelfContained=$sc)" -ForegroundColor Cyan
 

@@ -327,6 +327,34 @@ public class DatabaseSchedulerService : BackgroundService
 
         _logger.LogInformation("API #{ApiNumber} batch complete: {Processed} processed, {Skipped} skipped, {Failed} failed",
             apiNumber, processedCount, skippedCount, failedCount);
+
+        // Execute any post-batch sub-actions (folder-based actions that should run AFTER all orders)
+        var postBatchActions = apiConfig.SubActions
+            .Where(a => a.Enabled)
+            .Where(a => !string.IsNullOrWhiteSpace(a.LocalJsonFolderPath)) // Actions with LocalJsonFolderPath are post-batch
+            .ToList();
+
+        if (postBatchActions.Count > 0)
+        {
+            _logger.LogInformation("API #{ApiNumber}: Executing {Count} post-batch actions", apiNumber, postBatchActions.Count);
+            foreach (var action in postBatchActions)
+            {
+                try
+                {
+                    _logger.LogInformation("Executing post-batch action: {Name} ({Type})", action.Name, action.Type);
+                    await actionExecutor.ExecutePostBatchActionAsync(action, apiConfig, cancellationToken);
+                    _logger.LogInformation("Post-batch action '{Name}' completed", action.Name);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Post-batch action '{Name}' failed: {Message}", action.Name, ex.Message);
+                    if (!(action.ContinueOnError ?? true))
+                    {
+                        throw;
+                    }
+                }
+            }
+        }
     }
 
     private async Task ExecuteApiQueuedModeAsync(int apiNumber, Schedule schedule, CancellationToken cancellationToken)

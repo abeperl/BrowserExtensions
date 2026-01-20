@@ -197,6 +197,34 @@ if (manualMode && apiNumber.HasValue)
         }
         Log.Information("Manual mode complete for API #{ApiNumber}: {Processed} processed, {Failed} failed",
             apiNum, processed, failed);
+
+        // Execute any post-batch sub-actions (folder-based actions that should run AFTER all orders)
+        var postBatchActions = apiConfig.SubActions
+            .Where(a => a.Enabled)
+            .Where(a => !string.IsNullOrWhiteSpace(a.LocalJsonFolderPath))
+            .ToList();
+
+        if (postBatchActions.Count > 0)
+        {
+            Log.Information("API #{ApiNumber}: Executing {Count} post-batch actions", apiNum, postBatchActions.Count);
+            foreach (var action in postBatchActions)
+            {
+                try
+                {
+                    Log.Information("Executing post-batch action: {Name} ({Type})", action.Name, action.Type);
+                    await actionExecutor.ExecutePostBatchActionAsync(action, apiConfig);
+                    Log.Information("Post-batch action '{Name}' completed", action.Name);
+                }
+                catch (Exception ex)
+                {
+                    Log.Error(ex, "Post-batch action '{Name}' failed: {Message}", action.Name, ex.Message);
+                    if (!(action.ContinueOnError ?? true))
+                    {
+                        throw;
+                    }
+                }
+            }
+        }
     }
 
     // Exit without starting hosted services

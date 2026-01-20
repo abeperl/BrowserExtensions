@@ -205,6 +205,14 @@ public class SubAction
     // Store name for SaveJsonToFile action - appends store name to output directory path
     // e.g., if StoreName = "Boro Park", output becomes: basePath/sales-orders/Boro Park/order-123.json
     public string? StoreName { get; set; }
+
+    // Local JSON folder path for actions that read files from a folder (e.g., FlattenJsonToFile)
+    // When set, the action reads all JSON files from this folder instead of using the passed-in order data
+    public string? LocalJsonFolderPath { get; set; }
+
+    // Output folder for actions that write to a different folder than the input (e.g., FlattenJsonToFile)
+    // When set with LocalJsonFolderPath, enables reading from one folder and writing to another
+    public string? OutputFolder { get; set; }
 }
 
 /// <summary>

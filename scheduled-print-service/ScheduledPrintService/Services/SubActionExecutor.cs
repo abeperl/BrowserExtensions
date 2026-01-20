@@ -17,6 +17,7 @@ public interface ISubActionExecutor
     Task ExecuteBatchCreatePicklistAsync(SubAction action, IEnumerable<string> orderIds, CancellationToken ct = default);
     Task ExecuteBatchCreatePicklistAsync(SubAction action, IEnumerable<string> orderIds, ApiConfig apiConfig, CancellationToken ct = default);
     Task ExecuteChainedActionsAsync(SubAction sourceAction, string responseBody, CancellationToken ct = default);
+    Task ExecutePostBatchActionAsync(SubAction action, ApiConfig apiConfig, CancellationToken ct = default);
 }
 
 public class SubActionExecutor : ISubActionExecutor
@@ -340,6 +341,18 @@ public class SubActionExecutor : ISubActionExecutor
                 await ExecuteExportInvoicesCsvAsync(action, orderId, orderData, ct);
                 break;
 
+            case "flattenjsontofile":
+                // If LocalJsonFolderPath is set, this is a post-batch action - skip in per-order context
+                if (!string.IsNullOrWhiteSpace(action.LocalJsonFolderPath))
+                {
+                    _logger.LogDebug("Post-batch action '{ActionName}' encountered in per-order context; skipping (will run after all orders).", action.Name);
+                }
+                else
+                {
+                    await ExecuteFlattenJsonToFileAsync(action, orderId, orderData, ct);
+                }
+                break;
+
             case "createpicklistbatch":
                 // Batch action is intended to run at batch scope, not per order. Log and ignore here.
                 _logger.LogDebug("Batch action '{ActionName}' encountered in per-order context; skipping.", action.Name);
@@ -463,6 +476,46 @@ public class SubActionExecutor : ISubActionExecutor
             // Restore previous state
             _tempApiConfig = previousTemp;
             UpdateHttpClientAuth(); // Just update auth, don't touch BaseAddress
+        }
+    }
+
+    /// <summary>
+    /// Executes a post-batch action (runs AFTER all per-order actions are complete).
+    /// Used for folder-based actions like FlattenJsonToFile that process output from per-order actions.
+    /// </summary>
+    public async Task ExecutePostBatchActionAsync(SubAction action, ApiConfig apiConfig, CancellationToken ct = default)
+    {
+        var previousTemp = _tempApiConfig;
+        try
+        {
+            _tempApiConfig = apiConfig;
+            UpdateHttpClientForApiConfig(apiConfig);
+
+            _logger.LogInformation("Executing post-batch action: {Name} (Type: {Type})", action.Name, action.Type);
+
+            switch (action.Type.ToLowerInvariant())
+            {
+                case "flattenjsontofile":
+                    // Call the folder-based processing directly (not per-record)
+                    if (!string.IsNullOrWhiteSpace(action.LocalJsonFolderPath))
+                    {
+                        await ExecuteFlattenJsonFromFolderAsync(action, ct);
+                    }
+                    else
+                    {
+                        _logger.LogWarning("Post-batch FlattenJsonToFile action '{Name}' missing LocalJsonFolderPath", action.Name);
+                    }
+                    break;
+
+                default:
+                    _logger.LogWarning("Unknown post-batch action type: {Type}", action.Type);
+                    break;
+            }
+        }
+        finally
+        {
+            _tempApiConfig = previousTemp;
+            UpdateHttpClientAuth();
         }
     }
 
@@ -845,6 +898,10 @@ public class SubActionExecutor : ISubActionExecutor
     ///   - RequestBody: Field name containing sale order ID (e.g., "saleOrderId")
     ///   - OrderLookupFolders: Comma-separated list of folders to search for order files
     /// </summary>
+    /// <summary>
+    /// Filters items from customer ledger, finds matching order files, and COPIES them to output folder.
+    /// No transformation - just file copy. Flattening is done by SubAction 2 (FlattenJsonToFile).
+    /// </summary>
     private async Task ExecuteCombineOrderItemsAsync(SubAction action, string customerId, JsonElement customerData, CancellationToken ct)
     {
         _logger.LogInformation("CombineOrderItems: Processing customer {CustomerId}", customerId);
@@ -863,44 +920,6 @@ public class SubActionExecutor : ISubActionExecutor
                 @"C:\ProgramData\ScheduledPrintService\out\sales-orders\Sales,C:\ProgramData\ScheduledPrintService\out\sales-orders\Office";
             var lookupFolders = lookupFoldersConfig.Split(',').Select(f => f.Trim()).ToList();
 
-            // Extract customerName and referenceNo from customerData
-            string customerName = "";
-            string referenceNo = "";
-            
-            // Try multiple paths for customerName
-            if (customerData.TryGetProperty("customerName", out var customerNameValue))
-            {
-                customerName = customerNameValue.GetString() ?? "";
-            }
-            else if (customerData.TryGetProperty("name", out var nameValue))
-            {
-                customerName = nameValue.GetString() ?? "";
-            }
-            else if (TryGetJsonPath(customerData, "response.result.customerName", out var responseResultCustomerNameValue))
-            {
-                customerName = responseResultCustomerNameValue.GetString() ?? "";
-            }
-            else if (TryGetJsonPath(customerData, "result.customerName", out var resultCustomerNameValue))
-            {
-                customerName = resultCustomerNameValue.GetString() ?? "";
-            }
-            
-            // Extract first non-null referenceNo from items array
-            JsonElement itemsElement;
-            if (TryGetJsonPath(customerData, itemsArrayPath, out itemsElement) && itemsElement.ValueKind == JsonValueKind.Array)
-            {
-                foreach (var item in itemsElement.EnumerateArray())
-                {
-                    if (item.TryGetProperty("referenceNo", out var refNoValue) && 
-                        refNoValue.ValueKind != JsonValueKind.Null &&
-                        !string.IsNullOrWhiteSpace(refNoValue.GetString()))
-                    {
-                        referenceNo = refNoValue.GetString() ?? "";
-                        break;
-                    }
-                }
-            }
-
             // Navigate to items array
             JsonElement itemsElementForProcessing;
             if (!TryGetJsonPath(customerData, itemsArrayPath, out itemsElementForProcessing) || itemsElementForProcessing.ValueKind != JsonValueKind.Array)
@@ -909,14 +928,24 @@ public class SubActionExecutor : ISubActionExecutor
                 return;
             }
 
-            var invoiceEntries = new List<object>();
             var processedOrderIds = new HashSet<string>();
+            var copiedCount = 0;
+
+            // Build output path
+            var basePath = Path.Combine(DataPaths.DataRoot, "out");
+            var fullDirPath = Path.Combine(basePath, outputFolder);
+
+            if (!Directory.Exists(fullDirPath))
+            {
+                Directory.CreateDirectory(fullDirPath);
+                _logger.LogInformation("CombineOrderItems: Created output directory: {Path}", fullDirPath);
+            }
 
             foreach (var item in itemsElementForProcessing.EnumerateArray())
             {
                 ct.ThrowIfCancellationRequested();
 
-                // Check filter: storeId should be 5 or 6
+                // Check filter: storeId should be in allowed values
                 if (item.TryGetProperty(filterField, out var filterFieldValue))
                 {
                     var filterValueStr = filterFieldValue.ValueKind == JsonValueKind.Number
@@ -935,7 +964,7 @@ public class SubActionExecutor : ISubActionExecutor
                     continue;
                 }
 
-                // Check saleOrderId is not null
+                // Check saleOrderId is not null or zero
                 if (!item.TryGetProperty(saleOrderIdField, out var saleOrderIdValue) ||
                     saleOrderIdValue.ValueKind == JsonValueKind.Null ||
                     (saleOrderIdValue.ValueKind == JsonValueKind.String && string.IsNullOrWhiteSpace(saleOrderIdValue.GetString())))
@@ -947,6 +976,13 @@ public class SubActionExecutor : ISubActionExecutor
                 var saleOrderId = saleOrderIdValue.ValueKind == JsonValueKind.Number
                     ? saleOrderIdValue.GetInt32().ToString()
                     : saleOrderIdValue.GetString() ?? "";
+
+                // Skip zero values
+                if (saleOrderId == "0")
+                {
+                    _logger.LogDebug("CombineOrderItems: Skipping item - {SaleOrderIdField} is zero", saleOrderIdField);
+                    continue;
+                }
 
                 // Skip if already processed this order
                 if (processedOrderIds.Contains(saleOrderId))
@@ -978,77 +1014,22 @@ public class SubActionExecutor : ISubActionExecutor
 
                 _logger.LogDebug("CombineOrderItems: Found order file at {Path}", orderFilePath);
 
-                // Read and parse order file
-                var orderJson = await File.ReadAllTextAsync(orderFilePath, ct);
-                using var orderDoc = JsonDocument.Parse(orderJson);
-                var orderRoot = orderDoc.RootElement;
+                // Copy file as-is to output folder (no transformation)
+                var outputFilePath = Path.Combine(fullDirPath, $"{customerId}_{saleOrderId}.json");
+                File.Copy(orderFilePath, outputFilePath, overwrite: true);
+                copiedCount++;
 
-                // Extract items array from order
-                JsonElement orderItems;
-                if (!TryGetJsonPath(orderRoot, "items", out orderItems) &&
-                    !TryGetJsonPath(orderRoot, "response.result.items", out orderItems) &&
-                    !TryGetJsonPath(orderRoot, "response.result.orderItems", out orderItems))
-                {
-                    _logger.LogWarning("CombineOrderItems: Items array not found in order file {Path}", orderFilePath);
-                    continue;
-                }
-
-                // Create invoice entry with order number and items
-                var entry = new
-                {
-                    orderNumber = saleOrderId,
-                    items = orderItems.Clone()
-                };
-
-                invoiceEntries.Add(entry);
-                _logger.LogDebug("CombineOrderItems: Added {ItemCount} items from order {SaleOrderId}",
-                    orderItems.GetArrayLength(), saleOrderId);
+                _logger.LogInformation("CombineOrderItems: Copied order file for customer {CustomerId} order {SaleOrderId} to {Path}",
+                    customerId, saleOrderId, outputFilePath);
             }
 
-            if (invoiceEntries.Count == 0)
+            if (copiedCount == 0)
             {
                 _logger.LogInformation("CombineOrderItems: No matching items found for customer {CustomerId}", customerId);
-                return;
             }
-
-            // Build output path
-            var basePath = Path.Combine(DataPaths.DataRoot, "out");
-            var fullDirPath = Path.Combine(basePath, outputFolder);
-
-            if (!Directory.Exists(fullDirPath))
+            else
             {
-                Directory.CreateDirectory(fullDirPath);
-                _logger.LogInformation("CombineOrderItems: Created output directory: {Path}", fullDirPath);
-            }
-
-            // Create a separate file for each order
-            foreach (var entry in invoiceEntries)
-            {
-                ct.ThrowIfCancellationRequested();
-
-                var orderNumber = entry.GetType().GetProperty("orderNumber")?.GetValue(entry)?.ToString() ?? "unknown";
-                var outputFilePath = Path.Combine(fullDirPath, $"{customerId}_{orderNumber}.json");
-
-                // Write individual order file
-                var outputData = new
-                {
-                    customerId = customerId,
-                    customerName = customerName,
-                    referenceNo = referenceNo,
-                    orderNumber = orderNumber,
-                    generatedAt = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
-                    items = entry.GetType().GetProperty("items")?.GetValue(entry)
-                };
-
-                var outputJson = JsonSerializer.Serialize(outputData, new JsonSerializerOptions
-                {
-                    WriteIndented = true,
-                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-                });
-
-                await File.WriteAllTextAsync(outputFilePath, outputJson, ct);
-                _logger.LogInformation("CombineOrderItems: Saved invoice file for customer {CustomerId} order {OrderNumber} to {Path}",
-                    customerId, orderNumber, outputFilePath);
+                _logger.LogInformation("CombineOrderItems: Copied {Count} order files for customer {CustomerId}", copiedCount, customerId);
             }
         }
         catch (Exception ex)
@@ -1066,6 +1047,11 @@ public class SubActionExecutor : ISubActionExecutor
     {
         _logger.LogInformation("ExportInvoicesCsv: Processing customer {CustomerId}", customerId);
 
+        // Extract top-level fields for flattening
+        var customerName = GetScalar(combinedData, "customerName");
+        var referenceNo = GetScalar(combinedData, "referenceNo");
+        var generatedAt = GetScalar(combinedData, "generatedAt");
+
         if (!TryGetInvoicesArray(combinedData, out var invoicesElement))
         {
             _logger.LogWarning("ExportInvoicesCsv: 'invoices' array not found for customer {CustomerId}", customerId);
@@ -1074,6 +1060,11 @@ public class SubActionExecutor : ISubActionExecutor
 
         var headers = new[]
         {
+            "Customer ID",
+            "Customer Name",
+            "Reference No",
+            "Order Number",
+            "Generated At",
             "Lookup Code",
             "Item Name",
             "Price",
@@ -1086,8 +1077,7 @@ public class SubActionExecutor : ISubActionExecutor
             "Item Cost",
             "Item Price",
             "Item Case Price",
-            "Supplier Item Code",
-            "Order Number"
+            "Supplier Item Code"
         };
 
         var rows = new List<string[]>();
@@ -1108,6 +1098,11 @@ public class SubActionExecutor : ISubActionExecutor
 
                 var row = new[]
                 {
+                    customerId,
+                    customerName,
+                    referenceNo,
+                    !string.IsNullOrWhiteSpace(orderNumber) ? orderNumber : string.Empty,
+                    generatedAt,
                     GetScalar(item, "sku"),
                     GetScalar(item, "title"),
                     FirstNonEmpty(item, "salePrice", "rate"),
@@ -1120,8 +1115,7 @@ public class SubActionExecutor : ISubActionExecutor
                     string.Empty,
                     FirstNonEmpty(item, "discountedPrice", "amount"),
                     string.Empty,
-                    GetScalar(item, "vendorSKU"),
-                    !string.IsNullOrWhiteSpace(orderNumber) ? orderNumber : customerId
+                    GetScalar(item, "vendorSKU")
                 };
 
                 // Only add rows that contain at least one mapped value
@@ -1259,6 +1253,229 @@ public class SubActionExecutor : ISubActionExecutor
             _logger.LogError(ex, "ExportToXlsxAsync: Failed to export to XLSX: {Message}", ex.Message);
             throw;
         }
+    }
+
+    /// <summary>
+    /// Flattens combined invoice JSON files into a flat structure with top-level context fields.
+    /// - Input: LocalJsonFolderPath pointing to folder with JSON files (reads all files from folder)
+    /// - Output: Flattened JSON with customerId, customerName, referenceNo, orderNumber, generatedAt, items
+    /// - Writes to OutputFolder (or Endpoint as fallback)
+    ///
+    /// NOTE: When LocalJsonFolderPath is set, this action should be called via ExecutePostBatchActionAsync
+    /// (runs AFTER all per-order actions). In per-order context, folder-based actions are skipped.
+    /// </summary>
+    private async Task ExecuteFlattenJsonToFileAsync(SubAction action, string customerId, JsonElement orderData, CancellationToken ct)
+    {
+        // Legacy behavior: process the passed-in orderData (non-folder-based mode)
+        _logger.LogInformation("FlattenJsonToFile: Processing data for customer {CustomerId}", customerId);
+
+        try
+        {
+            await FlattenAndWriteSingleFileAsync(action, customerId, orderData, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "FlattenJsonToFile: Failed to flatten JSON for customer {CustomerId}: {Message}", customerId, ex.Message);
+            if (!(action.ContinueOnError ?? true))
+            {
+                throw;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Reads all JSON files from LocalJsonFolderPath and flattens each to OutputFolder
+    /// </summary>
+    private async Task ExecuteFlattenJsonFromFolderAsync(SubAction action, CancellationToken ct)
+    {
+        var inputFolderName = action.LocalJsonFolderPath!;
+        var inputFolder = Path.Combine(DataPaths.DataRoot, "out", inputFolderName);
+
+        if (!Directory.Exists(inputFolder))
+        {
+            _logger.LogWarning("FlattenJsonToFile: Input folder not found: {Path}", inputFolder);
+            return;
+        }
+
+        var jsonFiles = Directory.GetFiles(inputFolder, "*.json");
+        _logger.LogInformation("FlattenJsonToFile: Found {Count} JSON files in {Folder}", jsonFiles.Length, inputFolder);
+
+        var processedCount = 0;
+        var errorCount = 0;
+
+        foreach (var filePath in jsonFiles)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            try
+            {
+                var fileName = Path.GetFileNameWithoutExtension(filePath);
+                var jsonContent = await File.ReadAllTextAsync(filePath, ct);
+
+                using var doc = JsonDocument.Parse(jsonContent);
+                var fileData = doc.RootElement;
+
+                await FlattenAndWriteSingleFileAsync(action, fileName, fileData, ct);
+                processedCount++;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "FlattenJsonToFile: Failed to process file {Path}: {Message}", filePath, ex.Message);
+                errorCount++;
+                if (!(action.ContinueOnError ?? true))
+                {
+                    throw;
+                }
+            }
+        }
+
+        _logger.LogInformation("FlattenJsonToFile: Completed. Processed: {Processed}, Errors: {Errors}", processedCount, errorCount);
+    }
+
+    /// <summary>
+    /// Flattens a single JSON element and writes to output folder.
+    /// Handles nested response.result structure from order files.
+    /// </summary>
+    private async Task FlattenAndWriteSingleFileAsync(SubAction action, string fileId, JsonElement data, CancellationToken ct)
+    {
+        // Try to get the result object from nested structure, fall back to root
+        JsonElement resultData = data;
+        if (TryGetNestedProperty(data, "response.result", out var nestedResult))
+        {
+            resultData = nestedResult;
+        }
+        else if (TryGetNestedProperty(data, "result", out var simpleResult))
+        {
+            resultData = simpleResult;
+        }
+
+        // Extract fields from result data
+        var customerId = ExtractScalarValueFromPaths(resultData, "customerId");
+        var customerName = ExtractScalarValueFromPaths(resultData, "customerLastName", "customerName", "name");
+        var referenceNo = ExtractScalarValueFromPaths(resultData, "saleOrderNumber", "referenceNo");
+        var orderNumber = ExtractScalarValueFromPaths(resultData, "saleOrderId", "orderNumber");
+        var items = ExtractItemsArray(data); // This already handles nested paths
+
+        var flattenedData = new
+        {
+            customerId = customerId,
+            customerName = customerName,
+            referenceNo = referenceNo,
+            orderNumber = orderNumber,
+            generatedAt = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
+            items = items
+        };
+
+        // Determine output folder: OutputFolder > Endpoint > default
+        var outputFolderName = !string.IsNullOrWhiteSpace(action.OutputFolder)
+            ? action.OutputFolder
+            : (!string.IsNullOrWhiteSpace(action.Endpoint) ? action.Endpoint : "combine_glinvoices");
+        var outputDir = Path.Combine(DataPaths.DataRoot, "out", outputFolderName);
+        Directory.CreateDirectory(outputDir);
+
+        // Generate output filename - use fileId as fallback for customerId
+        var outputCustomerId = !string.IsNullOrWhiteSpace(flattenedData.customerId) ? flattenedData.customerId : fileId;
+        var outputFilename = !string.IsNullOrWhiteSpace(flattenedData.orderNumber)
+            ? $"{outputCustomerId}_{flattenedData.orderNumber}.json"
+            : $"{outputCustomerId}.json";
+        var outputPath = Path.Combine(outputDir, outputFilename);
+
+        // Serialize flattened data to JSON
+        var options = new JsonSerializerOptions
+        {
+            WriteIndented = true,
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        };
+
+        var json = JsonSerializer.Serialize(flattenedData, options);
+        await File.WriteAllTextAsync(outputPath, json, ct);
+
+        _logger.LogDebug("FlattenJsonToFile: Saved flattened JSON to {Path}", outputPath);
+    }
+
+    /// <summary>
+    /// Extracts a scalar value trying multiple property names in order
+    /// </summary>
+    private static string ExtractScalarValueFromPaths(JsonElement element, params string[] propertyNames)
+    {
+        foreach (var propName in propertyNames)
+        {
+            var value = ExtractScalarValue(element, propName);
+            if (!string.IsNullOrEmpty(value))
+            {
+                return value;
+            }
+        }
+        return string.Empty;
+    }
+
+    /// <summary>
+    /// Extracts items array from order data, handling nested structures
+    /// </summary>
+    private static List<object> ExtractItemsArray(JsonElement orderData)
+    {
+        var items = new List<object>();
+
+        // Try different possible paths for items array
+        var possiblePaths = new[] { "items", "response.result.items" };
+
+        foreach (var path in possiblePaths)
+        {
+            if (TryGetNestedProperty(orderData, path, out var itemsElement) && 
+                itemsElement.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var item in itemsElement.EnumerateArray())
+                {
+                    items.Add(JsonSerializer.Deserialize<object>(item.GetRawText()));
+                }
+                return items;
+            }
+        }
+
+        return items;
+    }
+
+    /// <summary>
+    /// Helper to get nested property by dot-separated path
+    /// </summary>
+    private static bool TryGetNestedProperty(JsonElement root, string path, out JsonElement result)
+    {
+        result = root;
+        var parts = path.Split('.');
+
+        foreach (var part in parts)
+        {
+            if (result.TryGetProperty(part, out var next))
+            {
+                result = next;
+            }
+            else
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Helper to extract a scalar value from a JsonElement by property name
+    /// </summary>
+    private static string ExtractScalarValue(JsonElement element, string propertyName)
+    {
+        if (!element.TryGetProperty(propertyName, out var prop))
+        {
+            return string.Empty;
+        }
+
+        return prop.ValueKind switch
+        {
+            JsonValueKind.String => prop.GetString() ?? string.Empty,
+            JsonValueKind.Number => prop.TryGetDecimal(out var dec) ? dec.ToString(CultureInfo.InvariantCulture) : prop.GetRawText(),
+            JsonValueKind.True => "true",
+            JsonValueKind.False => "false",
+            _ => string.Empty
+        };
     }
 
     /// <summary>
