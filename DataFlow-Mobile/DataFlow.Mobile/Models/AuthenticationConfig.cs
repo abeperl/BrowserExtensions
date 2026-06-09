@@ -13,6 +13,10 @@ public class AuthenticationConfig
     public int PageId { get; set; }
 
     [Required]
+    [MaxLength(100)]
+    public string Name { get; set; } = string.Empty;
+
+    [Required]
     [MaxLength(50)]
     public string AuthenticationType { get; set; } = string.Empty; // Bearer, ApiKey, Basic, OAuth
 
@@ -48,6 +52,11 @@ public class AuthenticationConfig
 
     public string? AdditionalHeaders { get; set; }
 
+    public bool IsActive { get; set; } = true;
+
+    [MaxLength(500)]
+    public string? TokenValue { get; set; }
+
     [Required]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
@@ -55,5 +64,5 @@ public class AuthenticationConfig
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
     // Navigation property
-    public Page Page { get; set; } = null!;
+    public DataPage Page { get; set; } = null!;
 }

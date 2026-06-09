@@ -1,10 +1,13 @@
+﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 17
-VisualStudioVersion = 17.5.2.0
+# Visual Studio Version 18
+VisualStudioVersion = 18.0.11018.127 d18.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "DataFlow-Mobile", "DataFlow-Mobile", "{9D0C9662-57AD-2F02-E20D-7E7ACBE487C8}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DataFlow.Mobile", "DataFlow-Mobile\DataFlow.Mobile\DataFlow.Mobile.csproj", "{E17C427E-81DD-FF51-EA67-66E6C8069723}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DataFlow.Mobile.Tests", "DataFlow-Mobile\DataFlow.Mobile.Tests\DataFlow.Mobile.Tests.csproj", "{D6561274-6C7E-CAF7-91E9-7155D7D70450}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -16,6 +19,10 @@ Global
 		{E17C427E-81DD-FF51-EA67-66E6C8069723}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{E17C427E-81DD-FF51-EA67-66E6C8069723}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{E17C427E-81DD-FF51-EA67-66E6C8069723}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D6561274-6C7E-CAF7-91E9-7155D7D70450}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D6561274-6C7E-CAF7-91E9-7155D7D70450}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D6561274-6C7E-CAF7-91E9-7155D7D70450}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D6561274-6C7E-CAF7-91E9-7155D7D70450}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

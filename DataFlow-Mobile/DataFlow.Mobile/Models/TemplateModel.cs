@@ -27,6 +27,15 @@ public class TemplateModel
     public string? ColorScheme { get; set; }
 
     [MaxLength(50)]
+    public string Layout { get; set; } = "List";
+
+    [MaxLength(7)]
+    public string BackgroundColor { get; set; } = "#FFFFFF";
+
+    [MaxLength(7)]
+    public string TextColor { get; set; } = "#000000";
+
+    [MaxLength(50)]
     public string? FontFamily { get; set; } = "Default";
 
     [Required]
@@ -67,5 +76,5 @@ public class TemplateModel
     [Required]
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
-    public ICollection<Page> Pages { get; set; } = [];
+    public ICollection<DataPage> Pages { get; set; } = [];
 }

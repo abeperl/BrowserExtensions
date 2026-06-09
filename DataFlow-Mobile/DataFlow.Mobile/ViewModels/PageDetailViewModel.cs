@@ -19,7 +19,7 @@ public partial class PageDetailViewModel : ObservableObject
     private readonly ITemplateProcessor _templateProcessor;
 
     [ObservableProperty]
-    private Models.Page _currentPage;
+    private DataPage _currentPage;
 
     [ObservableProperty]
     private ObservableCollection<JsonElement> _dataItems = new();
@@ -86,26 +86,39 @@ public partial class PageDetailViewModel : ObservableObject
             var apiResponse = await _apiService.GetDataAsync(CurrentPage);
             if (apiResponse.IsSuccess && apiResponse.Data != null)
             {
+                // Convert object to JsonElement if needed
+                JsonElement jsonData;
+                if (apiResponse.Data is JsonElement element)
+                {
+                    jsonData = element;
+                }
+                else
+                {
+                    // Convert object to JSON string and then parse to JsonElement
+                    var jsonString = JsonSerializer.Serialize(apiResponse.Data);
+                    jsonData = JsonSerializer.Deserialize<JsonElement>(jsonString);
+                }
+
                 // Process data using template system
                 if (CurrentPage.Template != null)
                 {
-                    ProcessedData = await _templateProcessor.ProcessDataAsync(CurrentPage.Template, apiResponse.Data);
+                    ProcessedData = await _templateProcessor.ProcessDataAsync(CurrentPage.Template, jsonData);
                     LayoutType = CurrentPage.Template.LayoutTemplate?.LayoutType ?? "List";
                 }
                 else
                 {
                     // Fallback to simple display
                     DataItems.Clear();
-                    if (apiResponse.Data.ValueKind == JsonValueKind.Array)
+                    if (jsonData.ValueKind == JsonValueKind.Array)
                     {
-                        foreach (var item in apiResponse.Data.EnumerateArray())
+                        foreach (var item in jsonData.EnumerateArray())
                         {
                             DataItems.Add(item);
                         }
                     }
-                    else if (apiResponse.Data.ValueKind == JsonValueKind.Object)
+                    else if (jsonData.ValueKind == JsonValueKind.Object)
                     {
-                        DataItems.Add(apiResponse.Data);
+                        DataItems.Add(jsonData);
                     }
                 }
 
@@ -160,6 +173,8 @@ public partial class PageDetailViewModel : ObservableObject
             // TODO: Implement ExecuteActionAsync in Phase 7
             throw new NotImplementedException("Action execution will be implemented in Phase 7");
 
+            // TODO: Uncomment when ExecuteActionAsync is implemented
+            /*
             if (result.IsSuccess)
             {
                 // Refresh data if action was successful and requires refresh
@@ -182,6 +197,7 @@ public partial class PageDetailViewModel : ObservableObject
                     result.Message ?? "Action failed",
                     "OK");
             }
+            */
         }
         catch (Exception ex)
         {
@@ -209,6 +225,8 @@ public partial class PageDetailViewModel : ObservableObject
             // TODO: Implement ExecuteActionWithContextAsync in Phase 7
             throw new NotImplementedException("Action execution will be implemented in Phase 7");
 
+            // TODO: Uncomment when ExecuteActionWithContextAsync is implemented
+            /*
             if (result.IsSuccess)
             {
                 // Refresh data if action was successful and requires refresh
@@ -231,6 +249,7 @@ public partial class PageDetailViewModel : ObservableObject
                     result.Message ?? "Action failed",
                     "OK");
             }
+            */
         }
         catch (Exception ex)
         {

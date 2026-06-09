@@ -16,7 +16,7 @@ public partial class ApiConfigurationViewModel : ObservableObject
     private readonly INavigationService _navigationService;
 
     [ObservableProperty]
-    private Models.Page _currentPage = new();
+    private DataPage _currentPage = new();
 
     [ObservableProperty]
     private ObservableCollection<HttpHeader> _requestHeaders = new();
@@ -167,7 +167,8 @@ public partial class ApiConfigurationViewModel : ObservableObject
             await UpdateHeadersJsonAsync();
             await UpdateParametersJsonAsync();
 
-            var response = await _apiService.GetDataAsync(CurrentPage);
+            // Execute API request for the configured page
+            var response = await _apiService.ExecutePageDataRequestAsync(CurrentPage.Id);
 
             var endTime = DateTime.Now;
             ResponseTime = (int)(endTime - startTime).TotalMilliseconds;
@@ -177,9 +178,9 @@ public partial class ApiConfigurationViewModel : ObservableObject
                 TestSuccessful = true;
                 TestResult = $"✅ Success! Response received in {ResponseTime}ms";
 
-                if (response.Data.HasValue)
+                if (response.Data != null)
                 {
-                    ApiResponse = JsonSerializer.Serialize(response.Data.Value, new JsonSerializerOptions
+                    ApiResponse = JsonSerializer.Serialize(response.Data, new JsonSerializerOptions
                     {
                         WriteIndented = true
                     });

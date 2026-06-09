@@ -50,6 +50,11 @@ public class PageAction
 
     public string? SoundEffect { get; set; }
 
+    [MaxLength(500)]
+    public string? AudioFile { get; set; }
+
+    public bool RefreshAfterExecution { get; set; } = false;
+
     public bool IsItemLevel { get; set; } = true;
 
     public int SortOrder { get; set; }
@@ -105,5 +110,5 @@ public class PageAction
 
     // Foreign key
     public int PageId { get; set; }
-    public Page Page { get; set; } = null!;
+    public DataPage Page { get; set; } = null!;
 }

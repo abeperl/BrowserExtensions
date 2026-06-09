@@ -1,1 +1,158 @@
-scan-overlay-extension.zip
+# =========================
+# Build Artifacts & Output
+# =========================
+
+# .NET Build outputs
+**/bin/
+**/obj/
+**/publish/
+**/.vs/
+
+# Extension packages
+*.zip
+
+# Python build artifacts
+**/build/
+**/dist/
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+*.egg
+
+# =========================
+# Logs & Temporary Files
+# =========================
+
+# Service logs
+**/logs/
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+*.stackdump
+error.txt
+output.txt
+printed-urls.txt
+
+# =========================
+# Cache & Downloaded Files
+# =========================
+
+# Chromium cache for PDF printing
+**/chromium-cache/
+
+# Package manager caches
+**/node_modules/
+**/packages/
+
+# =========================
+# IDE & Editor Files
+# =========================
+
+# Visual Studio
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# VS Code
+.vscode/*
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# JetBrains IDEs
+.idea/
+*.iml
+
+# =========================
+# OS Generated Files
+# =========================
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Linux
+*~
+
+# =========================
+# Project-Specific
+# =========================
+
+# Native host executables (should be built, not committed)
+word-template-extension/native-host/dist/*.exe
+
+# Local configuration overrides
+**/appsettings.Development.json
+**/appsettings.Local.json
+
+# Test outputs
+**/TestResults/
+
+# NuGet packages (should be restored, not committed)
+*.nupkg
+*.snupkg
+
+# User-specific files
+*.rsuser
+*.suo
+*.user
+*.userprefs
+
+# Mono auto generated files
+mono_crash.*
+
+# Build results
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleases/
+x64/
+x86/
+[Ww][Ii][Nn]32/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+
+# =========================
+# Security & Sensitive Data
+# =========================
+
+# Secrets and certificates
+*.pfx
+*.p12
+*.key
+*.pem
+secrets.json
+*.env.local
+
+# Database files (environment-specific)
+*.db
+*.db-shm
+*.db-wal
+
+# =========================
+# Claude AI Assistant
+# =========================
+
+# Claude configuration (keep structure, ignore transient data)
+.claude/*
+!.claude/.gitkeep
+.lollms/
+scheduled-print-service/out/20251111_115318525_demo-print.pdf

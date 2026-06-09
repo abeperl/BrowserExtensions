@@ -13,7 +13,7 @@ public partial class HomePageViewModel : ObservableObject
     private readonly INavigationService _navigationService;
 
     [ObservableProperty]
-    private ObservableCollection<Models.Page> _pages = new();
+    private ObservableCollection<DataPage> _pages = new();
 
     [ObservableProperty]
     private bool _isLoading;
@@ -74,7 +74,7 @@ public partial class HomePageViewModel : ObservableObject
     }
 
     [RelayCommand]
-    public async Task OpenPageAsync(Models.Page page)
+    public async Task OpenPageAsync(DataPage page)
     {
         if (page == null) return;
 

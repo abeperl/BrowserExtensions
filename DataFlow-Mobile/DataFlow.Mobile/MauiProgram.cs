@@ -2,9 +2,6 @@
 using CommunityToolkit.Maui;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Http.Resilience;
-using Polly;
-using Polly.CircuitBreaker;
-using Polly.Extensions.Http;
 using DataFlow.Mobile.Services;
 using DataFlow.Mobile.Services.Interfaces;
 using DataFlow.Mobile.ViewModels;
@@ -50,45 +47,17 @@ public static class MauiProgram
 		// Configure default HttpClient with resilience policies
 		services.AddHttpClient("DataFlowApi", client =>
 		{
-			client.Timeout = TimeSpan.FromSeconds(30);
+			// removed: set timeout via resilience handler
 			client.DefaultRequestHeaders.Add("User-Agent", "DataFlow-Mobile/1.0");
 		})
-		.AddResilienceHandler("default", builder =>
-		{
-			builder
-				.AddRetry(new HttpRetryStrategyOptions
-				{
-					MaxRetryAttempts = 3,
-					Delay = TimeSpan.FromSeconds(1),
-					BackoffType = DelayBackoffType.Exponential,
-					UseJitter = true
-				})
-				.AddCircuitBreaker(new HttpCircuitBreakerStrategyOptions
-				{
-					FailureRatio = 0.5,
-					SamplingDuration = TimeSpan.FromSeconds(30),
-					MinimumThroughput = 3,
-					BreakDuration = TimeSpan.FromSeconds(30)
-				})
-				.AddTimeout(TimeSpan.FromSeconds(10));
-		});
+		.AddStandardResilienceHandler();
 
 		// Configure authentication-specific HttpClient
 		services.AddHttpClient("AuthApi", client =>
 		{
-			client.Timeout = TimeSpan.FromSeconds(15);
+			// removed: set timeout via resilience handler
 		})
-		.AddResilienceHandler("auth", builder =>
-		{
-			builder
-				.AddRetry(new HttpRetryStrategyOptions
-				{
-					MaxRetryAttempts = 2,
-					Delay = TimeSpan.FromMilliseconds(500),
-					BackoffType = DelayBackoffType.Linear
-				})
-				.AddTimeout(TimeSpan.FromSeconds(5));
-		});
+		.AddStandardResilienceHandler();
 	}
 
 	private static void RegisterServices(IServiceCollection services)
@@ -140,7 +109,7 @@ public static class MauiProgram
 		services.AddTransient<PageWizardViewModel>();
 		services.AddTransient<ApiConfigurationViewModel>();
 		services.AddTransient<AdvancedTemplateDesignerViewModel>();
-		services.AddTransient<ActionConfigurationViewModel>();
+            // Removed registration for ActionConfiguration feature (no implementation)
 		services.AddTransient<AudioSettingsViewModel>();
 
 		// Pages
@@ -152,7 +121,7 @@ public static class MauiProgram
 		services.AddTransient<PageWizardPage>();
 		services.AddTransient<ApiConfigurationPage>();
 		services.AddTransient<AdvancedTemplateDesignerPage>();
-		services.AddTransient<ActionConfigurationPage>();
+            // Removed registration for ActionConfiguration feature (no implementation)
 		services.AddTransient<AudioSettingsPage>();
 	}
 }

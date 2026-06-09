@@ -27,6 +27,11 @@ public class ImportExportService : IImportExportService
         _backupService = backupService;
     }
 
+    public async Task<string> ExportAllDataAsync()
+    {
+        return await ExportAllConfigurationAsync();
+    }
+
     public async Task<string> ExportAllConfigurationAsync()
     {
         try
@@ -252,7 +257,8 @@ public class ImportExportService : IImportExportService
             };
 
             // Check for conflicts
-            result.Conflicts = await DetectConflictsAsync(importData);
+            var conflicts = await DetectConflictsAsync(importData);
+            result.Conflicts = conflicts.Select(c => c.ToString()).ToList();
 
             _logger.LogInformation("Import preview completed - {PagesCount} pages, {TemplatesCount} templates",
                 result.Summary.PagesCount, result.Summary.TemplatesCount);
@@ -367,7 +373,7 @@ public class ImportExportService : IImportExportService
     }
 
     // Private helper methods
-    private async Task<List<Page>> ExportPagesAsync()
+    private async Task<List<DataPage>> ExportPagesAsync()
     {
         return await _context.Pages
             .Include(p => p.Template)
@@ -500,7 +506,7 @@ public class ImportExportService : IImportExportService
         await _context.SaveChangesAsync();
     }
 
-    private async Task ImportPagesAsync(List<Page>? pages, bool overwrite)
+    private async Task ImportPagesAsync(List<DataPage>? pages, bool overwrite)
     {
         if (pages == null) return;
 
@@ -539,7 +545,7 @@ public class ImportExportService : IImportExportService
         foreach (var action in actions)
         {
             // Find the corresponding page
-            var page = await _context.Pages.FirstOrDefaultAsync(p => p.Name == action.Page?.Name);
+            var page = await _context.Pages.FirstOrDefaultAsync(p => action.Page != null && p.Name == action.Page.Name);
             if (page == null) continue;
 
             var existing = await _context.Actions.FirstOrDefaultAsync(a => a.Name == action.Name && a.PageId == page.Id);
@@ -657,7 +663,7 @@ public class ImportExportService : IImportExportService
         public DateTime ExportedAt { get; set; }
         public string Version { get; set; } = string.Empty;
         public string AppVersion { get; set; } = string.Empty;
-        public List<Page>? Pages { get; set; }
+        public List<DataPage>? Pages { get; set; }
         public List<Template>? Templates { get; set; }
         public List<ColorScheme>? ColorSchemes { get; set; }
         public List<LayoutTemplate>? LayoutTemplates { get; set; }
@@ -670,7 +676,7 @@ public class ImportExportService : IImportExportService
     {
         public DateTime ExportedAt { get; set; }
         public string Version { get; set; } = string.Empty;
-        public Page? Page { get; set; }
+        public DataPage? Page { get; set; }
         public List<PageAction>? Actions { get; set; }
         public Template? Template { get; set; }
     }

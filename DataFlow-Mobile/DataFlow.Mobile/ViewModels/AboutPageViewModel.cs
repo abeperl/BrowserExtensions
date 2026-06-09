@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using System.Reflection;
+using MauiDeviceInfo = Microsoft.Maui.Devices.DeviceInfo;
 
 namespace DataFlow.Mobile.ViewModels;
 
@@ -45,7 +46,7 @@ public partial class AboutPageViewModel : ObservableObject
             FrameworkVersion = Environment.Version.ToString();
 
             // Get device info
-            DeviceInfo = $"{DeviceInfo.Current.Platform} {DeviceInfo.Current.VersionString}";
+            DeviceInfo = $"{MauiDeviceInfo.Current.Platform} {MauiDeviceInfo.Current.VersionString}";
         }
         catch (Exception ex)
         {

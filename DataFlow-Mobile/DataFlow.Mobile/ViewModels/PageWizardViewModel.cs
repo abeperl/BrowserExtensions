@@ -27,7 +27,7 @@ public partial class PageWizardViewModel : ObservableObject
     private int _totalSteps = 5;
 
     [ObservableProperty]
-    private Models.Page _pageConfiguration = new();
+    private DataPage _pageConfiguration = new();
 
     [ObservableProperty]
     private Template _templateConfiguration = new();
@@ -154,7 +154,7 @@ public partial class PageWizardViewModel : ObservableObject
             TestResult = "Testing connection...";
 
             // Create a temporary page for testing
-            var testPage = new Models.Page
+            var testPage = new DataPage
             {
                 Name = "Test",
                 ApiEndpoint = PageConfiguration.ApiEndpoint,
@@ -291,7 +291,7 @@ public partial class PageWizardViewModel : ObservableObject
 
     private void InitializeDefaults()
     {
-        PageConfiguration = new Models.Page
+        PageConfiguration = new DataPage
         {
             Name = string.Empty,
             Description = string.Empty,

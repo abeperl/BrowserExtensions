@@ -14,6 +14,6 @@ public partial class AppShell : Shell
 		Routing.RegisterRoute("pagewizard", typeof(PageWizardPage));
 		Routing.RegisterRoute("apiconfiguration", typeof(ApiConfigurationPage));
 		Routing.RegisterRoute("advancedtemplatedesigner", typeof(AdvancedTemplateDesignerPage));
-		Routing.RegisterRoute("actionconfiguration", typeof(ActionConfigurationPage));
+            // Removed ActionConfigurationPage route (feature not implemented)
 	}
 }

@@ -1,6 +1,7 @@
 using DataFlow.Mobile.Models;
 using DataFlow.Mobile.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace DataFlow.Mobile.Services;
 
@@ -20,7 +21,8 @@ public class ColorSchemeService : IColorSchemeService
         try
         {
             var repository = _unitOfWork.GetRepository<ColorScheme>();
-            return await repository.GetAllAsync(orderBy: q => q.OrderBy(cs => cs.IsBuiltIn ? 0 : 1).ThenBy(cs => cs.Name));
+            var allSchemes = await repository.GetAllAsync();
+            return allSchemes.OrderBy(cs => cs.IsBuiltIn ? 0 : 1).ThenBy(cs => cs.Name).ToList();
         }
         catch (Exception ex)
         {
@@ -48,7 +50,8 @@ public class ColorSchemeService : IColorSchemeService
         try
         {
             var repository = _unitOfWork.GetRepository<ColorScheme>();
-            return await repository.GetAsync(cs => cs.IsBuiltIn, orderBy: q => q.OrderBy(cs => cs.Name));
+            var builtInSchemes = await repository.FindAsync(cs => cs.IsBuiltIn);
+            return builtInSchemes.OrderBy(cs => cs.Name).ToList();
         }
         catch (Exception ex)
         {

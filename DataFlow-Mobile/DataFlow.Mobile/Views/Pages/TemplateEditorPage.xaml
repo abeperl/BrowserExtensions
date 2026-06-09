@@ -177,12 +177,13 @@
                             <CollectionView.ItemTemplate>
                                 <DataTemplate x:DataType="models:TemplateColumn">
                                     <Grid>
-                                        <Frame
+                                        <Border
                                             BackgroundColor="White"
-                                            HasShadow="True"
-                                            CornerRadius="12"
                                             Margin="0,5"
                                             Padding="15">
+                                            <Border.StrokeShape>
+                                                <RoundRectangle CornerRadius="12" />
+                                            </Border.StrokeShape>
 
                                             <Grid RowDefinitions="Auto,Auto,Auto">
 
@@ -206,9 +207,7 @@
                                                         IsToggled="{Binding IsVisible}"
                                                         OnColor="{StaticResource Primary}"
                                                         VerticalOptions="Center"
-                                                        Margin="10,0"
-                                                        Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:TemplateEditorViewModel}}, Path=ToggleColumnVisibilityCommand}"
-                                                        CommandParameter="{Binding .}" />
+                                                        Margin="10,0" />
 
                                                     <!-- More Actions -->
                                                     <Button
@@ -286,7 +285,7 @@
                                                 </StackLayout>
 
                                             </Grid>
-                                        </Frame>
+                                        </Border>
                                     </Grid>
                                 </DataTemplate>
                             </CollectionView.ItemTemplate>

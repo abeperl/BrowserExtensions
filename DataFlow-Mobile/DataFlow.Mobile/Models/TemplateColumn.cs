@@ -79,4 +79,8 @@ public class TemplateColumn
 
     [Required]
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+
+    // Additional properties for compatibility
+    public string Name => DisplayName;
+    public int Order => SortOrder;
 }

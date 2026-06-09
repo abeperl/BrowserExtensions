@@ -20,4 +20,12 @@ public interface IGenericRepository<T> where T : class
     Task<int> CountAsync();
     Task<int> CountAsync(Expression<Func<T, bool>> predicate);
     Task<bool> ExistsAsync(Expression<Func<T, bool>> predicate);
+
+    // Additional convenience methods used by services
+    Task<IEnumerable<T>> GetAsync(Expression<Func<T, bool>> predicate);
+    Task<IEnumerable<T>> GetAsync<TKey>(Expression<Func<T, bool>> predicate, Func<IQueryable<T>, IOrderedQueryable<T>> orderBy);
+    Task<T?> GetAsync(int id);
+    T Update(T entity);
+    void Delete(T entity);
+    T Add(T entity);
 }

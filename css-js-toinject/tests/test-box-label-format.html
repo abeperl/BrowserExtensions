@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Box Label Format Test</title>
+    <link href="pages/Outbound/placard.css?eeeeee" rel="stylesheet">
+    <style media="print">
+        @media print {
+            body {
+                -webkit-print-color-adjust: exact !important;
+            }
+            .box-label-wrp {
+                page-break-inside: auto;
+                page-break-inside: avoid;
+                page-break-after: auto;
+            }
+            @page {
+                size: letter
+            }
+        }
+    </style>
+    
+    <!-- BOX LABEL FORMAT OVERRIDE CSS -->
+    <style id="box-label-format-override">
+        /* Hide "Box No : 1" line */
+        .top-info-section .text:first-child {
+            display: none !important;
+        }
+
+        /* Hide "To:" text */
+        .ship-info-section > .text:nth-child(1) {
+            display: none !important;
+        }
+
+        /* Put phone numbers on same line */
+        .top-info-section .text[style*="font-size: 30px"] {
+            display: inline-block !important;
+            margin-right: 20px !important;
+        }
+
+        /* Remove extra padding from top-info-section */
+        .top-info-section {
+            padding-top: 10px !important;
+            padding-bottom: 20px !important;
+            margin-bottom: 20px !important;
+            text-align: center !important;
+        }
+
+        /* Ensure customer info section has proper spacing */
+        .ship-info-section {
+            padding: 0 20px !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="box-label-wrp" style="page-break-after: always;">
+        <div class="top-info-section" style="text-align: center;font-size: 40px;font-family: sans-serif;line-height: 1.2;border-bottom: 5px solid #000;padding-bottom: 20px;margin-bottom: 20px;padding-top: 10px;letter-spacing: 1px;padding-bottom: 50px;">
+            <div class="text">Box No : 1</div>
+            <div class="text">Malchut Fine Judaica</div>
+            <div class="text">3902 14 Ave</div>
+            <div class="text" style="font-size: 30px">Brooklyn, NY 11218</div>
+            <div class="text" style="font-size: 30px">(718) 854-7700</div>
+            <div class="text" style="font-size: 30px">(718) 853-2722</div>
+        </div>
+        <div class="ship-info-section" style="font-size: 35px;padding: 0 20px;line-height: 1.5;">
+            <div class="text sm-text" style="text-align: center;font-size: 25px;">Customer ID: </div>
+            <div class="text" style="font-size: 40px;">To:</div>
+            <div class="text" style="font-size: 40px;">MALCHUT BORO PARK</div>
+            <div class="text" style="font-size: 40px;">3902 14 AVE</div>
+            <div class="text" style="font-size: 40px;">3902 14 AVE</div>
+            <div class="text" style="font-size: 40px;">Brooklyn, NY 11218</div>
+            <div class="text sm-text" style="font-size: 25px;margin-top: 10px;">Tel: 7182204720</div>
+            <div class="text" style="margin-top: 10px;font-size: 40px;">Carrier: Others</div>
+            <div class="order-ref" style="text-align:center;margin:25px 0 10px;">
+                <svg class="barcode" id="barcode0" width="380px" height="170px" x="0px" y="0px" viewBox="0 0 380 170" xmlns="http://www.w3.org/2000/svg" version="1.1" style="transform: translate(0,0)">
+                    <rect x="0" y="0" width="380" height="170" style="fill:#ffffff;"></rect>
+                    <g transform="translate(10, 10)" style="fill:#000;">
+                        <rect x="0" y="0" width="8" height="150"></rect>
+                        <rect x="12" y="0" width="4" height="150"></rect>
+                        <rect x="24" y="0" width="4" height="150"></rect>
+                        <rect x="44" y="0" width="8" height="150"></rect>
+                        <rect x="56" y="0" width="12" height="150"></rect>
+                        <rect x="72" y="0" width="4" height="150"></rect>
+                        <rect x="88" y="0" width="4" height="150"></rect>
+                        <rect x="104" y="0" width="4" height="150"></rect>
+                        <rect x="112" y="0" width="8" height="150"></rect>
+                        <rect x="132" y="0" width="4" height="150"></rect>
+                        <rect x="140" y="0" width="12" height="150"></rect>
+                        <rect x="156" y="0" width="16" height="150"></rect>
+                        <rect x="176" y="0" width="12" height="150"></rect>
+                        <rect x="196" y="0" width="4" height="150"></rect>
+                        <rect x="208" y="0" width="8" height="150"></rect>
+                        <rect x="220" y="0" width="4" height="150"></rect>
+                        <rect x="232" y="0" width="4" height="150"></rect>
+                        <rect x="244" y="0" width="8" height="150"></rect>
+                        <rect x="264" y="0" width="8" height="150"></rect>
+                        <rect x="276" y="0" width="12" height="150"></rect>
+                        <rect x="296" y="0" width="4" height="150"></rect>
+                        <rect x="308" y="0" width="8" height="150"></rect>
+                        <rect x="328" y="0" width="12" height="150"></rect>
+                        <rect x="344" y="0" width="4" height="150"></rect>
+                        <rect x="352" y="0" width="8" height="150"></rect>
+                    </g>
+                </svg>
+                <div class="order-ref-text" style="font-size:28px;font-weight:600;margin-top:8px;">SB2603</div>
+            </div>
+        </div>
+        <div class="carton-count" style="margin: 0 auto;display: table;border: 1px solid #000;padding: 5px 40px;font-size: 40px;">1 of 1</div>
+    </div>
+
+    <hr style="margin: 40px 0; border: 2px solid red;">
+    <h2>Expected Changes:</h2>
+    <ul>
+        <li>❌ "Box No : 1" line should be hidden</li>
+        <li>❌ "To:" text should be hidden</li>
+        <li>✅ Phone numbers (718) 854-7700 and (718) 853-2722 should be on the same line</li>
+        <li>✅ Top section padding should be reduced</li>
+    </ul>
+
+    <script>
+        console.log('🧪 Test page loaded');
+        console.log('📋 Box label element:', document.querySelector('.box-label-wrp'));
+        console.log('🎨 CSS override:', document.getElementById('box-label-format-override'));
+        
+        // Verify styles are applied
+        setTimeout(() => {
+            const boxNoElement = document.querySelector('.top-info-section .text:first-child');
+            const toElement = document.querySelector('.ship-info-section > .text:nth-child(1)');
+            const phoneElements = document.querySelectorAll('.top-info-section .text[style*="font-size: 30px"]');
+            
+            console.log('Box No element display:', window.getComputedStyle(boxNoElement).display);
+            console.log('To element display:', window.getComputedStyle(toElement).display);
+            console.log('Phone 1 display:', window.getComputedStyle(phoneElements[1]).display);
+            console.log('Phone 2 display:', window.getComputedStyle(phoneElements[2]).display);
+        }, 100);
+    </script>
+</body>
+</html>

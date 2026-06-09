@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Audio Enhancement Demo - Overlay Manager</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .container {
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      padding: 40px;
+      max-width: 700px;
+      width: 100%;
+    }
+
+    h1 {
+      color: #333;
+      margin-bottom: 10px;
+      font-size: 28px;
+    }
+
+    .subtitle {
+      color: #666;
+      margin-bottom: 30px;
+      font-size: 14px;
+    }
+
+    .section {
+      margin-bottom: 30px;
+    }
+
+    .section-title {
+      font-size: 18px;
+      font-weight: 600;
+      color: #444;
+      margin-bottom: 15px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid #f0f0f0;
+    }
+
+    .button-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    button {
+      padding: 14px 20px;
+      border: none;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+
+    button:active {
+      transform: translateY(0);
+    }
+
+    .btn-success {
+      background: #28a745;
+      color: white;
+    }
+
+    .btn-success:hover {
+      background: #218838;
+    }
+
+    .btn-error {
+      background: #dc3545;
+      color: white;
+    }
+
+    .btn-error:hover {
+      background: #c82333;
+    }
+
+    .btn-warning {
+      background: #ffc107;
+      color: #333;
+    }
+
+    .btn-warning:hover {
+      background: #e0a800;
+    }
+
+    .btn-info {
+      background: #17a2b8;
+      color: white;
+    }
+
+    .btn-info:hover {
+      background: #138496;
+    }
+
+    .btn-secondary {
+      background: #6c757d;
+      color: white;
+    }
+
+    .btn-secondary:hover {
+      background: #5a6268;
+    }
+
+    .control-group {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 15px;
+      padding: 12px;
+      background: #f8f9fa;
+      border-radius: 8px;
+    }
+
+    .control-group label {
+      font-weight: 500;
+      color: #555;
+      min-width: 120px;
+    }
+
+    input[type="range"] {
+      flex: 1;
+      height: 6px;
+      border-radius: 3px;
+      background: #ddd;
+      outline: none;
+      -webkit-appearance: none;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #667eea;
+      cursor: pointer;
+    }
+
+    input[type="range"]::-moz-range-thumb {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #667eea;
+      cursor: pointer;
+      border: none;
+    }
+
+    .value-display {
+      min-width: 50px;
+      font-weight: 600;
+      color: #667eea;
+      text-align: right;
+    }
+
+    .checkbox-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      cursor: pointer;
+    }
+
+    .info-box {
+      background: #e7f3ff;
+      border-left: 4px solid #2196F3;
+      padding: 15px;
+      border-radius: 4px;
+      margin-bottom: 20px;
+    }
+
+    .info-box p {
+      color: #0d47a1;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .status-indicator {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      margin-right: 8px;
+    }
+
+    .status-loaded {
+      background: #28a745;
+    }
+
+    .status-failed {
+      background: #dc3545;
+    }
+
+    .audio-status {
+      font-size: 13px;
+      color: #666;
+      padding: 10px;
+      background: #f8f9fa;
+      border-radius: 6px;
+      margin-top: 10px;
+    }
+
+    .audio-status-item {
+      display: flex;
+      align-items: center;
+      padding: 4px 0;
+    }
+
+    .keyboard-hint {
+      text-align: center;
+      color: #999;
+      font-size: 13px;
+      margin-top: 20px;
+      padding-top: 20px;
+      border-top: 1px solid #eee;
+    }
+
+    code {
+      background: #f4f4f4;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🔊 Audio Enhancement Demo</h1>
+    <p class="subtitle">Test the enhanced overlay audio system with MP3 files and synthesized fallback</p>
+
+    <div class="info-box">
+      <p><strong>Note:</strong> This demo will automatically try to load MP3 files from <code>./audio/</code> folder. If files don't exist, it will gracefully fallback to enhanced synthesized sounds using Web Audio API.</p>
+    </div>
+
+    <!-- Test Overlays -->
+    <div class="section">
+      <div class="section-title">📢 Test Overlay Notifications</div>
+      <div class="button-grid">
+        <button class="btn-success" onclick="testSuccess()">✓ Success</button>
+        <button class="btn-error" onclick="testError()">✕ Error</button>
+        <button class="btn-warning" onclick="testWarning()">⚠ Warning</button>
+        <button class="btn-info" onclick="testInfo()">ℹ Info</button>
+      </div>
+    </div>
+
+    <!-- Test Audio Only -->
+    <div class="section">
+      <div class="section-title">🎵 Test Audio Only</div>
+      <div class="button-grid">
+        <button class="btn-success" onclick="testAudioOnly('success')">Success Sound</button>
+        <button class="btn-error" onclick="testAudioOnly('error')">Error Sound</button>
+        <button class="btn-warning" onclick="testAudioOnly('warning')">Warning Sound</button>
+        <button class="btn-info" onclick="testAudioOnly('info')">Info Sound</button>
+      </div>
+    </div>
+
+    <!-- Audio Controls -->
+    <div class="section">
+      <div class="section-title">⚙️ Audio Settings</div>
+
+      <div class="control-group">
+        <label for="volume">Volume:</label>
+        <input type="range" id="volume" min="0" max="100" value="30" oninput="updateVolume(this.value)">
+        <span class="value-display" id="volumeValue">30%</span>
+      </div>
+
+      <div class="control-group">
+        <label for="duration">Display Duration:</label>
+        <input type="range" id="duration" min="1000" max="5000" value="2000" step="100" oninput="updateDuration(this.value)">
+        <span class="value-display" id="durationValue">2.0s</span>
+      </div>
+
+      <div class="control-group">
+        <div class="checkbox-group">
+          <input type="checkbox" id="audioEnabled" checked onchange="toggleAudio(this.checked)">
+          <label for="audioEnabled">Audio Enabled</label>
+        </div>
+      </div>
+
+      <div class="control-group">
+        <div class="checkbox-group">
+          <input type="checkbox" id="useMp3" checked onchange="toggleMp3(this.checked)">
+          <label for="useMp3">Use MP3 Files (fallback to synthesized)</label>
+        </div>
+      </div>
+    </div>
+
+    <!-- Audio Status -->
+    <div class="section">
+      <div class="section-title">📊 Audio File Status</div>
+      <div class="audio-status" id="audioStatus">
+        <div class="audio-status-item">
+          <span class="status-indicator" id="status-success"></span>
+          <span>Success: <span id="file-success">Loading...</span></span>
+        </div>
+        <div class="audio-status-item">
+          <span class="status-indicator" id="status-error"></span>
+          <span>Error: <span id="file-error">Loading...</span></span>
+        </div>
+        <div class="audio-status-item">
+          <span class="status-indicator" id="status-warning"></span>
+          <span>Warning: <span id="file-warning">Loading...</span></span>
+        </div>
+        <div class="audio-status-item">
+          <span class="status-indicator" id="status-info"></span>
+          <span>Info: <span id="file-info">Loading...</span></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Advanced Controls -->
+    <div class="section">
+      <div class="section-title">🔧 Advanced Controls</div>
+      <div class="button-grid">
+        <button class="btn-secondary" onclick="showSettings()">View Settings</button>
+        <button class="btn-secondary" onclick="reloadAudio()">Reload Audio</button>
+        <button class="btn-secondary" onclick="forceSynthesized()">Force Synthesized</button>
+        <button class="btn-secondary" onclick="resetDefaults()">Reset Defaults</button>
+      </div>
+    </div>
+
+    <div class="keyboard-hint">
+      Press <code>Escape</code> to dismiss overlays
+    </div>
+  </div>
+
+  <!-- Include the overlay manager -->
+  <script src="ui-feedback.js"></script>
+
+  <script>
+    // Test functions
+    function testSuccess() {
+      OverlayManager.success({ message: 'Operation completed successfully!' });
+    }
+
+    function testError() {
+      OverlayManager.error({ message: 'An error occurred while processing' });
+    }
+
+    function testWarning() {
+      OverlayManager.warning({ message: 'This action requires your attention' });
+    }
+
+    function testInfo() {
+      OverlayManager.info({ message: 'Here is some useful information' });
+    }
+
+    function testAudioOnly(type) {
+      OverlayManager.testAudio(type);
+    }
+
+    // Control functions
+    function updateVolume(value) {
+      const volume = value / 100;
+      OverlayManager.configure({ volume: volume });
+      document.getElementById('volumeValue').textContent = value + '%';
+    }
+
+    function updateDuration(value) {
+      OverlayManager.configure({ duration: parseInt(value) });
+      document.getElementById('durationValue').textContent = (value / 1000).toFixed(1) + 's';
+    }
+
+    function toggleAudio(enabled) {
+      OverlayManager.configure({ audioEnabled: enabled });
+    }
+
+    function toggleMp3(enabled) {
+      OverlayManager.configure({ useMp3Files: enabled });
+      if (enabled) {
+        OverlayManager.preloadAudio();
+      }
+    }
+
+    function showSettings() {
+      const settings = OverlayManager.getSettings();
+      console.log('Current Settings:', settings);
+      OverlayManager.info({
+        message: `Volume: ${(settings.volume * 100).toFixed(0)}%, Duration: ${settings.duration}ms, Audio: ${settings.audioEnabled ? 'ON' : 'OFF'}`
+      });
+    }
+
+    function reloadAudio() {
+      OverlayManager.preloadAudio();
+      OverlayManager.info({ message: 'Audio files reloaded' });
+    }
+
+    function forceSynthesized() {
+      OverlayManager.configure({ useMp3Files: false });
+      OverlayManager.info({ message: 'Switched to synthesized audio' });
+      document.getElementById('useMp3').checked = false;
+    }
+
+    function resetDefaults() {
+      OverlayManager.configure({
+        volume: 0.3,
+        duration: 2000,
+        audioEnabled: true,
+        useMp3Files: true
+      });
+      document.getElementById('volume').value = 30;
+      document.getElementById('volumeValue').textContent = '30%';
+      document.getElementById('duration').value = 2000;
+      document.getElementById('durationValue').textContent = '2.0s';
+      document.getElementById('audioEnabled').checked = true;
+      document.getElementById('useMp3').checked = true;
+      OverlayManager.success({ message: 'Settings reset to defaults' });
+    }
+
+    // Monitor audio loading status
+    function updateAudioStatus() {
+      const types = ['success', 'error', 'warning', 'info'];
+
+      setTimeout(() => {
+        types.forEach(type => {
+          const indicator = document.getElementById(`status-${type}`);
+          const fileStatus = document.getElementById(`file-${type}`);
+
+          // Simple check - if we're using MP3 files, assume loaded
+          // In reality, you'd need access to the internal audioCache
+          const useMp3 = document.getElementById('useMp3').checked;
+
+          if (useMp3) {
+            // Simulate checking - in real implementation, you'd check the cache
+            indicator.className = 'status-indicator status-loaded';
+            fileStatus.textContent = `${type}.mp3 (or fallback)`;
+          } else {
+            indicator.className = 'status-indicator status-failed';
+            fileStatus.textContent = 'Using synthesized sound';
+          }
+        });
+      }, 500);
+    }
+
+    // Initialize
+    window.addEventListener('load', () => {
+      updateAudioStatus();
+
+      // Show welcome message
+      setTimeout(() => {
+        OverlayManager.success({
+          message: 'Audio system loaded! Try the buttons above.'
+        });
+      }, 500);
+    });
+
+    // Update status when MP3 toggle changes
+    document.getElementById('useMp3').addEventListener('change', updateAudioStatus);
+
+    // Console helpers
+    console.log('%c🔊 Audio Demo Loaded', 'color: #667eea; font-size: 16px; font-weight: bold;');
+    console.log('%cAvailable commands:', 'color: #666; font-size: 12px;');
+    console.log('  OverlayManager.testAudio("success")');
+    console.log('  OverlayManager.configure({ volume: 0.5 })');
+    console.log('  OverlayManager.getSettings()');
+    console.log('  OverlayManager.preloadAudio()');
+  </script>
+</body>
+</html>

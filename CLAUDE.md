@@ -11,6 +11,25 @@ This repository contains two browser extensions:
 
 ## Development Commands
 
+### Scheduled Print Service
+
+**CRITICAL: Always publish to the SAME folder after ANY code changes**
+
+```bash
+cd scheduled-print-service
+powershell -ExecutionPolicy Bypass -File scripts/publish.ps1
+```
+
+**NEVER create new publish folders. ALWAYS use the publish script.**
+- Correct: `scheduled-print-service/publish/` (output from publish.ps1)
+- Wrong: `scheduled-print-service/ScheduledPrintService/bin/publish/`
+- Wrong: Any other location
+
+After any code modification:
+1. Run the publish script: `powershell -ExecutionPolicy Bypass -File scripts/publish.ps1`
+2. Verify files are in `scheduled-print-service/publish/`
+3. The script automatically builds and publishes with self-contained deployment
+
 ### Word Template Extension
 
 #### Building Packages
@@ -109,9 +128,17 @@ BrowserExtensions/
 │   ├── templates/             # Sample Word templates
 │   ├── build-packages.ps1     # Build script for distribution
 │   └── *.md                   # Documentation files
-└── scan-overlay-extension/    # Complete browser extension
-    ├── audio/                 # Sound effects
-    └── *.js, *.html, *.css   # Extension files
+├── scan-overlay-extension/    # Complete browser extension
+│   ├── audio/                 # Sound effects
+│   └── *.js, *.html, *.css   # Extension files
+└── css-js-toinject/           # Injectable scripts for website enhancement
+    ├── router.js              # Main routing logic
+    ├── auto-print-buttons.js  # Auto print buttons feature
+    ├── ui-feedback.js         # Overlay system + popup controller (replaces overlay-manager.js)
+    ├── status-dropdown.js     # Status dropdown controls
+    ├── table-item-linker.js   # SKU/Qty clickable items
+    ├── item-line-id.js        # Item line ID column
+    └── *.md                   # Feature documentation
 ```
 
 ## Key Technologies
@@ -136,6 +163,17 @@ BrowserExtensions/
 - Build script creates packages for Chrome Web Store and Edge Add-ons
 - Extension IDs and native host names are hardcoded in configuration files
 
+## Documentation Standards
+
+**IMPORTANT: All documentation files must be created in the `docs` folder within each project.**
+
+- **Scheduled Print Service**: All `.md` documentation files should be placed in `scheduled-print-service/docs/`
+- **Word Template Extension**: All `.md` documentation files should be placed in `word-template-extension/docs/`
+- **Scan Overlay Extension**: All `.md` documentation files should be placed in `scan-overlay-extension/docs/`
+- **CSS-JS-ToInject**: All `.md` documentation files should be placed in `css-js-toinject/docs/`
+
+Exception: Project root files like `README.md` and `CLAUDE.md` should remain in the root directory.
+
 ## Testing
 
 ### Word Template Extension
@@ -149,3 +187,66 @@ BrowserExtensions/
 - Test overlay rendering on various websites
 - Verify audio feedback functionality
 - Check accessibility features with screen readers
+
+### CSS-JS-ToInject Scripts
+
+Injectable scripts for enhancing the 3PL website:
+
+#### Auto Print Buttons Feature (`#outbound/packing`)
+- Monitors "Create Shipment" button clicks
+- Automatically combines "Print Carton Label" + "Packing Slip" buttons
+- Prints **Carton Label first** (async API), waits for completion
+- Then prints **Packing Slip second** (prevents window overlap)
+- Auto-clicks ONLY when "Create Shipment" button was pressed
+- See `AUTO-PRINT-BUTTONS-README.md` and `SEQUENTIAL-PRINTING-EXPLANATION.md` for details
+
+**Testing:**
+```javascript
+// Disable auto-click
+window.autoPrintButtons.setAutoClick(false);
+
+// Manual trigger
+window.autoPrintButtons.printAll();
+
+// View configuration
+window.autoPrintButtons.config
+```
+
+#### Status Dropdown (`#outbound/ProcessPersonalizedOrderItems`)
+- Adds status dropdown to page tools
+- Auto-fills status-scan input field
+- Enlarges scan modal for better visibility
+
+#### Item Line ID Column (`#outbound/ProcessPersonalizedOrderItems`)
+- Adds Item Line ID column to order items table
+- Auto-populates from API responses
+- Watches for table changes via MutationObserver
+
+#### Packing Slip Column (`#outbound/shipment`)
+- Adds "Packing Slip" link column to shipment table
+- Links to `#outbound/packingSlipdetail?id=<shipmentId>`
+- Updates dynamically as table loads
+
+#### Placard Text Enhancement (`#Outbound/shipmentdetails`)
+- Doubles text sizes on shipping placards
+- Makes all text bold for better readability
+- Works in iframes and main document
+
+#### Production Status Column (`#SO/orderdetails`)
+- Adds "Production Status" column to order items table
+- Intercepts API responses to get ItemStatusId for each item
+- Looks up status names from session storage
+- Updates dynamically as table loads
+- See `docs/PRODUCTION-STATUS-COLUMN.md` for full documentation
+
+**Testing:**
+```javascript
+// Refresh the column manually
+window.productionStatusAPI.refreshColumn();
+
+// View stored API data
+console.log(window.productionStatusAPI.store.data);
+
+// Get status list
+console.log(window.productionStatusAPI.getStatusList());
+```

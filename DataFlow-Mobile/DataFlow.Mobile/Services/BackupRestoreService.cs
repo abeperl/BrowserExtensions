@@ -129,7 +129,7 @@ public class BackupRestoreService : IBackupRestoreService
 
                 if (root.TryGetProperty("pages", out var pagesElement))
                 {
-                    var pages = JsonSerializer.Deserialize<List<Page>>(pagesElement.GetRawText(), jsonOptions);
+                    var pages = JsonSerializer.Deserialize<List<DataPage>>(pagesElement.GetRawText(), jsonOptions);
                     if (pages != null)
                     {
                         _context.Pages.AddRange(pages);
@@ -182,6 +182,11 @@ public class BackupRestoreService : IBackupRestoreService
             _logger.LogError(ex, "Error restoring from backup: {BackupPath}", backupPath);
             return false;
         }
+    }
+
+    public async Task<bool> RestoreBackupAsync(string backupPath)
+    {
+        return await RestoreFromBackupAsync(backupPath);
     }
 
     public async Task<bool> DeleteBackupAsync(string backupPath)

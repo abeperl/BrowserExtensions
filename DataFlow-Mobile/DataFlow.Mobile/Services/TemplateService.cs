@@ -118,4 +118,20 @@ public class TemplateService : ITemplateService
             return null;
         }
     }
+
+    public async Task<IEnumerable<TemplateColumn>> GetTemplateColumnsAsync(int templateId)
+    {
+        try
+        {
+            return await _context.TemplateColumns
+                .Where(tc => tc.TemplateId == templateId)
+                .OrderBy(tc => tc.SortOrder)
+                .ToListAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting template columns for template: {TemplateId}", templateId);
+            return [];
+        }
+    }
 }

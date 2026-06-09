@@ -13,7 +13,7 @@ public class ActionModel
     public int PageId { get; set; }
 
     [ForeignKey(nameof(PageId))]
-    public Page Page { get; set; } = null!;
+    public DataPage Page { get; set; } = null!;
 
     [Required]
     [MaxLength(100)]

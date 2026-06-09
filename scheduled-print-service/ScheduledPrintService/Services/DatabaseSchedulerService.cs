@@ -1,0 +1,478 @@
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using NCrontab;
+using ScheduledPrintService.Models;
+
+namespace ScheduledPrintService.Services;
+
+/// <summary>
+/// Background service that reads schedules from database and executes APIs based on cron expressions
+/// </summary>
+public class DatabaseSchedulerService : BackgroundService
+{
+    private readonly ILogger<DatabaseSchedulerService> _logger;
+    private readonly IDatabaseApiConfigService _dbConfigService;
+    private readonly IServiceProvider _serviceProvider;
+    private readonly IEmailNotificationService _email;
+    private readonly IPendingOrdersService _pendingOrders;
+    private readonly Dictionary<int, DateTime> _nextRunTimes = new();
+
+    public DatabaseSchedulerService(
+        ILogger<DatabaseSchedulerService> logger,
+        IDatabaseApiConfigService dbConfigService,
+        IServiceProvider serviceProvider,
+        IEmailNotificationService email,
+        IPendingOrdersService pendingOrders)
+    {
+        _logger = logger;
+        _dbConfigService = dbConfigService;
+        _serviceProvider = serviceProvider;
+        _email = email;
+        _pendingOrders = pendingOrders;
+    }
+
+    /// <summary>
+    /// Converts 5-field Unix cron expression to 6-field NCrontab format (with seconds)
+    /// </summary>
+    private string NormalizeCronExpression(string cronExpression)
+    {
+        var fields = cronExpression.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+
+        if (fields.Length == 5)
+        {
+            // Standard Unix cron format (minute hour day month dow)
+            // Convert to NCrontab format by prepending "0" for seconds
+            return $"0 {cronExpression}";
+        }
+        else if (fields.Length == 6)
+        {
+            // Already in NCrontab format (second minute hour day month dow)
+            return cronExpression;
+        }
+        else
+        {
+            // Invalid format - return as-is and let NCrontab throw a proper error
+            return cronExpression;
+        }
+    }
+
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        _logger.LogInformation("Database Scheduler Service starting...");
+
+        try
+        {
+            // Load schedules from database
+            var schedules = _dbConfigService.LoadEnabledSchedules();
+
+            if (schedules.Count == 0)
+            {
+                _logger.LogWarning("No enabled schedules found in database. Database Scheduler will remain idle.");
+                return;
+            }
+
+            _logger.LogInformation("Loaded {Count} enabled schedule(s)", schedules.Count);
+
+            // Display schedule information
+            foreach (var schedule in schedules)
+            {
+                var apiNumbers = _dbConfigService.LoadScheduleApiNumbers(schedule.Id);
+                schedule.ApiNumbers = apiNumbers;
+
+                _logger.LogInformation("Schedule #{Id}: '{Name}' - Cron: '{Cron}' - APIs: [{Apis}]",
+                    schedule.Id,
+                    schedule.ScheduleName,
+                    schedule.CronExpression,
+                    string.Join(", ", apiNumbers));
+
+                // Calculate next run time
+                try
+                {
+                    var normalizedCron = NormalizeCronExpression(schedule.CronExpression);
+                    var cronSchedule = CrontabSchedule.Parse(normalizedCron, new CrontabSchedule.ParseOptions { IncludingSeconds = true });
+                    var nextRun = cronSchedule.GetNextOccurrence(DateTime.Now);
+                    _nextRunTimes[schedule.Id] = nextRun;
+
+                    _logger.LogInformation("  Next execution: {NextRun} ({TimeUntil} from now)",
+                        nextRun.ToString("yyyy-MM-dd HH:mm:ss"),
+                        nextRun - DateTime.Now);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Invalid cron expression for Schedule #{Id}: '{Cron}'",
+                        schedule.Id, schedule.CronExpression);
+                }
+            }
+
+            _logger.LogInformation("Database Scheduler Service initialized. Monitoring schedules...");
+
+            // Main scheduling loop - check every minute
+            while (!stoppingToken.IsCancellationRequested)
+            {
+                var now = DateTime.Now;
+
+                foreach (var schedule in schedules)
+                {
+                    if (stoppingToken.IsCancellationRequested) break;
+
+                    // Check if it's time to run this schedule
+                    if (_nextRunTimes.TryGetValue(schedule.Id, out var nextRun) && now >= nextRun)
+                    {
+                        _logger.LogInformation("Executing schedule #{Id}: '{Name}'", schedule.Id, schedule.ScheduleName);
+
+                        try
+                        {
+                            await ExecuteScheduleAsync(schedule, stoppingToken);
+
+                            // Calculate next run time
+                            var normalizedCron = NormalizeCronExpression(schedule.CronExpression);
+                            var cronSchedule = CrontabSchedule.Parse(normalizedCron, new CrontabSchedule.ParseOptions { IncludingSeconds = true });
+                            _nextRunTimes[schedule.Id] = cronSchedule.GetNextOccurrence(DateTime.Now);
+
+                            _logger.LogInformation("Schedule #{Id} completed. Next run: {NextRun}",
+                                schedule.Id,
+                                _nextRunTimes[schedule.Id].ToString("yyyy-MM-dd HH:mm:ss"));
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(ex, "Error executing schedule #{Id}: {Message}", schedule.Id, ex.Message);
+
+                            await _email.TrySendAsync(
+                                subject: $"Schedule Execution Failed: {schedule.ScheduleName}",
+                                body: $"Schedule #{schedule.Id} failed at {DateTime.Now:u}\n\nError: {ex.Message}\n\nStack: {ex.StackTrace}",
+                                ct: stoppingToken);
+
+                            // Still calculate next run time even if this one failed
+                            var normalizedCron = NormalizeCronExpression(schedule.CronExpression);
+                            var cronSchedule = CrontabSchedule.Parse(normalizedCron, new CrontabSchedule.ParseOptions { IncludingSeconds = true });
+                            _nextRunTimes[schedule.Id] = cronSchedule.GetNextOccurrence(DateTime.Now);
+                        }
+                    }
+                }
+
+                // Wait 10 seconds before checking again (balances responsiveness vs CPU usage)
+                try
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(10), stoppingToken);
+                }
+                catch (TaskCanceledException)
+                {
+                    _logger.LogInformation("Database Scheduler Service shutting down");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogCritical(ex, "Fatal error in Database Scheduler Service: {Message}", ex.Message);
+            throw;
+        }
+    }
+
+    private async Task ExecuteScheduleAsync(Schedule schedule, CancellationToken cancellationToken)
+    {
+        _logger.LogInformation("Executing {Count} API(s) for schedule '{Name}' (mode: {Mode})",
+            schedule.ApiNumbers.Count, schedule.ScheduleName, schedule.ProcessingMode);
+
+        var successCount = 0;
+        var failureCount = 0;
+
+        foreach (var apiNumber in schedule.ApiNumbers)
+        {
+            if (cancellationToken.IsCancellationRequested) break;
+
+            try
+            {
+                _logger.LogInformation("Executing API #{ApiNumber} (order {Index}/{Total})",
+                    apiNumber,
+                    schedule.ApiNumbers.IndexOf(apiNumber) + 1,
+                    schedule.ApiNumbers.Count);
+
+                if (schedule.ProcessingMode.Equals("queued", StringComparison.OrdinalIgnoreCase))
+                {
+                    await ExecuteApiQueuedModeAsync(apiNumber, schedule, cancellationToken);
+                }
+                else
+                {
+                    await ExecuteApiImmediateModeAsync(apiNumber, cancellationToken);
+                }
+
+                successCount++;
+                _logger.LogInformation("API #{ApiNumber} completed successfully", apiNumber);
+            }
+            catch (Exception ex)
+            {
+                failureCount++;
+                _logger.LogError(ex, "API #{ApiNumber} failed: {Message}", apiNumber, ex.Message);
+
+                // Continue with next API even if this one failed
+                _logger.LogWarning("Continuing with next API despite failure in API #{ApiNumber}", apiNumber);
+            }
+        }
+
+        _logger.LogInformation("Schedule '{Name}' complete: {Success} succeeded, {Failed} failed",
+            schedule.ScheduleName, successCount, failureCount);
+    }
+
+    private async Task ExecuteApiImmediateModeAsync(int apiNumber, CancellationToken cancellationToken)
+    {
+        // Check if API is enabled BEFORE loading full configuration
+        if (!_dbConfigService.IsApiEnabled(apiNumber))
+        {
+            _logger.LogWarning("API #{ApiNumber} is disabled - skipping", apiNumber);
+            return;
+        }
+
+        // Load API configuration from database
+        var apiConfig = _dbConfigService.LoadApiConfig(apiNumber);
+
+        _logger.LogInformation("API #{ApiNumber} loaded: {SubActions} sub-actions configured ({Enabled} enabled)",
+            apiNumber,
+            apiConfig.SubActions.Count,
+            apiConfig.SubActions.Count(a => a.Enabled));
+
+        // Create scoped services for this API execution
+        using var scope = _serviceProvider.CreateScope();
+        var apiService = scope.ServiceProvider.GetRequiredService<IOrderApiService>();
+        var actionExecutor = scope.ServiceProvider.GetRequiredService<ISubActionExecutor>();
+
+        // Create tracker for this API
+        var tracker = new DatabaseOrderTracker(apiNumber, _logger);
+
+        // Fetch orders from API
+        _logger.LogInformation("API #{ApiNumber}: Calling {Endpoint}", apiNumber, apiConfig.PrimaryEndpoint);
+        var orders = await apiService.GetOrdersListAsync(apiConfig, cancellationToken);
+
+        if (orders.Count == 0)
+        {
+            _logger.LogInformation("API #{ApiNumber} returned no orders", apiNumber);
+            return;
+        }
+
+        _logger.LogInformation("API #{ApiNumber} returned {Count} orders", apiNumber, orders.Count);
+
+        // Execute any batch sub-actions first
+        var batchActions = apiConfig.SubActions
+            .Where(a => a.Enabled)
+            .Where(a => a.Type.Equals("CreatePicklistBatch", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        if (batchActions.Count > 0)
+        {
+            var idList = orders.Select(o => o.Id).ToList();
+            foreach (var action in batchActions)
+            {
+                try
+                {
+                    _logger.LogInformation("Executing batch action: {Name}", action.Name);
+                    await actionExecutor.ExecuteBatchCreatePicklistAsync(action, idList, apiConfig, cancellationToken);
+                    _logger.LogInformation("Batch action '{Name}' completed", action.Name);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Batch action '{Name}' failed: {Message}", action.Name, ex.Message);
+                    if (!(action.ContinueOnError ?? true))
+                    {
+                        throw;
+                    }
+                }
+            }
+        }
+
+        // Process individual orders
+        var processedCount = 0;
+        var skippedCount = 0;
+        var failedCount = 0;
+
+        foreach (var order in orders)
+        {
+            if (cancellationToken.IsCancellationRequested) break;
+
+            // Check if already processed
+            if (tracker.HasProcessed(order.Id))
+            {
+                // Don't log each skip individually - summary is logged at the end
+                skippedCount++;
+                continue;
+            }
+
+            try
+            {
+                _logger.LogDebug("Processing order: {OrderId}", order.Id);
+
+                // Execute sub-actions for this order
+                var anyActionSucceeded = await actionExecutor.ExecuteActionsForOrderAsync(order.Id, order.RawData, apiConfig, cancellationToken);
+
+                if (anyActionSucceeded)
+                {
+                    // Mark as processed only if at least one action succeeded
+                    tracker.MarkProcessed(order.Id);
+                    processedCount++;
+                    _logger.LogDebug("Successfully processed order: {OrderId}", order.Id);
+                }
+                else
+                {
+                    // All actions failed - don't mark as processed, increment failure count
+                    failedCount++;
+                    _logger.LogWarning("Order {OrderId} not marked as processed: no actions succeeded", order.Id);
+                }
+            }
+            catch (Exception ex)
+            {
+                failedCount++;
+                _logger.LogError(ex, "Failed to process order {OrderId}: {Message}", order.Id, ex.Message);
+                // Continue with next order
+            }
+        }
+
+        _logger.LogInformation("API #{ApiNumber} batch complete: {Processed} processed, {Skipped} skipped, {Failed} failed",
+            apiNumber, processedCount, skippedCount, failedCount);
+
+        // Execute any post-batch sub-actions (folder-based actions that should run AFTER all orders)
+        var postBatchActions = apiConfig.SubActions
+            .Where(a => a.Enabled)
+            .Where(a => !string.IsNullOrWhiteSpace(a.LocalJsonFolderPath)) // Actions with LocalJsonFolderPath are post-batch
+            .ToList();
+
+        if (postBatchActions.Count > 0)
+        {
+            _logger.LogInformation("API #{ApiNumber}: Executing {Count} post-batch actions", apiNumber, postBatchActions.Count);
+            foreach (var action in postBatchActions)
+            {
+                try
+                {
+                    _logger.LogInformation("Executing post-batch action: {Name} ({Type})", action.Name, action.Type);
+                    await actionExecutor.ExecutePostBatchActionAsync(action, apiConfig, cancellationToken);
+                    _logger.LogInformation("Post-batch action '{Name}' completed", action.Name);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Post-batch action '{Name}' failed: {Message}", action.Name, ex.Message);
+                    if (!(action.ContinueOnError ?? true))
+                    {
+                        throw;
+                    }
+                }
+            }
+        }
+    }
+
+    private async Task ExecuteApiQueuedModeAsync(int apiNumber, Schedule schedule, CancellationToken cancellationToken)
+    {
+        // Check if API is enabled BEFORE loading full configuration
+        if (!_dbConfigService.IsApiEnabled(apiNumber))
+        {
+            _logger.LogWarning("API #{ApiNumber} is disabled - skipping", apiNumber);
+            return;
+        }
+
+        // Load API configuration from database
+        var apiConfig = _dbConfigService.LoadApiConfig(apiNumber);
+
+        _logger.LogInformation("API #{ApiNumber} [QUEUED MODE]: Batch size: {BatchSize}, Enqueue new: {EnqueueNew}",
+            apiNumber, schedule.BatchSize, schedule.EnqueueNewOrders);
+
+        // Create scoped services for this API execution
+        using var scope = _serviceProvider.CreateScope();
+        var apiService = scope.ServiceProvider.GetRequiredService<IOrderApiService>();
+        var actionExecutor = scope.ServiceProvider.GetRequiredService<ISubActionExecutor>();
+
+        // Step 1: Enqueue new orders if configured
+        // Fetch primary API if: no records exist OR it's a new day (to pick up any updates)
+        if (schedule.EnqueueNewOrders)
+        {
+            var shouldFetch = _pendingOrders.ShouldFetchPrimaryApi(apiNumber);
+
+            if (shouldFetch)
+            {
+                _logger.LogInformation("API #{ApiNumber}: Fetching primary API to enqueue new orders", apiNumber);
+
+                await _pendingOrders.EnqueueNewOrdersAsync(
+                    apiNumber,
+                    async () =>
+                    {
+                        var orders = await apiService.GetOrdersListAsync(apiConfig, cancellationToken);
+                        return orders.Select(o => (o.Id, o.RawData.GetRawText())).ToList();
+                    },
+                    cancellationToken);
+
+                // Update the LastFetchedAt timestamp after successful fetch
+                _pendingOrders.UpdateLastFetchedAt(apiNumber);
+            }
+            else
+            {
+                _logger.LogInformation("API #{ApiNumber}: Already fetched today - skipping primary API fetch, processing sub-actions only", apiNumber);
+            }
+        }
+
+        // Step 2: Get queue statistics
+        var stats = _pendingOrders.GetStats(apiNumber);
+        _logger.LogInformation("API #{ApiNumber} queue stats: {Pending} pending, {Processing} processing, {Failed} failed, {Processed} total processed",
+            apiNumber, stats.pending, stats.processing, stats.failed, stats.processed);
+
+        if (stats.pending == 0)
+        {
+            _logger.LogInformation("API #{ApiNumber}: No pending orders to process", apiNumber);
+            return;
+        }
+
+        // Step 3: Process batch
+        var batch = _pendingOrders.GetNextBatch(apiNumber, schedule.BatchSize);
+
+        if (batch.Count == 0)
+        {
+            _logger.LogInformation("API #{ApiNumber}: No orders in batch (may be in processing state)", apiNumber);
+            return;
+        }
+
+        _logger.LogInformation("API #{ApiNumber}: Processing batch of {Count} orders", apiNumber, batch.Count);
+
+        var processedCount = 0;
+        var failedCount = 0;
+
+        foreach (var pendingOrder in batch)
+        {
+            if (cancellationToken.IsCancellationRequested) break;
+
+            try
+            {
+                _logger.LogDebug("Processing order: {OrderId}", pendingOrder.OrderId);
+
+                // Parse raw data back into JsonElement
+                var orderData = System.Text.Json.JsonDocument.Parse(pendingOrder.RawData).RootElement;
+
+                // Execute sub-actions for this order
+                var anyActionSucceeded = await actionExecutor.ExecuteActionsForOrderAsync(pendingOrder.OrderId, orderData, apiConfig, cancellationToken);
+
+                if (anyActionSucceeded)
+                {
+                    // Mark as processed only if at least one action succeeded
+                    _pendingOrders.MarkProcessed(apiNumber, pendingOrder.OrderId);
+                    processedCount++;
+                    _logger.LogDebug("Successfully processed order: {OrderId}", pendingOrder.OrderId);
+                }
+                else
+                {
+                    // All actions failed - mark as failed
+                    _pendingOrders.MarkFailed(apiNumber, pendingOrder.OrderId, "All actions failed or were skipped");
+                    failedCount++;
+                    _logger.LogWarning("Order {OrderId} marked as failed: no actions succeeded", pendingOrder.OrderId);
+                }
+            }
+            catch (Exception ex)
+            {
+                failedCount++;
+                _logger.LogError(ex, "Failed to process order {OrderId}: {Message}", pendingOrder.OrderId, ex.Message);
+
+                // Mark as failed
+                _pendingOrders.MarkFailed(apiNumber, pendingOrder.OrderId, ex.Message);
+            }
+        }
+
+        // Get updated stats after processing
+        var updatedStats = _pendingOrders.GetStats(apiNumber);
+
+        _logger.LogInformation("API #{ApiNumber} batch complete: {Processed} processed, {Failed} failed. Queue: {Pending} pending, {QueueFailed} failed",
+            apiNumber, processedCount, failedCount, updatedStats.pending, updatedStats.failed);
+    }
+}

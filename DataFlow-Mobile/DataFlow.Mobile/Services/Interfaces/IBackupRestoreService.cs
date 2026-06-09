@@ -4,6 +4,7 @@ public interface IBackupRestoreService
 {
     Task<string> CreateBackupAsync(string? backupName = null);
     Task<bool> RestoreFromBackupAsync(string backupPath);
+    Task<bool> RestoreBackupAsync(string backupPath);
     Task<bool> DeleteBackupAsync(string backupPath);
     Task<IEnumerable<string>> GetBackupListAsync();
     Task<bool> ValidateBackupAsync(string backupPath);

@@ -503,4 +503,39 @@ public class AuthenticationService : IAuthenticationService
             _logger.LogError(ex, "Error caching token for page: {PageId}", config.PageId);
         }
     }
+
+    public async Task<AuthenticationConfig> CreateAuthenticationAsync(AuthenticationConfig config)
+    {
+        try
+        {
+            config.CreatedAt = DateTime.UtcNow;
+            config.UpdatedAt = DateTime.UtcNow;
+            _context.AuthenticationConfigs.Add(config);
+            await _context.SaveChangesAsync();
+            _logger.LogInformation("Created authentication config: {Name} (ID: {Id})", config.Name, config.Id);
+            return config;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating authentication config: {Name}", config.Name);
+            throw;
+        }
+    }
+
+    public async Task<AuthenticationConfig> UpdateAuthenticationAsync(AuthenticationConfig config)
+    {
+        try
+        {
+            config.UpdatedAt = DateTime.UtcNow;
+            _context.Entry(config).State = EntityState.Modified;
+            await _context.SaveChangesAsync();
+            _logger.LogInformation("Updated authentication config: {Name} (ID: {Id})", config.Name, config.Id);
+            return config;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating authentication config: {Name}", config.Name);
+            throw;
+        }
+    }
 }

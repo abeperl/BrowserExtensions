@@ -5,6 +5,7 @@ namespace DataFlow.Mobile.Services;
 public interface IImportExportService
 {
     Task<string> ExportAllConfigurationAsync();
+    Task<string> ExportAllDataAsync();
     Task<string> ExportPageConfigurationAsync(int pageId);
     Task<bool> ImportConfigurationAsync(string jsonData, bool overwrite = false);
     Task<bool> ValidateImportDataAsync(string jsonData);

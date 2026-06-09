@@ -81,6 +81,9 @@ public class LayoutTemplate
     [Required]
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
+    // Additional properties for compatibility
+    public string? Configuration { get; set; }
+
     // Navigation properties
     public ICollection<Template> Templates { get; set; } = [];
 

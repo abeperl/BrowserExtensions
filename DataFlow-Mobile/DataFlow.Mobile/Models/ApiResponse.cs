@@ -8,6 +8,9 @@ public class ApiResponse<T>
     public T? Data { get; set; }
     public string? ErrorMessage { get; set; }
     public HttpStatusCode StatusCode { get; set; }
+
+    // Alias for backward compatibility
+    public string? Message => ErrorMessage;
     public Dictionary<string, string>? Headers { get; set; }
     public TimeSpan ResponseTime { get; set; }
 
